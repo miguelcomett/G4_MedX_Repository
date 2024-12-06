@@ -1,0 +1,8 @@
+#/run/numberOfThreads 10
+/run/initialize
+
+/myDetector/nColumns 1
+/myDetector/nRows 1
+
+/gun/energy 40 keV
+/run/beamOn 10

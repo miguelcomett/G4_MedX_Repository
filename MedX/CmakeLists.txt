@@ -1,0 +1,126 @@
+# Minimum CMake version required and policy for hot reload (if MSVC)
+cmake_minimum_required(VERSION 3.16...3.21)
+
+# Project name
+project(IFI.03.Radiography)
+
+# Platform-specific configuration =================================================================================================================
+
+if(APPLE)
+
+  # Copy each script file to the binary directory (standard location for macOS builds)
+  foreach(_script ${IFI03Radiography_SCRIPTS})
+    get_filename_component(_script_name ${_script} NAME)
+    configure_file(${_script} ${PROJECT_BINARY_DIR}/${_script_name} COPYONLY)
+  endforeach()
+
+
+elseif(WIN32)
+ 
+  if(POLICY CMP0141) # Enable Hot Reload for MSVC compilers if supported
+    cmake_policy(SET CMP0141 NEW)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT 
+        "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
+  endif()
+  
+
+  # Set startup project for Visual Studio
+  set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT IFI.03.Radiography)
+
+  # Copy each script file to the binary directory for Release configuration
+  foreach(_script ${IFI03Radiography_SCRIPTS})
+    get_filename_component(_script_name ${_script} NAME)
+    configure_file(
+      ${_script}
+      ${PROJECT_BINARY_DIR}/Release/${_script_name}
+      COPYONLY
+    )
+  endforeach()
+
+  # Add ROOT_DIR variable here
+  set(ROOT_DIR "C:\\root_v6.34.00\\cmake")
+
+  find_package(ROOT REQUIRED)
+  include(${ROOT_USE_FILE})
+
+
+else() # General Unix-based system settings if needed (Linux, etc.)
+  
+  # Copy each script file to the binary directory (for general Unix-like systems)
+  foreach(_script ${IFI03Radiography_SCRIPTS})
+    get_filename_component(_script_name ${_script} NAME)
+    configure_file(${_script} ${PROJECT_BINARY_DIR}/${_script_name} COPYONLY)
+  endforeach()
+endif()
+
+# Option to build with Geant4 UI and Visualization
+option(WITH_GEANT4_UIVIS "Build example with Geant4 UI and Vis drivers" ON)
+
+set(Geant4_DIR "C:\\Users\\A00831639\\Documents\\Geant4\\program_files\\lib\\cmake\\Geant4")
+
+# Find Geant4 libraries
+if(WITH_GEANT4_UIVIS)
+  find_package(Geant4 REQUIRED ui_all vis_all)
+else()
+  find_package(Geant4 REQUIRED)
+endif()
+
+# Include Geant4 environment
+include(${Geant4_USE_FILE})
+include_directories(${PROJECT_SOURCE_DIR}/SOURCE_CODE)
+
+# Locate source and header files in the SOURCE_CODE directory
+file(GLOB sources ${PROJECT_SOURCE_DIR}/SOURCE_CODE/*.cc)
+file(GLOB headers ${PROJECT_SOURCE_DIR}/SOURCE_CODE/*.hh)
+
+# Find ROOT libraries and include its environment
+if(APPLE)
+  find_package(ROOT REQUIRED)
+  include(${ROOT_USE_FILE})
+endif()
+
+# Add executable target and link with Geant4 and ROOT libraries
+add_executable(Sim 1_Main.cc ${sources} ${headers})
+target_link_libraries(Sim ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
+
+# Copy macro (.mac) files to the binary directory
+file(GLOB MACROFILES "${PROJECT_SOURCE_DIR}/Macrofiles/*.mac")
+file(COPY ${MACROFILES} DESTINATION ${PROJECT_BINARY_DIR})
+file(COPY ${MACROFILES} DESTINATION ${PROJECT_BINARY_DIR}/Release)
+
+# Copy .txt files to the main build directory
+file(GLOB TEXTFILES "${PROJECT_SOURCE_DIR}/*.txt")
+file(COPY ${TEXTFILES} DESTINATION ${PROJECT_BINARY_DIR}/)
+file(COPY ${TEXTFILES} DESTINATION ${PROJECT_BINARY_DIR}/Release)
+
+# Copy data (.dat) files to the binary directory
+file(GLOB DATA_FILES "*.dat")
+file(COPY ${DATA_FILES} DESTINATION ${PROJECT_BINARY_DIR})
+
+# Copy all the mac files from "mac_files" directory into the same directory as the executable.
+# file(GLOB IFI.03.Radiography-SCRIPTS ${PROJECT_SOURCE_DIR}/Macrofiles/*)
+
+# Define ROOT output directory and create it if not existing
+set(ROOT "${PROJECT_BINARY_DIR}/ROOT_temp")
+add_definitions(-DROOT_OUTPUT_DIR="${ROOT}")
+file(MAKE_DIRECTORY ${ROOT})
+
+
+#find_package(Qt5 REQUIRED Widgets)
+#target_link_libraries(your_target_name Qt5::Widgets)
+
+
+# Custom target for building the main executable
+add_custom_target(IFI.03.Radiography DEPENDS Sim)
+
+# Copy all macro files from MACROFILES directory to the executable directory
+file(GLOB IFI03Radiography-SCRIPTS ${PROJECT_SOURCE_DIR}/Macrofiles/*)
+file(GLOB IFI03Radiography-SCRIPTS ${PROJECT_SOURCE_DIR}/*.mac)
+
+# Set the C++ standard to C++20 if CMake version is compatible
+if(CMAKE_VERSION VERSION_GREATER 3.12)
+  set_property(TARGET IFI.03.Radiography PROPERTY CXX_STANDARD 20)
+endif()
+
+# Restrict build configuration types to "Release" only
+set(CMAKE_CONFIGURATION_TYPES "Release" CACHE INTERNAL "")

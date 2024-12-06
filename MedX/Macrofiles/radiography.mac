@@ -1,0 +1,17 @@
+#/run/numberOfThreads 10
+/run/initialize
+
+/myDetector/nColumns 1
+/myDetector/nRows 1
+
+#/myDetector/Rotation 0
+
+/Pgun/X 0 cm
+/Pgun/Y 0 cm
+#/Pgun/SpanX 220 mm
+/Pgun/gaussX true
+/Pgun/Xcos True
+/Pgun/SpanY 10 mm
+
+/gun/energy 40 keV
+/run/beamOn 100

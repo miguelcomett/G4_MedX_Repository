@@ -274,3 +274,4 @@ MedX_Engine.code-workspace
 .DS_Store
 MedX/.DS_Store
 .DS_Store
+/MedX/__pycache__

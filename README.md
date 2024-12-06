@@ -1,0 +1,5 @@
+# IFI.03.Radiography
+
+There is an increasing need for simulated images that accu- rately mimic real-world scenarios to drive innovation and im- prove existing techniques in medical imaging. This demand is met by rapidly cost-effectively iterating on various config- urations.
+Geant4 enables realistic simulations of X-ray radiography and tomography by modeling the X-ray source and detector. At the same time, Python handles data processing and analy- sis, resulting in an efficient and adaptable workflow.
+Endorsed by the scientific community for medical physics applications, Geant4 faithfully replicates the relevant interac- tions to medical imaging. Scaling to medium-sized servers allows for fast simulation production. A customizable frame- work has been developed with capabilities that include X- ray spectrum characterization, attenuation coefficient calcu- lations for any material, radiography, and tomography gener- ation, allowing image processing using the DEXA method to decompose materials, as shown in this report as an example of the tool’s usage.

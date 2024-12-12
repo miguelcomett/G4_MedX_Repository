@@ -56,7 +56,7 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
         if (arguments == 5)
         {
             const DetectorConstruction * detectorConstruction = static_cast<const DetectorConstruction*>(G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
-            G4bool is3DModel = detectorConstruction -> Getis3DModel();
+            is3DModel = detectorConstruction -> Getis3DModel();
 
             digits = 5; defaultDecimals = G4cout.precision(digits);
             if (is3DModel == true)

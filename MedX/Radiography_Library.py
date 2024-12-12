@@ -189,10 +189,10 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     x_shift = size[2]
     y_shift = size[3]
 
-    x_down = xmin - x_shift
-    x_up   = xmax - x_shift
-    y_down = ymin - y_shift
-    y_up   = ymax - y_shift
+    x_down = xmin + x_shift
+    x_up   = xmax + x_shift
+    y_down = ymin + y_shift
+    y_up   = ymax + y_shift
 
     x_data_shifted = x_values - x_shift            
     y_data_shifted = y_values - y_shift
@@ -217,10 +217,14 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
 
 def Logaritmic_Transform(heatmap, size, pixel_size):
 
-    import numpy as np
+    import numpy as np; import matplotlib.pyplot as plt
     
     maxi_vector = heatmap[0, :]
     heatmap = np.log(maxi_vector / heatmap)
+
+    # plt.plot(heatmap[0, :])
+    # plt.show()
+    plt.plot(maxi_vector)
 
     size_x = size[0]; 
     size_y = size[1]; 
@@ -258,11 +262,11 @@ def Plot_Heatmap(heatmap, set_bins_x, set_bins_y, save_as):
 
     import matplotlib.pyplot as plt
 
-    plt.figure(figsize=(14, 4))
-    plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray", extent=[set_bins_x[0], set_bins_y[-1], set_bins_x[0], set_bins_y[-1]]); # plt.axis("off")
-    plt.colorbar()
-    if save_as: plt.savefig(save_as + ".png", bbox_inches="tight", dpi=900)
     rows = heatmap.shape[0]
+
+    plt.figure(figsize=(14, 4))
+    plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray", extent=[set_bins_x[0], set_bins_y[-1], set_bins_x[0], set_bins_y[-1]]); plt.colorbar()
+    if save_as: plt.savefig(save_as + ".png", bbox_inches="tight", dpi=900)
     plt.subplot(1, 3, 2); plt.plot(heatmap[2*rows//3, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
 
@@ -712,7 +716,7 @@ def CT_Loop(directory, starts_with, angles):
         """ \
         /myDetector/Rotation {angle}
         /run/reinitializeGeometry
-        #/run/numberOfThreads 9
+        /run/numberOfThreads 10
         /run/initialize
 
         /myDetector/nColumns 1
@@ -766,11 +770,11 @@ def Calculate_Projections(directory, filename, roots, tree_name, x_branch, y_bra
     projections = np.arange(start, end+1, deg)
 
     for i in tqdm(projections, desc = 'Calculating heatmaps', unit = ' Heatmap', leave = True):
-        
+
         root_name = filename + '_' + str(i) + '.root'
         htmp_array, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
 
-        name = csv_folder + "/CT_" + str(projections[i-1]) + ".csv"
+        name = csv_folder + "/CT_" + str(i) + ".csv"
         np.savetxt(name, htmp_array, delimiter=',', fmt='%.5f')
 
     return htmp_array, xlim, ylim

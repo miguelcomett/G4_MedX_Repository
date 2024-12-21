@@ -220,11 +220,8 @@ def Logaritmic_Transform(heatmap, size, pixel_size):
     import numpy as np; import matplotlib.pyplot as plt
     
     maxi_vector = heatmap[0, :]
+    heatmap[heatmap == 0] = np.nan
     heatmap = np.log(maxi_vector / heatmap)
-
-    # plt.plot(heatmap[0, :])
-    # plt.show()
-    plt.plot(maxi_vector)
 
     size_x = size[0]; 
     size_y = size[1]; 
@@ -255,7 +252,6 @@ def Logaritmic_Transform(heatmap, size, pixel_size):
         cropped_matrix = heatmap[start_row:start_row + size_0[0], start_col:start_col + size_0[1]]
         heatmap = cropped_matrix
     
-
     return heatmap, bins_x1, bins_y1
 
 def Plot_Heatmap(heatmap, set_bins_x, set_bins_y, save_as):
@@ -775,7 +771,7 @@ def Calculate_Projections(directory, filename, roots, tree_name, x_branch, y_bra
         htmp_array, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
 
         name = csv_folder + "/CT_" + str(i) + ".csv"
-        np.savetxt(name, htmp_array, delimiter=',', fmt='%.5f')
+        np.savetxt(name, htmp_array, delimiter=',', fmt='%d')
 
     return htmp_array, xlim, ylim
 
@@ -821,7 +817,7 @@ def RadonReconstruction(roots, htmps, layers):
     # plt.figure(figsize = (6,6)); plt.imshow(reconstructed_imgs[slices//2], cmap = 'gray'); plt.colorbar(); plt.show()
     
     fig = go.Figure(go.Heatmap(z = reconstructed_imgs[0]))
-    fig.update_layout(width = 800, height = 800, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
     fig.show()
 
     return reconstructed_imgs
@@ -831,6 +827,11 @@ def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
 
     import numpy as np; import plotly.graph_objects as go; import plotly.io as pio 
 
+    initial = slices[0]
+    final = slices[1]
+    spacing = slices[2]
+    slices = np.round(np.arange(initial, final, spacing))
+
     HU_images = np.zeros(len(slices), dtype="object")
 
     for i in range(len(HU_images)):
@@ -838,9 +839,9 @@ def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
         HU_images[i] = np.round(1000 * ((reconstructed_imgs[i] - mu_water) / mu_water)).astype(int)
         HU_images[i][HU_images[i] < air_parameter] = -1000
 
-    fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = 800, height = 800, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
-    fig.show()
+    # fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
+    # fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    # fig.show()
 
     return HU_images
 

@@ -268,10 +268,18 @@ def Plot_Heatmap(heatmap, set_bins_x, set_bins_y, save_as):
 
 # 3.0. ========================================================================================================================================================
 
-def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in, 
-                   save_as_1, save_as_2, save_as_3, save_as_4, save_as_5, save_as_6, save_as_7, save_as_8):
+def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in, save_as):
 
     from scipy.ndimage import gaussian_filter; import matplotlib.pyplot as plt
+
+    save_as_1 = save_as[0]
+    save_as_2 = save_as[1]
+    save_as_3 = save_as[2]
+    save_as_4 = save_as[3]
+    save_as_5 = save_as[4]
+    save_as_6 = save_as[5]
+    save_as_7 = save_as[6]
+    save_as_8 = save_as[7]
 
     U_b_l = 0.7519 # mu1
     U_b_h = 0.3012 # mu2

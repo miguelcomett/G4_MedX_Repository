@@ -61,7 +61,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
                     if (data.stuckStepCount >= 5) 
                     {
                         track -> SetTrackStatus(fStopAndKill); 
-                        std::cout << "Killed stuck particle" << std::endl;
+                        std::cout << "• Killed stuck particle" << std::endl;
                         stuckParticles.erase(trackID);
                     }
                 } 

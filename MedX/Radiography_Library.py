@@ -1,3 +1,7 @@
+# 0.0. ========================================================================================================================================================
+
+
+
 # 1.1.1. ========================================================================================================================================================
 
 def MergeRoots(directory, starts_with, output_name):
@@ -719,12 +723,12 @@ def CT_Loop(directory, starts_with, angles):
         mac_template = \
         """ \
         /myDetector/Rotation {angle}
-        /run/reinitializeGeometry
-        /run/numberOfThreads 10
-        /run/initialize
-
         /myDetector/nColumns 1
         /myDetector/nRows 1
+        /run/reinitializeGeometry
+
+        /run/numberOfThreads 10
+        /run/initialize
 
         /Pgun/X 0 mm
         /Pgun/gaussX true

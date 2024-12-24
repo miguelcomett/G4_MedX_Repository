@@ -1,8 +1,272 @@
-# 0.0. ========================================================================================================================================================
+# 1.1. ========================================================================================================================================================
 
+def RunSim(directory, threads, energy, sim_time, merge_time):
 
+    import Radiography_Library as RadLib
+    import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
+    import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
 
-# 1.1.1. ========================================================================================================================================================
+    if merge_time == 0: merge_time = sim_time
+    elif merge_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
+
+    try: send2trash(rad_folder)
+    except: pass
+    
+    if platform.system() == "Darwin":
+        executable_file = "Sim"
+        mac_filename = 'Radiography.mac'
+        run_sim = f"./{executable_file} {mac_filename} . . ."
+    elif platform.system() == "Windows":
+        executable_file = "Sim.exe"
+        mac_filename = 'Radiography.mac'
+        run_sim = f".\{executable_file} .\{mac_filename} . . ."
+    else: raise EnvironmentError("Unsupported operating system")
+
+    root_folder = directory + "ROOT/"
+    mac_filepath = directory + mac_filename
+    
+    rad_folder = directory + "ROOT/" + "Rad_temp/"
+    os.makedirs(rad_folder, exist_ok = True)
+
+    sim_time = sim_time * 60 # s
+    merge_time = merge_time * 60 # s 
+
+    mac_template = \
+        """ \
+        /run/numberOfThreads {Threads}
+        /run/initialize
+        
+        /myDetector/nColumns 1
+        /myDetector/nRows 1 
+
+        /Pgun/X 0 mm
+        /Pgun/Y -10 mm
+        /Pgun/gaussX true
+        /Pgun/SpanY 260 mm
+
+        /gun/energy {Energy} keV
+        /run/beamOn {Beams}
+        """
+    
+    iterations = int(sim_time / merge_time) + 1
+    exit_requested = False
+
+    Beams_calibration = 0
+    calibration_time = 1
+
+    for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+        
+        if iteration == 0:
+            Beams_calibration = 1000000
+
+            filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
+            with open(mac_filepath, 'w') as f: f.write(filled_template)
+            
+        else:
+            iterationss = iterations - 1
+            Beams = int((sim_time * Beams_calibration) / (calibration_time * iterationss))
+
+            filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
+            with open(mac_filepath, 'w') as f: f.write(filled_template)
+
+        try: 
+            
+            if iteration == 0: 
+                start_time = time.time()
+                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+                end_time = time.time()
+                calibration_time = end_time - start_time
+                print("Calibration run completed.")
+            else:
+                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    
+            root_name = root_folder + 'CT_00.root'
+            new_name = root_folder + 'Rad_40kev_' + str(iteration) + '.root'
+
+            try: os.rename(root_name, new_name)
+            except FileNotFoundError: print("The file does not exist.")
+            except PermissionError: print("You do not have permission to rename this file.")
+
+            if os.path.exists(new_name): shutil.move(new_name, rad_folder)
+
+            if exit_requested: break
+        
+        except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
+        except KeyboardInterrupt: 
+            if not exit_requested: print("\nKeyboardInterrupt detected! Exiting after this iteration."); exit_requested = True
+            else: print("Forcing immediate termination."); raise
+
+    total_beams = int(np.ceil(Beams * iterations / 1000000))
+    merged_name = 'Rad_40kev_' + str(total_beams) + 'M'
+
+    if os.path.exists(root_folder + merged_name + '.root'):
+        counter = 1
+        while os.path.exists(root_folder + merged_name + '_' + str(counter) + '.root'): counter = counter + 1
+        merged_name = merged_name + '_' + str(counter)
+
+    with open(os.devnull, "w") as fnull: 
+        with redirect_stdout(fnull), redirect_stderr(fnull):
+            RadLib.MergeRoots_Parallel(rad_folder, 'Rad_40kev', merged_name, trim_coords = None)
+
+    merged_path = rad_folder + merged_name + '.root'
+    if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
+
+    try: send2trash(rad_folder)
+    except FileNotFoundError: print(f"The folder '{rad_folder}' does not exist.")
+    except Exception as e: print(f"An error occurred: {e}")
+
+    print('Files:', merged_name, 'written in', root_folder)
+    print("Simulation completed.")
+
+# 1.2. ========================================================================================================================================================
+
+def RunDEXA(directory, threads, sim_time, merge_time):
+
+    import Radiography_Library as RadLib
+    import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
+    import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
+
+    if merge_time == 0: merge_time = sim_time
+    elif merge_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
+
+    try: send2trash(rad_folder)
+    except: pass
+    
+    if platform.system() == "Darwin":
+        executable_file = "Sim"
+        mac_filename = 'Radiography.mac'
+        run_sim = f"./{executable_file} {mac_filename} . . ."
+    elif platform.system() == "Windows":
+        executable_file = "Sim.exe"
+        mac_filename = 'Radiography.mac'
+        run_sim = f".\{executable_file} .\{mac_filename} . . ."
+    else: raise EnvironmentError("Unsupported operating system")
+
+    root_folder = directory + "ROOT/"
+    mac_filepath = directory + mac_filename
+    
+    rad_folder = directory + "ROOT/" + "Rad_temp/"
+    os.makedirs(rad_folder, exist_ok = True)
+
+    sim_time = sim_time * 60 # s
+    merge_time = merge_time * 60 # s 
+
+    mac_template = \
+        """ \
+        /run/numberOfThreads {Threads}
+        /run/initialize
+        
+        /myDetector/nColumns 1
+        /myDetector/nRows 1 
+
+        /Pgun/X 0 mm
+        /Pgun/Y -10 mm
+        /Pgun/gaussX true
+        /Pgun/SpanY 260 mm
+
+        /gun/energy 40 keV
+        /run/beamOn {Beams40}
+
+        /gun/energy 80 keV
+        /run/beamOn {Beams80}
+        """
+    
+    iterations = int(sim_time / merge_time) + 1
+    exit_requested = False
+
+    Beams40_calibration = 0
+    Beams80_calibration = 0
+    calibration_time = 1
+
+    for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+        
+        if iteration == 0:
+            Beams40_calibration = 1000000
+            Beams80_calibration = Beams40_calibration // 2
+
+            filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
+            with open(mac_filepath, 'w') as f: f.write(filled_template)
+            
+        else:
+            iterationss = iterations - 1
+            Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterationss))
+            Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterationss))
+
+            filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
+            with open(mac_filepath, 'w') as f: f.write(filled_template)
+
+        try: 
+            
+            if iteration == 0: 
+                start_time = time.time()
+                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+                end_time = time.time()
+                calibration_time = end_time - start_time
+                print("Calibration run completed.")
+            else:
+                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    
+            file_40 = root_folder + 'CT_00.root'
+            file_80 = root_folder + 'CT_01.root'
+            new_name_40 = root_folder + 'Rad_40kev_' + str(iteration) + '.root'
+            new_name_80 = root_folder + 'Rad_80kev_' + str(iteration) + '.root'
+
+            try: os.rename(file_40, new_name_40)
+            except FileNotFoundError: print("The file does not exist.")
+            except PermissionError: print("You do not have permission to rename this file.")
+
+            try: os.rename(file_80, new_name_80)
+            except FileNotFoundError: print("The file does not exist.")
+            except PermissionError: print("You do not have permission to rename this file.")
+
+            if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
+            if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
+
+            if exit_requested: break
+        
+        except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
+        except KeyboardInterrupt: 
+            if not exit_requested: print("\nKeyboardInterrupt detected! Exiting after this iteration."); exit_requested = True
+            else: print("Forcing immediate termination."); raise
+
+    total_beams_40 = int(np.ceil(Beams40 * iterations / 1000000))
+    total_beams_80 = int(np.ceil(Beams80 * iterations / 1000000))
+
+    merged_40 = 'Rad_40kev_' + str(total_beams_40) + 'M'
+    merged_80 = 'Rad_80kev_' + str(total_beams_80) + 'M'
+
+    if os.path.exists(root_folder + merged_40 + '.root'):
+        counter = 1
+        while os.path.exists(root_folder + merged_40 + '_' + str(counter) + '.root'): counter = counter + 1
+        merged_40 = merged_40 + '_' + str(counter)
+
+    if os.path.exists(root_folder + merged_80 + '.root'):
+        counter = 1
+        while os.path.exists(root_folder + merged_80 + '_' + str(counter) + '.root'): counter = counter + 1
+        merged_80 = merged_80 + '_' + str(counter)
+
+    with open(os.devnull, "w") as fnull: 
+        with redirect_stdout(fnull), redirect_stderr(fnull):
+            RadLib.MergeRoots_Parallel(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
+
+    with open(os.devnull, "w") as fnull: 
+        with redirect_stdout(fnull), redirect_stderr(fnull):
+            RadLib.MergeRoots_Parallel(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+
+    merged_40_path = rad_folder + merged_40 + '.root'
+    if os.path.exists(merged_40_path): shutil.move(merged_40_path, root_folder)
+
+    merged_80_path = rad_folder + merged_80 + '.root'
+    if os.path.exists(merged_80_path): shutil.move(merged_80_path, root_folder)
+
+    try: send2trash(rad_folder)
+    except FileNotFoundError: print(f"The folder '{rad_folder}' does not exist.")
+    except Exception as e: print(f"An error occurred: {e}")
+
+    print('Files:', merged_40, ',', merged_80, 'written in', root_folder)
+    print("Simulation completed.")
+
+# 1.3.1. ========================================================================================================================================================
 
 def MergeRoots(directory, starts_with, output_name):
 
@@ -41,7 +305,7 @@ def MergeRoots(directory, starts_with, output_name):
 
     print("Archivo final creado en:", merged_file)
 
-# 1.1.2. ========================================================================================================================================================
+# 1.3.2. ========================================================================================================================================================
 
 def process_file(file, f_out, lock, trim_coords):
 
@@ -102,7 +366,7 @@ def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
 
     print("Archivo final creado en:", merged_file)
 
-# 1.2. ========================================================================================================================================================
+# 1.4. ========================================================================================================================================================
 
 def Summary_Data(directory, root_file, tree_1, branch_1, tree_2, branches_2):
 
@@ -127,7 +391,7 @@ def Summary_Data(directory, root_file, tree_1, branch_1, tree_2, branches_2):
     
     return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
 
-# 1.3. ========================================================================================================================================================
+# 1.5. ========================================================================================================================================================
 
 def CT_Summary_Data(directory, tree, branches):
 

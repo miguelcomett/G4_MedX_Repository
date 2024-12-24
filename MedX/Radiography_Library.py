@@ -48,42 +48,42 @@ def RunSim(directory, threads, energy, sim_time, merge_time):
         /run/beamOn {Beams}
         """
     
+    Beams_calibration = 2500000
+
+    filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
+    with open(mac_filepath, 'w') as f: f.write(filled_template)
+    
+    start_time = time.time()
+    subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    end_time = time.time()
+    calibration_time = end_time - start_time
+    print("Calibration run completed.")
+
+    root_name = root_folder + 'CT_00.root'
+    new_name = root_folder + 'Rad_40kev_0.root'
+
+    try: os.rename(root_name, new_name)
+    except FileNotFoundError: print("The file does not exist.")
+    except PermissionError: print("You do not have permission to rename this file.")
+
+    if os.path.exists(new_name): shutil.move(new_name, rad_folder)
+
     iterations = int(sim_time / merge_time) + 1
     exit_requested = False
 
-    Beams_calibration = 0
-    calibration_time = 1
-
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
-        if iteration == 0:
-            Beams_calibration = 2500000
+        Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
+        if iteration == 0: print('Beams to simulate:', round(Beams * iterations / 1000000, 2), 'M')
 
-            filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
-            with open(mac_filepath, 'w') as f: f.write(filled_template)
-            
-        else:
-            iterationss = iterations - 1
-            Beams = int((sim_time * Beams_calibration) / (calibration_time * iterationss))
-
-            if iteration == 1: print('Beams to simulate:', round(Beams * iterationss / 1000000, 2), 'M')
-
-            filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
-            with open(mac_filepath, 'w') as f: f.write(filled_template)
+        filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
+        with open(mac_filepath, 'w') as f: f.write(filled_template)
 
         try: 
-            
-            if iteration == 0: 
-                start_time = time.time()
-                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-                end_time = time.time()
-                calibration_time = end_time - start_time
-                print("Calibration run completed.")
-            else:
-                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+            subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     
             root_name = root_folder + 'CT_00.root'
-            new_name = root_folder + 'Rad_40kev_' + str(iteration) + '.root'
+            new_name = root_folder + 'Rad_40kev_' + str(iteration+1) + '.root'
 
             try: os.rename(root_name, new_name)
             except FileNotFoundError: print("The file does not exist.")
@@ -215,7 +215,7 @@ def RunDEXA(directory, threads, sim_time, merge_time):
         Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
         Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterations))
 
-        if iteration == 1: print('Beams to simulate:', round(Beams40 * iterations / 1000000, 2), 'M', round(Beams80 * iterations / 1000000, 2), 'M')
+        if iteration == 0: print('Beams to simulate:', round(Beams40 * iterations / 1000000, 2), 'M', round(Beams80 * iterations / 1000000, 2), 'M')
 
         filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
         with open(mac_filepath, 'w') as f: f.write(filled_template)

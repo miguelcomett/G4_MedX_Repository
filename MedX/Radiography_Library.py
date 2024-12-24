@@ -57,7 +57,7 @@ def RunSim(directory, threads, energy, sim_time, merge_time):
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
         if iteration == 0:
-            Beams_calibration = 1000000
+            Beams_calibration = 2500000
 
             filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
             with open(mac_filepath, 'w') as f: f.write(filled_template)
@@ -65,6 +65,8 @@ def RunSim(directory, threads, energy, sim_time, merge_time):
         else:
             iterationss = iterations - 1
             Beams = int((sim_time * Beams_calibration) / (calibration_time * iterationss))
+
+            print('Beams to simulate:', Beams/1000000, 'M')
 
             filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
             with open(mac_filepath, 'w') as f: f.write(filled_template)
@@ -181,7 +183,7 @@ def RunDEXA(directory, threads, sim_time, merge_time):
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
         if iteration == 0:
-            Beams40_calibration = 1000000
+            Beams40_calibration = 2000000
             Beams80_calibration = Beams40_calibration // 2
 
             filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
@@ -191,6 +193,8 @@ def RunDEXA(directory, threads, sim_time, merge_time):
             iterationss = iterations - 1
             Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterationss))
             Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterationss))
+
+            print('Beams to simulate:', Beams40/1000000, 'M', Beams80/1000000, 'M')
 
             filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
             with open(mac_filepath, 'w') as f: f.write(filled_template)

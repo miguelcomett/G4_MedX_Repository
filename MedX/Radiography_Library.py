@@ -1,13 +1,13 @@
 # 1.1. ========================================================================================================================================================
 
-def RunRadiography(directory, threads, energy, sim_time, merge_time):
+def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
     import Radiography_Library as RadLib
     import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
     import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
 
-    if merge_time == 0: merge_time = sim_time
-    elif merge_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
+    if iteration_time == 0: iteration_time = sim_time
+    elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
 
     try: send2trash(rad_folder)
     except: pass
@@ -29,7 +29,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
     os.makedirs(rad_folder, exist_ok = True)
 
     sim_time = sim_time * 60 # s
-    merge_time = merge_time * 60 # s 
+    iteration_time = iteration_time * 60 # s 
 
     mac_template = \
         """ \
@@ -60,7 +60,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
     print("Calibration run completed.")
 
     root_name = root_folder + 'CT_00.root'
-    new_name = root_folder + 'Rad_40kev_0.root'
+    new_name = root_folder + 'Rad_0.root'
 
     try: os.rename(root_name, new_name)
     except FileNotFoundError: print("The file does not exist.")
@@ -68,7 +68,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
 
     if os.path.exists(new_name): shutil.move(new_name, rad_folder)
 
-    iterations = int(sim_time / merge_time)
+    iterations = int(sim_time / iteration_time)
     exit_requested = False
 
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
@@ -83,7 +83,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
             subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     
             root_name = root_folder + 'CT_00.root'
-            new_name = root_folder + 'Rad_40kev_' + str(iteration+1) + '.root'
+            new_name = root_folder + 'Rad_' + str(iteration + 1) + '.root'
 
             try: os.rename(root_name, new_name)
             except FileNotFoundError: print("The file does not exist.")
@@ -99,7 +99,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
             else: print("Forcing immediate termination."); raise
 
     total_beams = int(np.ceil(Beams * iterations / 1000000))
-    merged_name = 'Rad_40kev_' + str(total_beams) + 'M'
+    merged_name = 'Rad_' + str(energy) + 'kev_' + str(total_beams) + 'M'
 
     if os.path.exists(root_folder + merged_name + '.root'):
         counter = 1
@@ -108,7 +108,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            RadLib.MergeRoots_Parallel(rad_folder, 'Rad_40kev', merged_name, trim_coords = None)
+            RadLib.MergeRoots_Parallel(rad_folder, 'Rad', merged_name, trim_coords = None)
 
     merged_path = rad_folder + merged_name + '.root'
     if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
@@ -143,14 +143,14 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
     if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
 
 
-def RunDEXA(directory, threads, sim_time, merge_time):
+def RunDEXA(directory, threads, sim_time, iteration_time):
 
     import Radiography_Library as RadLib
     import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
     import os; import subprocess; from contextlib import redirect_stdout, redirect_stderr; import shutil
 
-    if merge_time == 0: merge_time = sim_time
-    elif merge_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
+    if iteration_time == 0: iteration_time = sim_time
+    elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
 
     if platform.system() == "Darwin":
         executable_file = "Sim"
@@ -171,7 +171,7 @@ def RunDEXA(directory, threads, sim_time, merge_time):
     os.makedirs(rad_folder, exist_ok = True)
 
     sim_time = sim_time * 60 # s
-    merge_time = merge_time * 60 # s 
+    iteration_time = iteration_time * 60 # s 
 
     mac_template = \
         """ \
@@ -207,7 +207,7 @@ def RunDEXA(directory, threads, sim_time, merge_time):
 
     Rename_and_Move(root_folder, rad_folder, 0)
     
-    iterations = int(sim_time / merge_time)
+    iterations = int(sim_time / iteration_time)
     exit_requested = False
 
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):

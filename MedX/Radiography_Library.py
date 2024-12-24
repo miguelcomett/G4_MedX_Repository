@@ -68,7 +68,7 @@ def RunRadiography(directory, threads, energy, sim_time, merge_time):
 
     if os.path.exists(new_name): shutil.move(new_name, rad_folder)
 
-    iterations = int(sim_time / merge_time) + 1
+    iterations = int(sim_time / merge_time)
     exit_requested = False
 
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):

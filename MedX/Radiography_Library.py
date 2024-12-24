@@ -1,6 +1,6 @@
 # 1.1. ========================================================================================================================================================
 
-def RunSim(directory, threads, energy, sim_time, merge_time):
+def RunRadiography(directory, threads, energy, sim_time, merge_time):
 
     import Radiography_Library as RadLib
     import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np

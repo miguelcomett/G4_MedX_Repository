@@ -66,7 +66,7 @@ def RunSim(directory, threads, energy, sim_time, merge_time):
             iterationss = iterations - 1
             Beams = int((sim_time * Beams_calibration) / (calibration_time * iterationss))
 
-            print('Beams to simulate:', Beams/1000000, 'M')
+            if iteration == 1: print('Beams to simulate:', round(Beams * iterationss / 1000000, 2), 'M')
 
             filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
             with open(mac_filepath, 'w') as f: f.write(filled_template)
@@ -122,18 +122,36 @@ def RunSim(directory, threads, energy, sim_time, merge_time):
 
 # 1.2. ========================================================================================================================================================
 
+def Rename_and_Move(root_folder, rad_folder, iteration):
+
+    import os; import shutil
+
+    file_40 = root_folder + 'CT_00.root'
+    file_80 = root_folder + 'CT_01.root'
+    new_name_40 = root_folder + 'Rad_40kev_' + str(iteration) + '.root'
+    new_name_80 = root_folder + 'Rad_80kev_' + str(iteration) + '.root'
+
+    try: os.rename(file_40, new_name_40)
+    except FileNotFoundError: print("The file does not exist.")
+    except PermissionError: print("You do not have permission to rename this file.")
+
+    try: os.rename(file_80, new_name_80)
+    except FileNotFoundError: print("The file does not exist.")
+    except PermissionError: print("You do not have permission to rename this file.")
+
+    if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
+    if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
+
+
 def RunDEXA(directory, threads, sim_time, merge_time):
 
     import Radiography_Library as RadLib
     import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
-    import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
+    import os; import subprocess; from contextlib import redirect_stdout, redirect_stderr; import shutil
 
     if merge_time == 0: merge_time = sim_time
     elif merge_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
 
-    try: send2trash(rad_folder)
-    except: pass
-    
     if platform.system() == "Darwin":
         executable_file = "Sim"
         mac_filename = 'Radiography.mac'
@@ -148,6 +166,8 @@ def RunDEXA(directory, threads, sim_time, merge_time):
     mac_filepath = directory + mac_filename
     
     rad_folder = directory + "ROOT/" + "Rad_temp/"
+    try: send2trash(rad_folder)
+    except: pass
     os.makedirs(rad_folder, exist_ok = True)
 
     sim_time = sim_time * 60 # s
@@ -173,58 +193,37 @@ def RunDEXA(directory, threads, sim_time, merge_time):
         /run/beamOn {Beams80}
         """
     
-    iterations = int(sim_time / merge_time) + 1
-    exit_requested = False
+    Beams40_calibration = 2000000
+    Beams80_calibration = Beams40_calibration // 2
 
-    Beams40_calibration = 0
-    Beams80_calibration = 0
-    calibration_time = 1
+    filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
+    with open(mac_filepath, 'w') as f: f.write(filled_template)
+
+    start_time = time.time()
+    subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    end_time = time.time()
+    calibration_time = end_time - start_time
+    print("Calibration run completed.")
+
+    Rename_and_Move(root_folder, rad_folder, 0)
+    
+    iterations = int(sim_time / merge_time)
+    exit_requested = False
 
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
-        if iteration == 0:
-            Beams40_calibration = 2000000
-            Beams80_calibration = Beams40_calibration // 2
+        Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
+        Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterations))
 
-            filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
-            with open(mac_filepath, 'w') as f: f.write(filled_template)
-            
-        else:
-            iterationss = iterations - 1
-            Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterationss))
-            Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterationss))
+        if iteration == 1: print('Beams to simulate:', round(Beams40 * iterations / 1000000, 2), 'M', round(Beams80 * iterations / 1000000, 2), 'M')
 
-            print('Beams to simulate:', Beams40/1000000, 'M', Beams80/1000000, 'M')
-
-            filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
-            with open(mac_filepath, 'w') as f: f.write(filled_template)
+        filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
+        with open(mac_filepath, 'w') as f: f.write(filled_template)
 
         try: 
-            
-            if iteration == 0: 
-                start_time = time.time()
-                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-                end_time = time.time()
-                calibration_time = end_time - start_time
-                print("Calibration run completed.")
-            else:
-                subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+            subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     
-            file_40 = root_folder + 'CT_00.root'
-            file_80 = root_folder + 'CT_01.root'
-            new_name_40 = root_folder + 'Rad_40kev_' + str(iteration) + '.root'
-            new_name_80 = root_folder + 'Rad_80kev_' + str(iteration) + '.root'
-
-            try: os.rename(file_40, new_name_40)
-            except FileNotFoundError: print("The file does not exist.")
-            except PermissionError: print("You do not have permission to rename this file.")
-
-            try: os.rename(file_80, new_name_80)
-            except FileNotFoundError: print("The file does not exist.")
-            except PermissionError: print("You do not have permission to rename this file.")
-
-            if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
-            if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
+            Rename_and_Move(root_folder, rad_folder, iteration+1)
 
             if exit_requested: break
         
@@ -267,7 +266,7 @@ def RunDEXA(directory, threads, sim_time, merge_time):
     except FileNotFoundError: print(f"The folder '{rad_folder}' does not exist.")
     except Exception as e: print(f"An error occurred: {e}")
 
-    print('Files:', merged_40, ',', merged_80, 'written in', root_folder)
+    print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
     print("Simulation completed.")
 
 # 1.3.1. ========================================================================================================================================================

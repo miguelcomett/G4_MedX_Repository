@@ -1,8 +1,25 @@
+# 0.1. ========================================================================================================================================================
+
+def PlayAlarm():
+
+    import pygame
+
+    alarm_path = '/Users/miguelcomett/Music/Spotify/México.mp3'
+
+    pygame.mixer.music.set_volume(0.7)
+    pygame.mixer.init()
+    pygame.mixer.music.load(alarm_path)
+
+    print("Script completed. Playing alarm...")
+    pygame.mixer.music.play(loops = -1) 
+    
+    input("Press Enter to stop the alarm...")
+    pygame.mixer.music.stop()
+
 # 1.1. ========================================================================================================================================================
 
 def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
-    import Radiography_Library as RadLib
     import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
     import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
 
@@ -108,7 +125,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            RadLib.MergeRoots_Parallel(rad_folder, 'Rad', merged_name, trim_coords = None)
+            MergeRoots_Parallel(rad_folder, 'Rad', merged_name, trim_coords = None)
 
     merged_path = rad_folder + merged_name + '.root'
     if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
@@ -119,6 +136,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
     print('Files:', merged_name, 'written in', root_folder)
     print("Simulation completed.")
+    PlayAlarm()
 
 # 1.2. ========================================================================================================================================================
 
@@ -144,7 +162,6 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
 
 def RunDEXA(directory, threads, sim_time, iteration_time):
 
-    import Radiography_Library as RadLib
     import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
     import os; import subprocess; from contextlib import redirect_stdout, redirect_stderr; import shutil
 
@@ -249,11 +266,11 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            RadLib.MergeRoots_Parallel(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
+            MergeRoots_Parallel(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            RadLib.MergeRoots_Parallel(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+            MergeRoots_Parallel(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
 
     merged_40_path = rad_folder + merged_40 + '.root'
     if os.path.exists(merged_40_path): shutil.move(merged_40_path, root_folder)
@@ -990,7 +1007,7 @@ def ClearFolder(directory):
 
 def CT_Loop(directory, starts_with, angles):
 
-    import Radiography_Library as RadLib; import platform; from tqdm.notebook import tqdm;
+    import platform; from tqdm.notebook import tqdm;
     import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
 
     if platform.system() == "Darwin":
@@ -1051,7 +1068,7 @@ def CT_Loop(directory, starts_with, angles):
 
         with open(os.devnull, "w") as fnull: 
             with redirect_stdout(fnull), redirect_stderr(fnull):
-                RadLib.MergeRoots_Parallel(root_folder, starts_with, output_name, trim_coords = None)
+                MergeRoots_Parallel(root_folder, starts_with, output_name, trim_coords = None)
 
         merged_file_path = root_folder + output_name + '.root'
 

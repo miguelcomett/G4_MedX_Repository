@@ -142,7 +142,6 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
     if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
     if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
 
-
 def RunDEXA(directory, threads, sim_time, iteration_time):
 
     import Radiography_Library as RadLib
@@ -343,15 +342,20 @@ def process_file(file, f_out, lock, trim_coords):
 
 def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
     
-    import uproot; import os; from tqdm import tqdm
-    from concurrent.futures import ThreadPoolExecutor; import threading
+    import uproot; import os; from tqdm import tqdm; import send2trash as send2trash
+    from concurrent.futures import ThreadPoolExecutor; import threading; import shutil
 
     max_workers = 9
     
+    trash_folder = directory + 'Trash_' + output_name
+    os.makedirs(trash_folder, exist_ok = True)
+
     file_list = []
     for file in os.listdir(directory):
-        if file.endswith('.root') and not file.startswith('merge') and not file.startswith(output_name):
-            if starts_with == '' or file.startswith(starts_with): file_list.append(os.path.join(directory, file))
+        if file.endswith('.root') and file.startswith(starts_with): 
+            file_path  = os.path.join(directory, file)
+            shutil.move(file_path, trash_folder)
+            file_list.append(os.path.join(trash_folder, file))
 
     merged_file = directory + output_name 
     if not os.path.exists(merged_file + ".root"): merged_file = merged_file + ".root"
@@ -366,6 +370,9 @@ def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
         with ThreadPoolExecutor(max_workers = max_workers) as executor:
             futures = [executor.submit(process_file, file, f_out, lock, trim_coords=trim_coords) for file in file_list]
             for future in tqdm(futures, desc="Merging ROOT files", unit="file"): future.result()  # Asegura que se complete cada tarea
+
+    try: send2trash(trash_folder)
+    except: 'Error: Trash folder not found.'
 
     print("Archivo final creado en:", merged_file)
 

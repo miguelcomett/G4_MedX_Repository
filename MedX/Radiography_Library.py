@@ -537,6 +537,24 @@ def Plot_Heatmap(heatmap, set_bins_x, set_bins_y, save_as):
     plt.subplot(1, 3, 2); plt.plot(heatmap[2*rows//3, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
 
+def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
+
+    import numpy as np
+
+    save_as = save_folder + save_as + ".csv"
+
+    np.savetxt(save_as, heatmap, delimiter=',', fmt='%d')
+
+def Read_Heatmap_from_CSV(save_folder, csv_name):
+
+    import numpy as np
+
+    csv_path = save_folder + csv_name + ".csv"
+
+    heatmap = np.genfromtxt(csv_path, delimiter = ',')
+
+    return heatmap
+
 # 3.0. ========================================================================================================================================================
 
 def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in, save_as):

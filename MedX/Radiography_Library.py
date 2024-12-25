@@ -543,7 +543,7 @@ def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
 
     save_as = save_folder + save_as + ".csv"
 
-    np.savetxt(save_as, heatmap, delimiter=',', fmt='%d')
+    np.savetxt(save_as, heatmap, delimiter=',', fmt='%.6f')
 
 def Read_Heatmap_from_CSV(save_folder, csv_name):
 

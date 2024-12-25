@@ -342,12 +342,12 @@ def process_file(file, f_out, lock, trim_coords):
 
 def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
     
-    import uproot; import os; from tqdm import tqdm; import send2trash as send2trash
+    import uproot; import os; from tqdm import tqdm; from send2trash import send2trash
     from concurrent.futures import ThreadPoolExecutor; import threading; import shutil
 
     max_workers = 9
     
-    trash_folder = directory + 'Trash_' + output_name
+    trash_folder = directory + 'Trash_' + output_name + '/'
     os.makedirs(trash_folder, exist_ok = True)
 
     file_list = []
@@ -372,7 +372,7 @@ def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
             for future in tqdm(futures, desc="Merging ROOT files", unit="file"): future.result()  # Asegura que se complete cada tarea
 
     try: send2trash(trash_folder)
-    except: 'Error: Trash folder not found.'
+    except Exception as e: print(f"Error deleting trash folder: {e}")
 
     print("Archivo final creado en:", merged_file)
 

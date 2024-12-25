@@ -2,12 +2,15 @@
 
 def PlayAlarm():
 
-    import pygame
+    import pygame; import os
 
     alarm_path = '/Users/miguelcomett/Music/Spotify/México.mp3'
 
-    pygame.mixer.music.set_volume(0.7)
+    volume_level = 50
+    os.system(f"osascript -e 'set volume output volume {volume_level}'")
+
     pygame.mixer.init()
+    # pygame.mixer.music.set_volume(0.7)
     pygame.mixer.music.load(alarm_path)
 
     print("Script completed. Playing alarm...")

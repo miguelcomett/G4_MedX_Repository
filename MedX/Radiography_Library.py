@@ -6,11 +6,10 @@ def PlayAlarm():
 
     alarm_path = '/Users/miguelcomett/Music/Spotify/México.mp3'
 
-    volume_level = 50
+    volume_level = 40
     os.system(f"osascript -e 'set volume output volume {volume_level}'")
 
     pygame.mixer.init()
-    # pygame.mixer.music.set_volume(0.7)
     pygame.mixer.music.load(alarm_path)
 
     print("Script completed. Playing alarm...")
@@ -73,9 +72,9 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
     with open(mac_filepath, 'w') as f: f.write(filled_template)
     
-    start_time = time.time()
+    start_time = time.perf_counter()
     subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-    end_time = time.time()
+    end_time = time.perf_counter()
     calibration_time = end_time - start_time
     print("Calibration run completed.")
 
@@ -139,7 +138,6 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
     print('Files:', merged_name, 'written in', root_folder)
     print("Simulation completed.")
-    PlayAlarm()
 
 # 1.2. ========================================================================================================================================================
 
@@ -213,14 +211,14 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
         """
     
     Beams40_calibration = 2000000
-    Beams80_calibration = Beams40_calibration // 2
+    Beams80_calibration = int(Beams40_calibration / 1.75)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as f: f.write(filled_template)
 
-    start_time = time.time()
+    start_time = time.perf_counter()
     subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-    end_time = time.time()
+    end_time = time.perf_counter()
     calibration_time = end_time - start_time
     print("Calibration run completed.")
 
@@ -418,6 +416,11 @@ def Summary_Data(directory, root_file, tree_1, branch_1, tree_2, branches_2):
         NumberofPhotons  = tree_2[branches_2[0]].array(library="np").sum()
         EnergyDeposition = tree_2[branches_2[1]].array(library="np").sum()
         RadiationDose    = tree_2[branches_2[2]].array(library="np").sum()
+
+    print('Total Hits in simulation:', NumberofHits)
+    print('Initial photons in simulation:', NumberofPhotons)
+    print('Total energy deposited in tissue (TeV):', round(EnergyDeposition, 5))
+    print('Dose of radiation received (uSv):', round(RadiationDose, 5))
     
     return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
 
@@ -452,6 +455,10 @@ def CT_Summary_Data(directory, tree, branches):
         num_of_files = num_of_files + 1
 
     print('Files processed: ', num_of_files)
+
+    print('Initial photons in simulation:', NumberofPhotons)
+    print('Total energy deposited in tissue (TeV):', round(EnergyDeposition, 5))
+    print('Dose of radiation received (uSv):', round(RadiationDose, 5))
         
     return NumberofPhotons, EnergyDeposition, RadiationDose
 
@@ -498,17 +505,29 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     bins_x0 = np.arange(x_down, x_up + pixel_size, pixel_size)
     bins_y0 = np.arange(y_down, y_up + pixel_size, pixel_size)
 
-    heatmap = da.full((len(bins_x0) - 1, len(bins_y0) - 1), 0, dtype=float)
+    # heatmap = da.full((len(bins_x0) - 1, len(bins_y0) - 1), 0, dtype=float)
+
+    # for x_chunk, y_chunk in zip(x_data_shifted.to_delayed(), y_data_shifted.to_delayed()):
+        
+    #     x_chunk = da.from_delayed(x_chunk, shape=(chunk_size,), dtype=np.float32)
+    #     y_chunk = da.from_delayed(y_chunk, shape=(chunk_size,), dtype=np.float32)
+
+    #     chunk_histogram, _, _ = da.histogram2d(x_chunk, y_chunk, bins=[bins_x0, bins_y0])
+    #     heatmap = heatmap + chunk_histogram
+
+    # heatmap = heatmap.compute()
+    # heatmap = np.rot90(heatmap.T, 2)
+
+    heatmap = np.zeros((len(bins_x0) - 1, len(bins_y0) - 1), dtype=float)
 
     for x_chunk, y_chunk in zip(x_data_shifted.to_delayed(), y_data_shifted.to_delayed()):
-        
+
         x_chunk = da.from_delayed(x_chunk, shape=(chunk_size,), dtype=np.float32)
         y_chunk = da.from_delayed(y_chunk, shape=(chunk_size,), dtype=np.float32)
 
-        chunk_histogram, _, _ = da.histogram2d(x_chunk, y_chunk, bins=[bins_x0, bins_y0])
-        heatmap = heatmap + chunk_histogram
+        chunk_histogram = da.histogram2d(x_chunk, y_chunk, bins=[bins_x0, bins_y0])[0].compute()
+        heatmap += chunk_histogram
 
-    heatmap = heatmap.compute()
     heatmap = np.rot90(heatmap.T, 2)
 
     return heatmap, bins_x0, bins_y0

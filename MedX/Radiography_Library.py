@@ -466,30 +466,31 @@ def CT_Summary_Data(directory, tree, branches):
 
 def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, pixel_size):
 
-    import uproot; import numpy as np; import dask.array as da
-    
-    chunk_size = 1_000_000
+    import uproot; import numpy as np; import dask.array as dask_da; import platform
 
-    file_name = directory + root_name
+    file_path = directory + root_name
 
-    with uproot.open(file_name) as root_file:
-        
-        tree = root_file[tree_name]
-        if tree is None: print(f"Tree '{tree_name}' not found in {file_name}"); return
-        if x_branch not in tree or y_branch not in tree: print(f"Branches '{x_branch}' or '{y_branch}' not found in the tree"); return
+    opened_file = uproot.open(file_path)
+    tree = opened_file[tree_name]
+    if tree is None: print(f"Tree '{tree_name}' not found in {root_name}"); return
+    if x_branch not in tree or y_branch not in tree: print(f"Branches '{x_branch}' or '{y_branch}' not found in the tree"); return
 
-        x_values = da.from_array(tree[x_branch].array(library="np"), chunks=chunk_size)
-        y_values = da.from_array(tree[y_branch].array(library="np"), chunks=chunk_size)
+    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
+    x_values = dataframe[x_branch]
+    y_values = dataframe[y_branch]
 
-        xmin = tree[x_branch].array(library="np").min()
-        xmax = tree[x_branch].array(library="np").max()
-        ymin = tree[y_branch].array(library="np").min()
-        ymax = tree[y_branch].array(library="np").max()
+    xmin = dask_da.min(x_values).compute()
+    xmax = dask_da.max(x_values).compute()
+    ymin = dask_da.min(y_values).compute()
+    ymax = dask_da.max(y_values).compute()
 
-        xmin = np.ceil(xmin)
-        xmax = np.floor(xmax)
-        ymin = np.ceil(ymin)
-        ymax = np.floor(ymax)
+    xmin = int(np.ceil(xmin))
+    xmax = int(np.floor(xmax))
+    ymin = int(np.ceil(ymin))
+    ymax = int(np.floor(ymax))
+
+    print(f'X dimension data limits: {xmin} : {xmax}')
+    print(f'Y dimension data limits: {ymin} : {ymax}')
 
     x_shift = size[2]
     y_shift = size[3]
@@ -505,29 +506,7 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     bins_x0 = np.arange(x_down, x_up + pixel_size, pixel_size)
     bins_y0 = np.arange(y_down, y_up + pixel_size, pixel_size)
 
-    # heatmap = da.full((len(bins_x0) - 1, len(bins_y0) - 1), 0, dtype=float)
-
-    # for x_chunk, y_chunk in zip(x_data_shifted.to_delayed(), y_data_shifted.to_delayed()):
-        
-    #     x_chunk = da.from_delayed(x_chunk, shape=(chunk_size,), dtype=np.float32)
-    #     y_chunk = da.from_delayed(y_chunk, shape=(chunk_size,), dtype=np.float32)
-
-    #     chunk_histogram, _, _ = da.histogram2d(x_chunk, y_chunk, bins=[bins_x0, bins_y0])
-    #     heatmap = heatmap + chunk_histogram
-
-    # heatmap = heatmap.compute()
-    # heatmap = np.rot90(heatmap.T, 2)
-
-    heatmap = np.zeros((len(bins_x0) - 1, len(bins_y0) - 1), dtype=float)
-
-    for x_chunk, y_chunk in zip(x_data_shifted.to_delayed(), y_data_shifted.to_delayed()):
-
-        x_chunk = da.from_delayed(x_chunk, shape=(chunk_size,), dtype=np.float32)
-        y_chunk = da.from_delayed(y_chunk, shape=(chunk_size,), dtype=np.float32)
-
-        chunk_histogram = da.histogram2d(x_chunk, y_chunk, bins=[bins_x0, bins_y0])[0].compute()
-        heatmap += chunk_histogram
-
+    heatmap = dask_da.histogram2d(x_values, y_values, bins=[bins_x0, bins_y0])[0].compute()
     heatmap = np.rot90(heatmap.T, 2)
 
     return heatmap, bins_x0, bins_y0
@@ -536,9 +515,14 @@ def Logaritmic_Transform(heatmap, size, pixel_size):
 
     import numpy as np; import matplotlib.pyplot as plt
     
-    maxi_vector = heatmap[0, :]
-    heatmap[heatmap == 0] = np.nan
-    heatmap = np.log(maxi_vector / heatmap)
+    # heatmap[heatmap == 0] = np.nan
+    
+    # maxi_vector = heatmap[0, :]
+    # heatmap = np.log(maxi_vector / heatmap)
+
+    for i in range(heatmap.shape[0]):
+        for j in range(heatmap.shape[1]):
+            heatmap[i, j] = np.log(heatmap[i, 0] / heatmap[i, j])
 
     size_x = size[0]; 
     size_y = size[1]; 
@@ -574,31 +558,24 @@ def Logaritmic_Transform(heatmap, size, pixel_size):
 def Plot_Heatmap(heatmap, set_bins_x, set_bins_y, save_as):
 
     import matplotlib.pyplot as plt
-
     rows = heatmap.shape[0]
-
     plt.figure(figsize=(14, 4))
     plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray", extent=[set_bins_x[0], set_bins_y[-1], set_bins_x[0], set_bins_y[-1]]); plt.colorbar()
     if save_as: plt.savefig(save_as + ".png", bbox_inches="tight", dpi=900)
-    plt.subplot(1, 3, 2); plt.plot(heatmap[2*rows//3, :])
+    plt.subplot(1, 3, 2); plt.plot(heatmap[rows//2, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
 
 def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
 
     import numpy as np
-
     save_as = save_folder + save_as + ".csv"
-
     np.savetxt(save_as, heatmap, delimiter=',', fmt='%.6f')
 
 def Read_Heatmap_from_CSV(save_folder, csv_name):
 
     import numpy as np
-
     csv_path = save_folder + csv_name + ".csv"
-
     heatmap = np.genfromtxt(csv_path, delimiter = ',')
-
     return heatmap
 
 # 3.0. ========================================================================================================================================================

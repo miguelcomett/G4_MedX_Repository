@@ -489,8 +489,8 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     ymin = int(np.ceil(ymin))
     ymax = int(np.floor(ymax))
 
-    print(f'X dimension data limits: {xmin} : {xmax}')
-    print(f'Y dimension data limits: {ymin} : {ymax}')
+    print(f'X dimension data limits: [{xmin} : {xmax}]')
+    print(f'Y dimension data limits: [{ymin} : {ymax}]')
 
     x_shift = size[2]
     y_shift = size[3]
@@ -506,23 +506,26 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     bins_x0 = np.arange(x_down, x_up + pixel_size, pixel_size)
     bins_y0 = np.arange(y_down, y_up + pixel_size, pixel_size)
 
-    heatmap = dask_da.histogram2d(x_values, y_values, bins=[bins_x0, bins_y0])[0].compute()
+    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0].compute()
     heatmap = np.rot90(heatmap.T, 2)
 
     return heatmap, bins_x0, bins_y0
 
 def Logaritmic_Transform(heatmap, size, pixel_size):
 
-    import numpy as np; import matplotlib.pyplot as plt
+    import numpy as np
     
-    # heatmap[heatmap == 0] = np.nan
+    heatmap[heatmap == 0] = np.nan
+    
+    maxi = np.nanmax(heatmap)
+    heatmap = np.log(maxi / heatmap)
     
     # maxi_vector = heatmap[0, :]
     # heatmap = np.log(maxi_vector / heatmap)
 
-    for i in range(heatmap.shape[0]):
-        for j in range(heatmap.shape[1]):
-            heatmap[i, j] = np.log(heatmap[i, 0] / heatmap[i, j])
+    # for i in range(heatmap.shape[0]):
+    #     for j in range(heatmap.shape[1]):
+    #         heatmap[i, j] = np.log(heatmap[i, 0] / heatmap[i, j])    
 
     size_x = size[0]; 
     size_y = size[1]; 

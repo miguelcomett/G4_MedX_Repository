@@ -468,6 +468,11 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
 
     import uproot; import numpy as np; import dask.array as dask_da; import platform
 
+    xlim = size[0]
+    ylim = size[1]
+    x_shift = size[2]
+    y_shift = size[3]
+
     file_path = directory + root_name
 
     opened_file = uproot.open(file_path)
@@ -479,91 +484,45 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     x_values = dataframe[x_branch]
     y_values = dataframe[y_branch]
 
-    xmin = dask_da.min(x_values).compute()
-    xmax = dask_da.max(x_values).compute()
-    ymin = dask_da.min(y_values).compute()
-    ymax = dask_da.max(y_values).compute()
+    x_data_shifted = x_values + x_shift            
+    y_data_shifted = y_values + y_shift
 
-    xmin = int(np.ceil(xmin))
-    xmax = int(np.floor(xmax))
-    ymin = int(np.ceil(ymin))
-    ymax = int(np.floor(ymax))
-
-    print(f'X dimension data limits: [{xmin} : {xmax}]')
-    print(f'Y dimension data limits: [{ymin} : {ymax}]')
-
-    x_shift = size[2]
-    y_shift = size[3]
-
-    x_down = xmin + x_shift
-    x_up   = xmax + x_shift
-    y_down = ymin + y_shift
-    y_up   = ymax + y_shift
-
-    x_data_shifted = x_values - x_shift            
-    y_data_shifted = y_values - y_shift
-
-    bins_x0 = np.arange(x_down, x_up + pixel_size, pixel_size)
-    bins_y0 = np.arange(y_down, y_up + pixel_size, pixel_size)
+    bins_x0 = np.arange(-xlim, xlim + pixel_size, pixel_size)
+    bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
 
     heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0].compute()
     heatmap = np.rot90(heatmap.T, 2)
 
     return heatmap, bins_x0, bins_y0
 
-def Logaritmic_Transform(heatmap, size, pixel_size):
+def Logaritmic_Transform(heatmap):
 
     import numpy as np
-    
-    heatmap[heatmap == 0] = np.nan
-    
-    maxi = np.nanmax(heatmap)
-    heatmap = np.log(maxi / heatmap)
-    
-    # maxi_vector = heatmap[0, :]
-    # heatmap = np.log(maxi_vector / heatmap)
 
-    # for i in range(heatmap.shape[0]):
-    #     for j in range(heatmap.shape[1]):
-    #         heatmap[i, j] = np.log(heatmap[i, 0] / heatmap[i, j])    
+    flat_index = np.where(~np.isnan(heatmap.ravel()))[0][0]
+    firstrow, col = np.unravel_index(flat_index, heatmap.shape)
 
-    size_x = size[0]; 
-    size_y = size[1]; 
+    heatmap2 = np.empty_like(heatmap)
 
-    bins_x1 = np.arange(-size_x, size_x + pixel_size, pixel_size)
-    bins_y1 = np.arange(-size_y, size_y + pixel_size, pixel_size)
+    with np.errstate(divide='ignore', invalid='ignore'):
 
-    new_size = np.zeros((len(bins_x1), len(bins_y1)))
+        max_values = np.max(heatmap, axis=0, keepdims=True)  # Compute max for each row
+        ratio = max_values / heatmap 
+        heatmap2 = np.log(ratio)  
+        heatmap2[heatmap <= 0] = np.nan 
+
+    heatmap2[np.isnan(heatmap2)] = 0
     
-    size_0 = new_size.shape
-    size_1 = heatmap.shape
+    return heatmap2
 
-    if size_0 > size_1:
-    
-        start_row = (size_0[0] - size_1[0]) // 2
-        start_col = (size_0[1] - size_1[1]) // 2
-
-        padded_matrix = np.zeros(size_0)
-        # padded_matrix = np.full(size_0, maxi)
-        padded_matrix[start_row:start_row + size_1[0], start_col:start_col + size_1[1]] = heatmap
-        heatmap = padded_matrix
-    
-    else: 
-    
-        start_row = (size_1[0] - size_0[0]) // 2
-        start_col = (size_1[1] - size_0[1]) // 2
-
-        cropped_matrix = heatmap[start_row:start_row + size_0[0], start_col:start_col + size_0[1]]
-        heatmap = cropped_matrix
-    
-    return heatmap, bins_x1, bins_y1
-
-def Plot_Heatmap(heatmap, set_bins_x, set_bins_y, save_as):
+def Plot_Heatmap(heatmap, save_as):
 
     import matplotlib.pyplot as plt
+
     rows = heatmap.shape[0]
+
     plt.figure(figsize=(14, 4))
-    plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray", extent=[set_bins_x[0], set_bins_y[-1], set_bins_x[0], set_bins_y[-1]]); plt.colorbar()
+    plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray"); plt.colorbar()
     if save_as: plt.savefig(save_as + ".png", bbox_inches="tight", dpi=900)
     plt.subplot(1, 3, 2); plt.plot(heatmap[rows//2, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
@@ -583,18 +542,12 @@ def Read_Heatmap_from_CSV(save_folder, csv_name):
 
 # 3.0. ========================================================================================================================================================
 
-def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in, save_as):
+def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in, save_as, save_all):
 
     from scipy.ndimage import gaussian_filter; import matplotlib.pyplot as plt
 
-    save_as_1 = save_as[0]
-    save_as_2 = save_as[1]
-    save_as_3 = save_as[2]
-    save_as_4 = save_as[3]
-    save_as_5 = save_as[4]
-    save_as_6 = save_as[5]
-    save_as_7 = save_as[6]
-    save_as_8 = save_as[7]
+    save_as_1 = save_as[0]; save_as_2 = save_as[1]; save_as_3 = save_as[2]; save_as_4 = save_as[3]
+    save_as_5 = save_as[4]; save_as_6 = save_as[5]; save_as_7 = save_as[6]; save_as_8 = save_as[7]
 
     U_b_l = 0.7519 # mu1
     U_b_h = 0.3012 # mu2
@@ -610,12 +563,6 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
     ACNR_Bone = SLS_Bone + (gaussian_filter(SLS_Tissue, sigma = sigma1)*wn) - 1
     ACNR_SSH_Bone = SSH_Bone + (gaussian_filter(SSH_Tissue, sigma = sigma2) * wn) - 1
     ACNR_Tissue = SLS_Tissue + (gaussian_filter(SLS_Bone, sigma = sigma1)*wn) - 1
-
-    # w  = U_t_h / U_t_l
-    # wc = U_b_h / U_b_l
-    # low  = - (wn * wc * gaussian_filter(low_energy_img, sigma = sigma1) ) + (w * low_energy_img)
-    # high = - high_energy_img + ( wn * gaussian_filter(high_energy_img, sigma = sigma1))
-    # ACNR_LONG_bone = low + high
 
     plt.imshow(low_energy_img, cmap='gray'); plt.axis('off')
     if save_as_1 != '': plt.savefig(save_in + save_as_1, bbox_inches = 'tight', dpi = 600); plt.close()
@@ -635,8 +582,7 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
     if save_as_8 != '': plt.savefig(save_in + save_as_8, bbox_inches = 'tight', dpi = 600); 
     plt.close()
 
-    plt.figure(figsize = (18, 10))
-    plt.tight_layout()
+    plt.figure(figsize = (18, 10)); plt.tight_layout()
     plt.subplot(2, 4, 1); plt.imshow(low_energy_img,    cmap='gray'); plt.axis('off');  plt.title("Low Energy")
     plt.subplot(2, 4, 2); plt.imshow(high_energy_img,   cmap='gray'); plt.axis('off');  plt.title("High Energy")
     plt.subplot(2, 4, 3); plt.imshow(SLS_Bone,          cmap='gray'); plt.axis('off');  plt.title("Bone [SLS]")
@@ -646,6 +592,7 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
     plt.subplot(2, 4, 7); plt.imshow(ACNR_Bone,         cmap='gray'); plt.axis('off');  plt.title("Bone [ACNR]")
     # plt.subplot(2, 4, 8); plt.imshow(ACNR_SSH_Bone,     cmap='gray'); plt.axis('off');  plt.title("Bone [ACNR + SSH]")
     plt.subplot(2, 4, 8); plt.imshow(ACNR_Tissue,       cmap='gray'); plt.axis('off');  plt.title("Tissue [ACNR]")
+    if save_all != '': plt.savefig(save_in + save_all, bbox_inches = 'tight', dpi = 600)
    
     return SLS_Bone, SLS_Tissue, SSH_Bone, SSH_Tissue, ACNR_Bone, ACNR_Tissue
 

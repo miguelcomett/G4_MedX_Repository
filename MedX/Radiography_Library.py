@@ -402,21 +402,21 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
     file_path = directory + root_file
 
-    with uproot.open(file_path) as opened_file:
+    opened_file = uproot.open(file_path)
         
-        Hits_tree = uproot.dask(opened_file[data_tree], library='np', step_size = '50 MB')
-        if data_branch not in Hits_tree.keys(): raise ValueError(f"Branch: '{data_branch}', not found in tree: '{data_tree}'.")
-        Hits = Hits_tree[data_branch]
-        NumberofHits = len(Hits)
+    Hits_tree = uproot.dask(opened_file[data_tree], library='np', step_size = '50 MB')
+    if data_branch not in Hits_tree.keys(): raise ValueError(f"Branch: '{data_branch}', not found in tree: '{data_tree}'.")
+    Hits = Hits_tree[data_branch]
+    NumberofHits = len(Hits)
 
-        summary_tree = opened_file[summary_tree]
-        if summary_branches[0] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[0]}', not found in tree: '{summary_tree}'.")
-        if summary_branches[1] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[1]}', not found in tree: '{summary_tree}'.")
-        if summary_branches[2] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[2]}', not found in tree: '{summary_tree}'.")
+    summary_tree = opened_file[summary_tree]
+    if summary_branches[0] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[0]}', not found in tree: '{summary_tree}'.")
+    if summary_branches[1] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[1]}', not found in tree: '{summary_tree}'.")
+    if summary_branches[2] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[2]}', not found in tree: '{summary_tree}'.")
 
-        NumberofPhotons  = summary_tree[summary_branches[0]].array(library="np").sum()
-        EnergyDeposition = summary_tree[summary_branches[1]].array(library="np").sum()
-        RadiationDose    = summary_tree[summary_branches[2]].array(library="np").sum()
+    NumberofPhotons  = int(summary_tree[summary_branches[0]].array(library="np").sum())
+    EnergyDeposition = summary_tree[summary_branches[1]].array(library="np").sum()
+    RadiationDose    = summary_tree[summary_branches[2]].array(library="np").sum()
 
     print('-> Initial photons in simulation:', f"{NumberofPhotons:,}")
     print('-> Total photon hits in detector:', f"{NumberofHits:,}")

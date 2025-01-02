@@ -396,33 +396,69 @@ def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
 
 # 1.4. ========================================================================================================================================================
 
-def Summary_Data(directory, root_file, tree_1, branch_1, tree_2, branches_2):
+def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, summary_branches):
 
     import uproot
 
     file_path = directory + root_file
 
-    with uproot.open(file_path) as file:
+    with uproot.open(file_path) as opened_file:
         
-        tree_1 = file[tree_1]
-        if branch_1 not in tree_1.keys(): raise ValueError(f"Branch: '{branch_1}', not found in tree: '{tree_1}'.")
-        NumberofHits = len(tree_1[branch_1].array(library="np"))
+        Hits_tree = uproot.dask(opened_file[data_tree], library='np', step_size = '50 MB')
+        if data_branch not in Hits_tree.keys(): raise ValueError(f"Branch: '{data_branch}', not found in tree: '{data_tree}'.")
+        Hits = Hits_tree[data_branch]
+        NumberofHits = len(Hits)
 
-        tree_2 = file[tree_2]
-        if branches_2[0] not in tree_2.keys(): raise ValueError(f"Branch: '{branches_2[0]}', not found in tree: '{tree_2}'.")
-        if branches_2[1] not in tree_2.keys(): raise ValueError(f"Branch: '{branches_2[1]}', not found in tree: '{tree_2}'.")
-        if branches_2[2] not in tree_2.keys(): raise ValueError(f"Branch: '{branches_2[2]}', not found in tree: '{tree_2}'.")
+        summary_tree = opened_file[summary_tree]
+        if summary_branches[0] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[0]}', not found in tree: '{summary_tree}'.")
+        if summary_branches[1] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[1]}', not found in tree: '{summary_tree}'.")
+        if summary_branches[2] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[2]}', not found in tree: '{summary_tree}'.")
 
-        NumberofPhotons  = tree_2[branches_2[0]].array(library="np").sum()
-        EnergyDeposition = tree_2[branches_2[1]].array(library="np").sum()
-        RadiationDose    = tree_2[branches_2[2]].array(library="np").sum()
+        NumberofPhotons  = summary_tree[summary_branches[0]].array(library="np").sum()
+        EnergyDeposition = summary_tree[summary_branches[1]].array(library="np").sum()
+        RadiationDose    = summary_tree[summary_branches[2]].array(library="np").sum()
 
-    print('Total Hits in simulation:', NumberofHits)
-    print('Initial photons in simulation:', NumberofPhotons)
-    print('Total energy deposited in tissue (TeV):', round(EnergyDeposition, 5))
-    print('Dose of radiation received (uSv):', round(RadiationDose, 5))
+    print('-> Initial photons in simulation:', f"{NumberofPhotons:,}")
+    print('-> Total photon hits in detector:', f"{NumberofHits:,}")
+    print('-> Total energy deposited in tissue (TeV):', f"{EnergyDeposition:,.5f}")
+    print('-> Dose of radiation received (uSv):', f"{RadiationDose:,.5f}")
     
     return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
+
+def XY_1D_Histogram(directory, root_name, tree_name, x_branch, y_branch, range_x, range_y):
+
+    import uproot; import numpy as np; import dask.array as dask_da; import matplotlib.pyplot as plt
+
+    file_path = directory + root_name
+    opened_file = uproot.open(file_path)
+
+    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
+    x_values = dataframe[x_branch]
+    y_values = dataframe[y_branch]
+
+    range_min_x = range_x[0]
+    range_max_x = range_x[1]
+    bins_x = range_x[2]
+
+    range_min_y = range_y[0]
+    range_max_y = range_y[1]
+    bins_y = range_y[2]
+
+    hist_x, bin_edges = dask_da.histogram(x_values, bins = bins_x, range = (range_min_x, range_max_x))
+    hist_y, bin_edges = dask_da.histogram(y_values, bins = bins_y, range = (range_min_y, range_max_y))
+
+    hist_x = hist_x.compute()
+    hist_y = hist_y.compute()
+
+    plt.figure(figsize = (14, 4)); plt.tight_layout()
+
+    plt.subplot(1, 2, 1)
+    plt.bar(bin_edges[:-1], hist_x, width = (bin_edges[1] - bin_edges[0]), align = 'edge', edgecolor = 'gray', linewidth = 0.8)
+    plt.xlabel('Distance in X (mm)'); plt.ylabel('Frequency'); #plt.title('1D Histogram with Dask')
+
+    plt.subplot(1, 2, 2)
+    plt.bar(bin_edges[:-1], hist_y, width = (bin_edges[1] - bin_edges[0]), align = 'edge', edgecolor = 'gray', linewidth = 0.8)
+    plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); # plt.title('')
 
 # 1.5. ========================================================================================================================================================
 

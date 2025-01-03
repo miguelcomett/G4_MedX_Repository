@@ -129,7 +129,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            MergeRoots_Parallel(rad_folder, 'Rad', merged_name, trim_coords = None)
+            Merge_Roots_Files(rad_folder, 'Rad', merged_name, trim_coords = None)
 
     merged_path = rad_folder + merged_name + '.root'
     if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
@@ -269,11 +269,11 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            MergeRoots_Parallel(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
+            Merge_Roots_Files(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            MergeRoots_Parallel(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+            Merge_Roots_Files(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
 
     merged_40_path = rad_folder + merged_40 + '.root'
     if os.path.exists(merged_40_path): shutil.move(merged_40_path, root_folder)
@@ -288,85 +288,72 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
     print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
     print("Simulation completed.")
 
-# 1.3.1. ========================================================================================================================================================
+# 1.3. ========================================================================================================================================================
 
-def MergeRoots(directory, starts_with, output_name):
+def Merge_Roots_Files(directory, starts_with, output_name, trim_coords):
+    
+    import uproot; from tqdm import tqdm; from send2trash import send2trash; from concurrent.futures import ThreadPoolExecutor; import threading
 
-    import uproot; import os; from tqdm import tqdm
+    max_workers = 9
+    
+    trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
 
-    file_list = []
-
-    # Crear lista de archivos para procesar
-    for file in os.listdir(directory):
-        if file.endswith('.root') and not file.startswith('merge') and not file.startswith(output_name):
-            if starts_with == '' or file.startswith(starts_with):
-                file_list.append(os.path.join(directory, file))
-
-    merged_file = os.path.join(directory, output_name)
-    counter = 0
-    while os.path.exists(f"{merged_file}_{counter}.root"): counter += 1
-    merged_file = f"{merged_file}_{counter}.root"
+    lock = threading.Lock() # Crear un lock para el acceso a f_out
 
     with uproot.recreate(merged_file) as f_out:
-        for file in tqdm(file_list, desc="Merging ROOT files", unit="file"):
-            with uproot.open(file) as f_in:
-                for key in f_in.keys():
-                    base_key = key.split(';')[0]  # Obtener el nombre base sin número de ciclo
-                    obj = f_in[key]
+        
+        with ThreadPoolExecutor(max_workers = max_workers) as executor:
+            
+            futures = [executor.submit(process_file, file, f_out, lock, trim_coords = trim_coords) for file in file_list]
+            for future in tqdm(futures, desc = "Merging ROOT files", unit = "file"): future.result()
 
-                    # Solo procesar si es un TTree
-                    if isinstance(obj, uproot.TTree):
-                        # Leer los datos por partes para optimizar el uso de memoria
-                        for new_data in obj.iterate(library="np", step_size="10 MB"):
-                            # Si el árbol ya existe en el archivo de salida, añadir los datos en partes
-                            if base_key in f_out:
-                                f_out[base_key].extend(new_data)
-                            else:
-                                # Crear un nuevo TTree en el archivo de salida con los primeros datos
-                                f_out[base_key] = new_data
+    try: send2trash(trash_folder)
+    except Exception as e: print(f"Error deleting trash folder: {e}")
 
     print("Archivo final creado en:", merged_file)
 
-# 1.3.2. ========================================================================================================================================================
-
-def process_file(file, f_out, lock, trim_coords):
+def process_file(file, root_out, lock, trim_coords):
 
     import uproot
 
-    step_size = "10 MB"
+    step_size = "50 MB"
     
-    with uproot.open(file) as f_in:
+    with uproot.open(file) as root_in:
         
-        for key in f_in.keys():
+        for key in root_in.keys():
             base_key = key.split(';')[0]
-            obj = f_in[key]
+            obj = root_in[key]
 
             if base_key == "Hits" and isinstance(obj, uproot.TTree):
+                
                 for new_data in obj.iterate(["x_ax", "y_ax"], library="np", step_size=step_size):
+                    
                     if trim_coords:
                         x_min, x_max, y_min, y_max = trim_coords
                         mask = ((new_data['x_ax'] >= x_min) & (new_data['x_ax'] <= x_max) & (new_data['y_ax'] >= y_min) & (new_data['y_ax'] <= y_max))
                         if mask.sum() == 0: print("No data after filtering. Skipping chunk."); continue
                         new_data = {key: value[mask] for key, value in new_data.items()}
+                    
                     with lock: # Lock para asegurar que la escritura en f_out sea thread-safe
-                        if base_key in f_out: f_out[base_key].extend(new_data)
-                        else: f_out[base_key] = new_data
+                        
+                        if base_key in root_out: root_out[base_key].extend(new_data)
+                        else: root_out[base_key] = new_data
 
             elif base_key == "Run Summary" and isinstance(obj, uproot.TTree):
+                
                 for summary_data in obj.iterate(library="np", step_size=step_size):
+                    
                     with lock:
-                        if base_key in f_out: f_out[base_key].extend(summary_data)
-                        else:f_out[base_key] = summary_data
+                        
+                        if base_key in root_out: root_out[base_key].extend(summary_data)
+                        else: root_out[base_key] = summary_data
             
             else: print(f"Skipping unrecognized tree or object: {base_key}")
 
-def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
-    
-    import uproot; import os; from tqdm import tqdm; from send2trash import send2trash
-    from concurrent.futures import ThreadPoolExecutor; import threading; import shutil
+def Manage_Merge_Files(directory, starts_with, output_name):
 
-    max_workers = 9
-    
+    import os; import shutil
+
     trash_folder = directory + 'Trash_' + output_name + '/'
     os.makedirs(trash_folder, exist_ok = True)
 
@@ -384,17 +371,7 @@ def MergeRoots_Parallel(directory, starts_with, output_name, trim_coords):
         while os.path.exists(f"{merged_file}_{counter}.root"): counter += 1
         merged_file = f"{merged_file}_{counter}.root"
 
-    lock = threading.Lock() # Crear un lock para el acceso a f_out
-
-    with uproot.recreate(merged_file) as f_out:
-        with ThreadPoolExecutor(max_workers = max_workers) as executor:
-            futures = [executor.submit(process_file, file, f_out, lock, trim_coords=trim_coords) for file in file_list]
-            for future in tqdm(futures, desc="Merging ROOT files", unit="file"): future.result()  # Asegura que se complete cada tarea
-
-    try: send2trash(trash_folder)
-    except Exception as e: print(f"Error deleting trash folder: {e}")
-
-    print("Archivo final creado en:", merged_file)
+    return trash_folder, file_list, merged_file
 
 # 1.4. ========================================================================================================================================================
 
@@ -429,7 +406,7 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
 def XY_1D_Histogram(directory, root_name, tree_name, x_branch, y_branch, range_x, range_y):
 
-    import uproot; import numpy as np; import dask.array as dask_da; import matplotlib.pyplot as plt
+    import uproot; import dask.array as dask_da; import matplotlib.pyplot as plt
 
     file_path = directory + root_name
     opened_file = uproot.open(file_path)
@@ -461,44 +438,6 @@ def XY_1D_Histogram(directory, root_name, tree_name, x_branch, y_branch, range_x
     plt.subplot(1, 2, 2)
     plt.bar(bin_edges[:-1], hist_y, width = (bin_edges[1] - bin_edges[0]), align = 'edge', edgecolor = 'gray', linewidth = 0.8)
     plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); # plt.title('')
-
-# 1.5. ========================================================================================================================================================
-
-def CT_Summary_Data(directory, tree, branches):
-
-    import uproot; import os
-
-    NumberofPhotons = 0
-    EnergyDeposition = 0
-    RadiationDose = 0
-
-    num_of_files = 0
-
-    for file in os.listdir(directory):
-
-        file_path = os.path.join(directory, file)
-        if not file_path.endswith('.root'): continue
-
-        with uproot.open(file_path) as root_file:
-
-            tree_data = root_file[tree]
-            if branches[0] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[0]}', not found in tree: '{tree}'.")
-            if branches[1] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[1]}', not found in tree: '{tree}'.")
-            if branches[2] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[2]}', not found in tree: '{tree}'.")
-
-            NumberofPhotons  = NumberofPhotons  + tree_data[branches[0]].array(library="np").sum()
-            EnergyDeposition = EnergyDeposition + tree_data[branches[1]].array(library="np").sum()
-            RadiationDose    = RadiationDose    + tree_data[branches[2]].array(library="np").sum()
-        
-        num_of_files = num_of_files + 1
-
-    print('Files processed: ', num_of_files)
-
-    print('Initial photons in simulation:', NumberofPhotons)
-    print('Total energy deposited in tissue (TeV):', round(EnergyDeposition, 5))
-    print('Dose of radiation received (uSv):', round(RadiationDose, 5))
-        
-    return NumberofPhotons, EnergyDeposition, RadiationDose
 
 # 2.0. ========================================================================================================================================================
 
@@ -541,7 +480,9 @@ def Logarithmic_Transform(heatmap):
 
     with np.errstate(divide = 'ignore', invalid = 'ignore'): 
         ratio = max_values / heatmap 
-        heatmap = np.log(ratio)  
+        heatmap = np.log(ratio)
+
+    # heatmap = np.where(~np.isfinite(heatmap), 1, 0) # for debugging
 
     return heatmap
 
@@ -981,6 +922,7 @@ def ClearFolder(directory):
                 try: os.remove(file_path)
                 except Exception as e: print(f"Error deleting file {file_path}: {e}")
 
+
 def CT_Loop(directory, starts_with, angles):
 
     import platform; from tqdm.notebook import tqdm;
@@ -1052,6 +994,42 @@ def CT_Loop(directory, starts_with, angles):
 
         ClearFolder(root_folder)
 
+
+def CT_Summary_Data(directory, tree, branches):
+
+    import uproot; import os
+
+    NumberofPhotons = 0
+    EnergyDeposition = 0
+    RadiationDose = 0
+
+    num_of_files = 0
+
+    for file in os.listdir(directory):
+
+        file_path = os.path.join(directory, file)
+        if not file_path.endswith('.root'): continue
+
+        with uproot.open(file_path) as root_file:
+
+            tree_data = root_file[tree]
+            if branches[0] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[0]}', not found in tree: '{tree}'.")
+            if branches[1] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[1]}', not found in tree: '{tree}'.")
+            if branches[2] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[2]}', not found in tree: '{tree}'.")
+
+            NumberofPhotons  = NumberofPhotons  + tree_data[branches[0]].array(library="np").sum()
+            EnergyDeposition = EnergyDeposition + tree_data[branches[1]].array(library="np").sum()
+            RadiationDose    = RadiationDose    + tree_data[branches[2]].array(library="np").sum()
+        
+        num_of_files = num_of_files + 1
+
+    print('Files processed: ', num_of_files)
+
+    print('Initial photons in simulation:', NumberofPhotons)
+    print('Total energy deposited in tissue (TeV):', round(EnergyDeposition, 5))
+    print('Dose of radiation received (uSv):', round(RadiationDose, 5))
+        
+    return NumberofPhotons, EnergyDeposition, RadiationDose
 
 def Calculate_Projections(directory, filename, roots, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder):
     
@@ -1421,3 +1399,29 @@ def LogaritmicTransformation(radiographs, pixel_size, sigma):
     plt.imshow(htmps[-1]); plt.colorbar(); plt.show()
 
     return htmps
+
+def MergeRoots(directory, starts_with, output_name):
+
+    import uproot; from tqdm import tqdm
+
+    trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
+
+    with uproot.recreate(merged_file) as f_out:
+        
+        for file in tqdm(file_list, desc="Merging ROOT files", unit="file"):
+            
+            with uproot.open(file) as root_in:
+                
+                for key in root_in.keys():
+                    
+                    base_key = key.split(';')[0]  # Obtener el nombre base sin número de ciclo
+                    obj = root_in[key]
+
+                    if isinstance(obj, uproot.TTree):
+
+                        for new_data in obj.iterate(library="np", step_size="10 MB"):
+
+                            if base_key in f_out: f_out[base_key].extend(new_data)
+                            else: f_out[base_key] = new_data
+
+    print("Archivo final creado en:", merged_file)

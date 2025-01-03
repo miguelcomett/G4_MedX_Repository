@@ -58,10 +58,10 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
             const DetectorConstruction * detectorConstruction = static_cast<const DetectorConstruction*>(G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
             is3DModel = detectorConstruction -> Getis3DModel();
 
-            digits = 6; defaultDecimals = G4cout.precision(digits);
+            // digits = 6; defaultDecimals = G4cout.precision(digits);
             if (is3DModel == true)
             {
-                if (posPhoton[0]<230*mm && posPhoton[0]>-230*mm  && posPhoton[1]<245*mm && posPhoton[1]>-270*mm)
+                if (posPhoton[0]<230*mm && posPhoton[0]>-230*mm  && posPhoton[1]<200*mm && posPhoton[1]>-280*mm)
                 {
                     analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
                     analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
@@ -74,7 +74,7 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
                 analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
                 analysisManager -> AddNtupleRow(0);
             }
-            G4cout.precision(defaultDecimals);
+            // G4cout.precision(defaultDecimals);
         }
     }
 

@@ -502,7 +502,7 @@ def CT_Summary_Data(directory, tree, branches):
 
 def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, pixel_size):
 
-    import uproot; import numpy as np; import dask.array as dask_da; import platform
+    import uproot; import numpy as np; import dask.array as dask_da
 
     xlim = size[0]
     ylim = size[1]
@@ -516,7 +516,7 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     if tree is None: print(f"Tree '{tree_name}' not found in {root_name}"); return
     if x_branch not in tree or y_branch not in tree: print(f"Branches '{x_branch}' or '{y_branch}' not found in the tree"); return
 
-    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
+    dataframe = uproot.dask(opened_file[tree_name], library = 'np', step_size = '50 MB')
     x_values = dataframe[x_branch]
     y_values = dataframe[y_branch]
 
@@ -531,18 +531,15 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
 
     return heatmap, bins_x0, bins_y0
 
-def Logaritmic_Transform(heatmap):
+def Logarithmic_Transform(heatmap):
 
     import numpy as np
 
-    max_values = np.max(heatmap, axis=0, keepdims=True)  # Compute max for each row
-    with np.errstate(divide='ignore', invalid='ignore'): ratio = max_values / heatmap 
-    heatmap = np.log(ratio)  
-    
-    # heatmap[heatmap == np.nan] = 100
-    nan_indices = np.isnan(heatmap)  # Find where NaN values exist
-    # heatmap[nan_indices] = np.take(max_values, np.where(nan_indices)[1])
-    heatmap[nan_indices] = np.take(1000, np.where(nan_indices))
+    max_values = np.max(heatmap, axis = 0, keepdims = True)
+
+    with np.errstate(divide = 'ignore', invalid = 'ignore'): 
+        ratio = max_values / heatmap 
+        heatmap = np.log(ratio)  
 
     return heatmap
 
@@ -554,7 +551,7 @@ def Plot_Heatmap(heatmap, save_as):
 
     plt.figure(figsize=(14, 4))
     plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray"); plt.colorbar()
-    if save_as: plt.savefig(save_as + ".png", bbox_inches="tight", dpi=900)
+    if save_as: plt.savefig(save_as + ".png", bbox_inches = "tight", dpi = 900)
     plt.subplot(1, 3, 2); plt.plot(heatmap[rows//2, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
 

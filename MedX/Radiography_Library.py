@@ -60,9 +60,10 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
         /myDetector/nRows 1 
 
         /Pgun/X 0 mm
-        /Pgun/Y -10 mm
+        /Pgun/Y -40 mm
         /Pgun/gaussX true
-        /Pgun/SpanY 260 mm
+        /Pgun/SpanX 230 mm
+        /Pgun/SpanY 240 mm
 
         /gun/energy {Energy} keV
         /run/beamOn {Beams}
@@ -199,9 +200,10 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
         /myDetector/nRows 1 
 
         /Pgun/X 0 mm
-        /Pgun/Y -10 mm
+        /Pgun/Y -40 mm
         /Pgun/gaussX true
-        /Pgun/SpanY 260 mm
+        /Pgun/SpanX 230 mm
+        /Pgun/SpanY 240 mm
 
         /gun/energy 40 keV
         /run/beamOn {Beams40}

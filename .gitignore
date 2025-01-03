@@ -275,3 +275,4 @@ MedX_Engine.code-workspace
 MedX/.DS_Store
 .DS_Store
 /MedX/__pycache__
+MedX/heatmap_dask.ipynb

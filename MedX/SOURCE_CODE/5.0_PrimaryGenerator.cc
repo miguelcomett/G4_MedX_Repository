@@ -33,7 +33,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     long seed = static_cast<long>(std::time(nullptr)) + runID + eventID;
     CLHEP::HepRandom::setTheSeed(seed);
 
-    if (Xgauss == true)  {x0 = G4RandGauss::shoot(0, 80*mm);}
+    if (Xgauss == true)  {x0 = G4RandGauss::shoot(0,140*mm);}
     if (Xgauss == false) {x0 = 2 * (G4UniformRand() - 0.5); x0 = x0 * SpanX;}
     if (Xcos == true) {x0 = x0 * std::cos(thoraxAngle/2);}
     x0 = x0 + Xpos; 

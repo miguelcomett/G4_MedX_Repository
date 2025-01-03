@@ -2,7 +2,7 @@
 
 def PlayAlarm():
 
-    import pygame; import os
+    import pygame; import os; import time
 
     alarm_path = '/Users/miguelcomett/Music/Spotify/México.mp3'
 
@@ -14,8 +14,9 @@ def PlayAlarm():
 
     print("Script completed. Playing alarm...")
     pygame.mixer.music.play(loops = -1) 
-    
-    input("Press Enter to stop the alarm...")
+
+    time.sleep(5)
+    # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
 
 # 1.1. ========================================================================================================================================================
@@ -136,8 +137,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
     except FileNotFoundError: print(f"The folder '{rad_folder}' does not exist.")
     except Exception as e: print(f"An error occurred: {e}")
 
-    print('Files:', merged_name, 'written in', root_folder)
-    print("Simulation completed.")
+    print('-> Simulation completed. Files:', merged_name, 'written in', root_folder)
 
 # 1.2. ========================================================================================================================================================
 
@@ -535,21 +535,16 @@ def Logaritmic_Transform(heatmap):
 
     import numpy as np
 
-    flat_index = np.where(~np.isnan(heatmap.ravel()))[0][0]
-    firstrow, col = np.unravel_index(flat_index, heatmap.shape)
-
-    heatmap2 = np.empty_like(heatmap)
-
-    with np.errstate(divide='ignore', invalid='ignore'):
-
-        max_values = np.max(heatmap, axis=0, keepdims=True)  # Compute max for each row
-        ratio = max_values / heatmap 
-        heatmap2 = np.log(ratio)  
-        heatmap2[heatmap <= 0] = np.nan 
-
-    heatmap2[np.isnan(heatmap2)] = 0
+    max_values = np.max(heatmap, axis=0, keepdims=True)  # Compute max for each row
+    with np.errstate(divide='ignore', invalid='ignore'): ratio = max_values / heatmap 
+    heatmap = np.log(ratio)  
     
-    return heatmap2
+    # heatmap[heatmap == np.nan] = 100
+    nan_indices = np.isnan(heatmap)  # Find where NaN values exist
+    # heatmap[nan_indices] = np.take(max_values, np.where(nan_indices)[1])
+    heatmap[nan_indices] = np.take(1000, np.where(nan_indices))
+
+    return heatmap
 
 def Plot_Heatmap(heatmap, save_as):
 
@@ -562,6 +557,14 @@ def Plot_Heatmap(heatmap, save_as):
     if save_as: plt.savefig(save_as + ".png", bbox_inches="tight", dpi=900)
     plt.subplot(1, 3, 2); plt.plot(heatmap[rows//2, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
+
+def Plot_Plotly(heatmap, xlim, ylim):
+
+    import plotly.graph_objects as go
+
+    fig = go.Figure(go.Heatmap(z = heatmap, x = xlim, y = ylim, colorscale = [[0, 'black'], [1, 'white']], showscale = False))
+    fig.update_layout(width = 800, height = 800, yaxis = dict(autorange = 'reversed'))    
+    fig.show()
 
 def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
 
@@ -634,30 +637,19 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
 
 # 4.0. ========================================================================================================================================================
 
-def BMO(SLS_Bone, SLS_Tissue, save_as):
-
-    import matplotlib.pyplot as plt
+def BMO(SLS_Bone, SLS_Tissue):
 
     U_b_l = 0.7519 # mu1
     U_b_h = 0.3012 # mu2
-    # U_t_l = 0.26 # mu3
-    # U_t_h = 0.18 # mu4
-    U_t_l = 0.281
-    U_t_h = 0.192
+    U_t_l = 0.281 # mu3
+    U_t_h = 0.192 # mu4
 
     Thick_cons_bone = (U_t_l) / ( (U_t_h * U_b_l) - (U_t_l * U_b_h) )
     thickness_bone = Thick_cons_bone * SLS_Bone
     Thick_cons_tissue = (U_t_l) / ( (U_t_l * U_b_h) - (U_t_h * U_b_l) )
     thickness_tissue = Thick_cons_tissue * SLS_Tissue
 
-    plt.figure(figsize = (12, 3))
-    plt.subplot(1, 3, 1); plt.imshow(thickness_bone); plt.colorbar()
-    plt.subplot(1, 3, 2); plt.plot(thickness_bone[120,:])
-    plt.subplot(1, 3, 3); plt.plot(thickness_bone[:,120])
-    if save_as != '': plt.savefig(save_as, bbox_inches = 'tight', dpi = 600); 
-    plt.show()
-
-    return thickness_bone
+    return thickness_bone, thickness_tissue
 
 # 5.1 ========================================================================================================================================================
 

@@ -60,7 +60,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
         /myDetector/nRows 1 
 
         /Pgun/X 0 mm
-        /Pgun/Y -40 mm
+        /Pgun/Y 0 mm
         /Pgun/gaussX true
         /Pgun/SpanX 230 mm
         /Pgun/SpanY 240 mm
@@ -200,7 +200,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
         /myDetector/nRows 1 
 
         /Pgun/X 0 mm
-        /Pgun/Y -40 mm
+        /Pgun/Y 0 mm
         /Pgun/gaussX true
         /Pgun/SpanX 230 mm
         /Pgun/SpanY 240 mm
@@ -480,7 +480,7 @@ def Logarithmic_Transform(heatmap):
     
     heatmap[heatmap <= 0] = np.nan
 
-    with np.errstate(divide = 'warn', invalid = 'warn'): heatmap = np.log(max_value / heatmap)
+    with np.errstate(divide = 'warn', invalid = 'warn'): heatmap = np.log(max_values / heatmap)
 
     # heatmap = np.where(np.isnan(heatmap), 1, 0) # for debugging
 

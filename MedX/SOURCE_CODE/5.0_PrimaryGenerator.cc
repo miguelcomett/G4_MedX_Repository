@@ -29,8 +29,8 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
 
     if (Xgauss == true) 
     {
-        x0 = G4RandGauss::shoot(0, 130*mm);
-        while (x0 > SpanX || x0 < -SpanX) {x0 = G4RandGauss::shoot(0, 130*mm);}
+        x0 = G4RandGauss::shoot(0, 110*mm);
+        while (x0 > SpanX || x0 < -SpanX) {x0 = G4RandGauss::shoot(0, 110*mm);}
     }
     if (Xgauss == false) 
     {

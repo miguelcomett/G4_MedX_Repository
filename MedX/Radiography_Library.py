@@ -477,12 +477,12 @@ def Logarithmic_Transform(heatmap):
     import numpy as np
 
     max_values = np.max(heatmap, axis = 0, keepdims = True)
+    
+    heatmap[heatmap <= 0] = np.nan
 
-    with np.errstate(divide = 'ignore', invalid = 'ignore'): 
-        ratio = max_values / heatmap 
-        heatmap = np.log(ratio)
+    with np.errstate(divide = 'warn', invalid = 'warn'): heatmap = np.log(max_value / heatmap)
 
-    # heatmap = np.where(~np.isfinite(heatmap), 1, 0) # for debugging
+    # heatmap = np.where(np.isnan(heatmap), 1, 0) # for debugging
 
     return heatmap
 

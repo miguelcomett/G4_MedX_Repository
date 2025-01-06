@@ -388,19 +388,24 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
     Hits = Hits_tree[data_branch]
     NumberofHits = len(Hits)
 
+    branches_num = (len(summary_branches))
     summary_tree = opened_file[summary_tree]
-    if summary_branches[0] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[0]}', not found in tree: '{summary_tree}'.")
-    if summary_branches[1] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[1]}', not found in tree: '{summary_tree}'.")
-    if summary_branches[2] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[2]}', not found in tree: '{summary_tree}'.")
+    for i in range(branches_num):
+        if summary_branches[i] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
+    # if summary_branches[1] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[1]}', not found in tree: '{summary_tree}'.")
+    # if summary_branches[2] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[2]}', not found in tree: '{summary_tree}'.")
+    # if summary_branches[3] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[3]}', not found in tree: '{summary_tree}'.")
 
-    NumberofPhotons  = int(summary_tree[summary_branches[0]].array(library="np").sum())
-    EnergyDeposition = summary_tree[summary_branches[1]].array(library="np").sum()
-    RadiationDose    = summary_tree[summary_branches[2]].array(library="np").sum()
+    Photons_Energy   = int(summary_tree[summary_branches[0]].array(library="np").mean())
+    NumberofPhotons  = int(summary_tree[summary_branches[1]].array(library="np").sum())
+    EnergyDeposition = summary_tree[summary_branches[2]].array(library="np").sum()
+    RadiationDose    = summary_tree[summary_branches[3]].array(library="np").sum()
 
+    print('-> Photons energy:', Photons_Energy, 'keV')
     print('-> Initial photons in simulation:', f"{NumberofPhotons:,}")
     print('-> Total photon hits in detector:', f"{NumberofHits:,}")
-    print('-> Total energy deposited in tissue (TeV):', f"{EnergyDeposition:,.5f}")
-    print('-> Dose of radiation received (uSv):', f"{RadiationDose:,.5f}")
+    print('-> Total energy deposited in tissue:', f"{EnergyDeposition:,.5f}", 'TeV')
+    print('-> Dose of radiation received:', f"{RadiationDose:,.5f}", 'µSv')
     
     return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
 

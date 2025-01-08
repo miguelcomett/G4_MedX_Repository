@@ -51,20 +51,25 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
 
         if (arguments == 5)
         {
+            Decimals = 3;
+            scaleFactor = std::pow(10, Decimals);
+            xpos = std::round(posPhoton[0] * scaleFactor) / scaleFactor;
+            ypos = std::round(posPhoton[1] * scaleFactor) / scaleFactor;
+
             const DetectorConstruction * detectorConstruction = static_cast<const DetectorConstruction*>(G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
             is3DModel = detectorConstruction -> Getis3DModel();
 
             if ( (is3DModel == true) && (posPhoton[0]<230*mm && posPhoton[0]>-230*mm && posPhoton[1]<240*mm && posPhoton[1]>-240*mm))
             { 
-                analysisManager -> FillNtupleFColumn(0, 0, posPhoton[0]);
-                analysisManager -> FillNtupleFColumn(0, 1, posPhoton[1]);
+                analysisManager -> FillNtupleFColumn(0, 0, xpos);
+                analysisManager -> FillNtupleFColumn(0, 1, ypos);
                 analysisManager -> AddNtupleRow(0);
             }
             
             if (is3DModel == false)
             {
-                analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
-                analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
+                analysisManager -> FillNtupleDColumn(0, 0, xpos);
+                analysisManager -> FillNtupleDColumn(0, 1, ypos);
                 analysisManager -> AddNtupleRow(0);
             }
         }

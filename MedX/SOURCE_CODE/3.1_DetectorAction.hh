@@ -21,7 +21,8 @@ class SensitiveDetector : public G4VSensitiveDetector
 
         virtual G4bool ProcessHits(G4Step *, G4TouchableHistory *);
         G4bool is3DModel;
-        G4int digits, defaultDecimals, copyNo, Event;
+        G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor;
+        G4float xpos, ypos;
         G4double Wavelength, Energy;
 };
 

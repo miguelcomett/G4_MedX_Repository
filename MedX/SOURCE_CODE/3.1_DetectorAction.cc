@@ -21,7 +21,7 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
         
         G4ThreeVector posPhoton = preStepPoint -> GetPosition();
         G4ThreeVector momPhoton = preStepPoint -> GetMomentum();
-        
+
         Energy = preStepPoint -> GetKineticEnergy() / keV;
         Wavelength = (1.239841939 * eV / momPhoton.mag()) * 1E+03;
         
@@ -55,9 +55,9 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
             is3DModel = detectorConstruction -> Getis3DModel();
 
             if ( (is3DModel == true) && (posPhoton[0]<230*mm && posPhoton[0]>-230*mm && posPhoton[1]<240*mm && posPhoton[1]>-240*mm))
-            {
-                analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
-                analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
+            { 
+                analysisManager -> FillNtupleFColumn(0, 0, posPhoton[0]);
+                analysisManager -> FillNtupleFColumn(0, 1, posPhoton[1]);
                 analysisManager -> AddNtupleRow(0);
             }
             

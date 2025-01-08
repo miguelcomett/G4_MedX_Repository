@@ -213,7 +213,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
         """
     
     Beams40_calibration = 2000000
-    Beams80_calibration = int(Beams40_calibration / 1.75)
+    Beams80_calibration = int(Beams40_calibration / 1.7)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as f: f.write(filled_template)
@@ -379,6 +379,7 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
     import uproot
 
+    if not root_file.endswith('.root'): root_file = root_file + '.root'
     file_path = directory + root_file
 
     opened_file = uproot.open(file_path)
@@ -409,11 +410,12 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
     
     return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
 
-def XY_1D_Histogram(directory, root_name, tree_name, x_branch, y_branch, range_x, range_y):
+def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x, range_y):
 
     import uproot; import dask.array as dask_da; import matplotlib.pyplot as plt
 
-    file_path = directory + root_name
+    if not root_file.endswith('.root'): root_file = root_file + '.root'
+    file_path = directory + root_file
     opened_file = uproot.open(file_path)
 
     dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
@@ -446,7 +448,7 @@ def XY_1D_Histogram(directory, root_name, tree_name, x_branch, y_branch, range_x
 
 # 2.0. ========================================================================================================================================================
 
-def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, pixel_size):
+def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size):
 
     import uproot; import numpy as np; import dask.array as dask_da
 
@@ -455,11 +457,12 @@ def Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, size, p
     x_shift = size[2]
     y_shift = size[3]
 
-    file_path = directory + root_name
+    if not root_file.endswith('.root'): root_file = root_file + '.root'
+    file_path = directory + root_file
 
     opened_file = uproot.open(file_path)
     tree = opened_file[tree_name]
-    if tree is None: print(f"Tree '{tree_name}' not found in {root_name}"); return
+    if tree is None: print(f"Tree '{tree_name}' not found in {root_file}"); return
     if x_branch not in tree or y_branch not in tree: print(f"Branches '{x_branch}' or '{y_branch}' not found in the tree"); return
 
     dataframe = uproot.dask(opened_file[tree_name], library = 'np', step_size = '50 MB')
@@ -542,11 +545,11 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
     SLS_Tissue = high_energy_img - ( low_energy_img * (U_b_h/U_b_l) )
 
     SSH_Bone = ( (U_t_h/U_t_l) * low_energy_img) - gaussian_filter(high_energy_img, sigma = sigma1)
-    SSH_Tissue = gaussian_filter(high_energy_img, sigma = sigma1) - ( low_energy_img * (U_b_h/U_b_l) )
+    SSH_Tissue = gaussian_filter( high_energy_img, sigma = sigma1) - ( low_energy_img * (U_b_h/U_b_l) )
 
-    ACNR_Bone = SLS_Bone + (gaussian_filter(SLS_Tissue, sigma = sigma1)*wn) - 1
+    ACNR_Bone     = SLS_Bone + (gaussian_filter(SLS_Tissue, sigma = sigma1) * wn) - 1
     ACNR_SSH_Bone = SSH_Bone + (gaussian_filter(SSH_Tissue, sigma = sigma2) * wn) - 1
-    ACNR_Tissue = SLS_Tissue + (gaussian_filter(SLS_Bone, sigma = sigma1)*wn) - 1
+    ACNR_Tissue = SLS_Tissue + (gaussian_filter(SLS_Bone,   sigma = sigma1) * wn) - 1
 
     plt.imshow(low_energy_img, cmap='gray'); plt.axis('off')
     if save_as_1 != '': plt.savefig(save_in + save_as_1, bbox_inches = 'tight', dpi = 600); plt.close()
@@ -574,8 +577,8 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
     plt.subplot(2, 4, 5); plt.imshow(SSH_Bone,          cmap='gray'); plt.axis('off');  plt.title("Bone [SSH]")
     plt.subplot(2, 4, 6); plt.imshow(SSH_Tissue,        cmap='gray'); plt.axis('off');  plt.title("Tissue [SSH]")
     plt.subplot(2, 4, 7); plt.imshow(ACNR_Bone,         cmap='gray'); plt.axis('off');  plt.title("Bone [ACNR]")
-    # plt.subplot(2, 4, 8); plt.imshow(ACNR_SSH_Bone,     cmap='gray'); plt.axis('off');  plt.title("Bone [ACNR + SSH]")
-    plt.subplot(2, 4, 8); plt.imshow(ACNR_Tissue,       cmap='gray'); plt.axis('off');  plt.title("Tissue [ACNR]")
+    plt.subplot(2, 4, 8); plt.imshow(ACNR_SSH_Bone,     cmap='gray'); plt.axis('off');  plt.title("Bone [ACNR + SSH]")
+    # plt.subplot(2, 4, 8); plt.imshow(ACNR_Tissue,       cmap='gray'); plt.axis('off');  plt.title("Tissue [ACNR]")
     if save_all != '': plt.savefig(save_in + save_all, bbox_inches = 'tight', dpi = 600)
    
     return SLS_Bone, SLS_Tissue, SSH_Bone, SSH_Tissue, ACNR_Bone, ACNR_Tissue

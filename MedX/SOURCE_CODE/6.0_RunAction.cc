@@ -52,8 +52,8 @@ RunAction::RunAction()
     if (arguments == 5)
     {
         analysisManager -> CreateNtuple("Hits", "Hits");
-        analysisManager -> CreateNtupleDColumn("x_ax");
-        analysisManager -> CreateNtupleDColumn("y_ax");
+        analysisManager -> CreateNtupleFColumn("x_ax");
+        analysisManager -> CreateNtupleFColumn("y_ax");
         analysisManager -> FinishNtuple(0);
 
         analysisManager -> CreateNtuple("Run Summary", "Run Summary");

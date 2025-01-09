@@ -294,7 +294,7 @@ def Merge_Roots_Files(directory, starts_with, output_name, trim_coords):
     
     import uproot; from tqdm import tqdm; from send2trash import send2trash; from concurrent.futures import ThreadPoolExecutor; import threading
 
-    max_workers = 9
+    max_workers = 100
     
     trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
 
@@ -391,11 +391,8 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
     branches_num = (len(summary_branches))
     summary_tree = opened_file[summary_tree]
-    for i in range(branches_num):
+    for i in range(branches_num): 
         if summary_branches[i] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
-    # if summary_branches[1] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[1]}', not found in tree: '{summary_tree}'.")
-    # if summary_branches[2] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[2]}', not found in tree: '{summary_tree}'.")
-    # if summary_branches[3] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[3]}', not found in tree: '{summary_tree}'.")
 
     Photons_Energy   = int(summary_tree[summary_branches[0]].array(library="np").mean())
     NumberofPhotons  = int(summary_tree[summary_branches[1]].array(library="np").sum())
@@ -465,7 +462,7 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     if tree is None: print(f"Tree '{tree_name}' not found in {root_file}"); return
     if x_branch not in tree or y_branch not in tree: print(f"Branches '{x_branch}' or '{y_branch}' not found in the tree"); return
 
-    dataframe = uproot.dask(opened_file[tree_name], library = 'np', step_size = '50 MB')
+    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
     x_values = dataframe[x_branch]
     y_values = dataframe[y_branch]
 
@@ -510,7 +507,7 @@ def Plot_Plotly(heatmap, xlim, ylim):
 
     import plotly.graph_objects as go
 
-    fig = go.Figure(go.Heatmap(z = heatmap, x = xlim, y = ylim, colorscale = [[0, 'black'], [1, 'white']], showscale = False))
+    fig = go.Figure(go.Heatmap(z = heatmap, x = xlim, y = ylim, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
     fig.update_layout(width = 800, height = 800, yaxis = dict(autorange = 'reversed'))    
     fig.show()
 
@@ -518,7 +515,7 @@ def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
 
     import numpy as np
     save_as = save_folder + save_as + ".csv"
-    np.savetxt(save_as, heatmap, delimiter=',', fmt='%.6f')
+    np.savetxt(save_as, heatmap, delimiter=',', fmt='%.4f')
 
 def Read_Heatmap_from_CSV(save_folder, csv_name):
 

@@ -1,8 +1,55 @@
+# Built-in modules: 
+import os, sys, time, subprocess, shutil, platform, numpy as np
+from contextlib import redirect_stdout, redirect_stderr
+import matplotlib.pyplot as plt
+
+def Install_Libraries():
+
+    libraries = {
+        "matplotlib.pyplot": None,
+        "tqdm": None,
+        "send2trash": None,
+        "dask": "2024.10.0",  
+        "pygame": None,
+        "ipywidgets": None,
+        "uproot": None,
+        "tqdm": None,
+        "plotly": None,
+        "scipy": None,
+        "pydicom": None,
+        "PIL": None,
+        "skimage": None,
+    }
+
+    def install_and_import(package, version=None):
+
+        try:
+            
+            if package in sys.modules: return  
+            if version: __import__(package)
+            else: __import__(package)
+        
+        except ImportError: 
+            
+            print(f"Installing {package}...")
+            try:
+                if version: subprocess.check_call([sys.executable, "-m", "pip", "install", f"{package}=={version}"])
+                else: subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+           
+            except Exception as e: print(f"Error installing {package}: {e}")
+            else: print(f"{package} installed successfully.")
+        
+        except Exception as e: print(f"Unexpected error with {package}: {e}")
+
+    for lib, version in libraries.items(): install_and_import(lib, version)
+
+    print("All libraries are installed and ready to use.")
+
 # 0.1. ========================================================================================================================================================
 
 def PlayAlarm():
 
-    import pygame; import os; import time
+    import pygame
 
     alarm_path = '/Users/miguelcomett/Music/Spotify/México.mp3'
 
@@ -23,9 +70,8 @@ def PlayAlarm():
 
 def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
-    import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
-    import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
-
+    from tqdm.notebook import tqdm; from send2trash import send2trash
+    
     if iteration_time == 0: iteration_time = sim_time
     elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
 
@@ -39,7 +85,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
     elif platform.system() == "Windows":
         executable_file = "Sim.exe"
         mac_filename = 'Radiography.mac'
-        run_sim = f".\{executable_file} .\{mac_filename} . . ."
+        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
     else: raise EnvironmentError("Unsupported operating system")
 
     root_folder = directory + "ROOT/"
@@ -129,7 +175,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_Files(rad_folder, 'Rad', merged_name, trim_coords = None)
+            Merge_Roots_HADD(rad_folder, 'Rad', merged_name, trim_coords = None)
 
     merged_path = rad_folder + merged_name + '.root'
     if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
@@ -143,8 +189,6 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
 # 1.2. ========================================================================================================================================================
 
 def Rename_and_Move(root_folder, rad_folder, iteration):
-
-    import os; import shutil
 
     file_40 = root_folder + 'CT_00.root'
     file_80 = root_folder + 'CT_01.root'
@@ -164,8 +208,7 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
 
 def RunDEXA(directory, threads, sim_time, iteration_time):
 
-    import platform; from tqdm.notebook import tqdm; import time; from send2trash import send2trash; import numpy as np
-    import os; import subprocess; from contextlib import redirect_stdout, redirect_stderr; import shutil
+    from tqdm.notebook import tqdm; from send2trash import send2trash
 
     if iteration_time == 0: iteration_time = sim_time
     elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
@@ -177,7 +220,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
     elif platform.system() == "Windows":
         executable_file = "Sim.exe"
         mac_filename = 'Radiography.mac'
-        run_sim = f".\{executable_file} .\{mac_filename} . . ."
+        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
     else: raise EnvironmentError("Unsupported operating system")
 
     root_folder = directory + "ROOT/"
@@ -269,11 +312,11 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_Files(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
+            Merge_Roots_HADD(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_Files(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+            Merge_Roots_HADD(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
 
     merged_40_path = rad_folder + merged_40 + '.root'
     if os.path.exists(merged_40_path): shutil.move(merged_40_path, root_folder)
@@ -290,69 +333,92 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
 
 # 1.3. ========================================================================================================================================================
 
-def Merge_Roots_Files(directory, starts_with, output_name, trim_coords):
+def Merge_Roots_HADD(directory, starts_with, output_name, trim_coords):
     
-    import uproot; from tqdm import tqdm; from send2trash import send2trash; from concurrent.futures import ThreadPoolExecutor; import threading
+    if trim_coords == None: 
 
-    max_workers = 100
-    
-    trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
+        trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
+        hadd_command = ["hadd", '-f', merged_file] + file_list
 
-    lock = threading.Lock() # Crear un lock para el acceso a f_out
-
-    with uproot.recreate(merged_file) as f_out:
+        try:
+            with open(os.devnull, 'wb') as devnull: success = subprocess.run(hadd_command, stdout = devnull, stderr = devnull, check = True)
+            Trash_Folder(trash_folder)
+            success = success.returncode
+            if success == 0: print(f"Merged data written to: {merged_file}")
         
-        with ThreadPoolExecutor(max_workers = max_workers) as executor:
-            
-            futures = [executor.submit(process_file, file, f_out, lock, trim_coords = trim_coords) for file in file_list]
-            for future in tqdm(futures, desc = "Merging ROOT files", unit = "file"): future.result()
-
-    try: send2trash(trash_folder)
-    except Exception as e: print(f"Error deleting trash folder: {e}")
-
-    print("Archivo final creado en:", merged_file)
-
-def process_file(file, root_out, lock, trim_coords):
-
-    import uproot
-
-    step_size = "50 MB"
-    
-    with uproot.open(file) as root_in:
+        except subprocess.CalledProcessError as e:
+            print(f"Error: The merge process failed with return code {e.returncode}.")
+            print(f"Command: {' '.join(hadd_command)}")
+            print("Retriying with Merge_Roots_Dask Function")
+            if 'directory' in locals() and 'starts_with' in locals() and 'output_name' in locals() and 'trim_coords' in locals():
+                Merge_Roots_Dask(directory, starts_with, output_name, trim_coords)
+            else: print("Error: One or more arguments for Merge_Roots_Dask are missing or undefined.")
         
-        for key in root_in.keys():
-            base_key = key.split(';')[0]
-            obj = root_in[key]
+        except FileNotFoundError:
+            print("Error: 'hadd' command not found. Make sure ROOT is installed and configured.")
 
-            if base_key == "Hits" and isinstance(obj, uproot.TTree):
-                
-                for new_data in obj.iterate(["x_ax", "y_ax"], library="np", step_size=step_size):
-                    
-                    if trim_coords:
-                        x_min, x_max, y_min, y_max = trim_coords
-                        mask = ((new_data['x_ax'] >= x_min) & (new_data['x_ax'] <= x_max) & (new_data['y_ax'] >= y_min) & (new_data['y_ax'] <= y_max))
-                        if mask.sum() == 0: print("No data after filtering. Skipping chunk."); continue
-                        new_data = {key: value[mask] for key, value in new_data.items()}
-                    
-                    with lock: # Lock para asegurar que la escritura en f_out sea thread-safe
-                        
-                        if base_key in root_out: root_out[base_key].extend(new_data)
-                        else: root_out[base_key] = new_data
+    if trim_coords: 
 
-            elif base_key == "Run Summary" and isinstance(obj, uproot.TTree):
-                
-                for summary_data in obj.iterate(library="np", step_size=step_size):
-                    
-                    with lock:
-                        
-                        if base_key in root_out: root_out[base_key].extend(summary_data)
-                        else: root_out[base_key] = summary_data
-            
-            else: print(f"Skipping unrecognized tree or object: {base_key}")
+        print("Using Merge_Roots_Dask Function")
+        Merge_Roots_Dask(directory, starts_with, output_name, trim_coords)
 
-def Manage_Merge_Files(directory, starts_with, output_name):
 
-    import os; import shutil
+def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
+
+    import uproot, dask.array as da
+
+    trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
+
+    merged_trees_data = {}
+
+    for file_path in file_list:
+
+        opened_file = uproot.open(file_path)
+
+        for tree_name in opened_file.keys():
+
+            if not tree_name.endswith(";1"): continue
+
+            tree_key = tree_name.rstrip(";1")
+            tree = uproot.dask(opened_file[tree_key], library="np")
+
+            if tree_key not in merged_trees_data: merged_trees_data[tree_key] = {}
+
+            branches = tree.keys()
+            for branch_name in branches:
+
+                branch_data = tree[branch_name]
+                if branch_name not in merged_trees_data[tree_key]: merged_trees_data[tree_key][branch_name] = [branch_data]
+                else: merged_trees_data[tree_key][branch_name].append(branch_data)
+
+    for tree_name, branches_data in merged_trees_data.items():
+        for branch_name, data_list in branches_data.items():
+            merged_trees_data[tree_name][branch_name] = da.concatenate(data_list)
+
+    if trim_coords:
+        x_min, x_max, y_min, y_max = trim_coords
+        for tree_name in list(merged_trees_data.keys()):  # Use list() to avoid runtime error while modifying dict
+            if "x_ax" in merged_trees_data[tree_name] and "y_ax" in merged_trees_data[tree_name]:
+                x_data = merged_trees_data[tree_name]["x_ax"]
+                y_data = merged_trees_data[tree_name]["y_ax"]
+
+                mask = ((x_data >= x_min) & (x_data <= x_max) & (y_data >= y_min) & (y_data <= y_max))
+                if mask.sum().compute() == 0:
+                    print(f"No data after filtering in tree '{tree_name}'. Skipping tree.")
+                    del merged_trees_data[tree_name]
+                else: merged_trees_data[tree_name] = {key: value[mask] for key, value in merged_trees_data[tree_name].items()}
+
+    with uproot.recreate(merged_file) as new_root_file:
+        for tree_name, branches_data in merged_trees_data.items():
+            new_root_file[tree_name] = branches_data
+
+    Trash_Folder(trash_folder)
+    print(f"Merged data written to: {merged_file}")
+
+
+def Manage_Files(directory, starts_with, output_name):
+
+    directory = os.path.join(directory, '')
 
     trash_folder = directory + 'Trash_' + output_name + '/'
     os.makedirs(trash_folder, exist_ok = True)
@@ -364,6 +430,10 @@ def Manage_Merge_Files(directory, starts_with, output_name):
             shutil.move(file_path, trash_folder)
             file_list.append(os.path.join(trash_folder, file))
 
+    if file_list == []: 
+        print("No files found. Please check your inputs.")
+        sys.exit(1)
+
     merged_file = directory + output_name 
     if not os.path.exists(merged_file + ".root"): merged_file = merged_file + ".root"
     if os.path.exists(merged_file + ".root"):
@@ -373,12 +443,21 @@ def Manage_Merge_Files(directory, starts_with, output_name):
 
     return trash_folder, file_list, merged_file
 
+
+def Trash_Folder(trash_folder):
+
+    from send2trash import send2trash
+                 
+    try: send2trash(trash_folder)
+    except Exception as e: print(f"Error deleting trash folder: {e}")
+
 # 1.4. ========================================================================================================================================================
 
 def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, summary_branches):
 
     import uproot
 
+    directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
     file_path = directory + root_file
 
@@ -411,6 +490,7 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
 
     import uproot; import dask.array as dask_da; import matplotlib.pyplot as plt
 
+    directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
     file_path = directory + root_file
     opened_file = uproot.open(file_path)
@@ -447,7 +527,9 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
 
 def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size):
 
-    import uproot; import numpy as np; import dask.array as dask_da
+    import uproot; import dask.array as dask_da
+
+    directory = os.path.join(directory, '')
 
     xlim = size[0]
     ylim = size[1]
@@ -478,8 +560,6 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     return heatmap, bins_x0, bins_y0
 
 def Logarithmic_Transform(heatmap):
-
-    import numpy as np
 
     max_values = np.max(heatmap, axis = 0, keepdims = True)
     
@@ -513,13 +593,11 @@ def Plot_Plotly(heatmap, xlim, ylim):
 
 def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
 
-    import numpy as np
     save_as = save_folder + save_as + ".csv"
     np.savetxt(save_as, heatmap, delimiter=',', fmt='%.4f')
 
 def Read_Heatmap_from_CSV(save_folder, csv_name):
 
-    import numpy as np
     csv_path = save_folder + csv_name + ".csv"
     heatmap = np.genfromtxt(csv_path, delimiter = ',')
     return heatmap
@@ -600,7 +678,7 @@ def BMO(SLS_Bone, SLS_Tissue):
 
 def Interactive_CNR(cropped_image):
 
-    import numpy as np; import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
     data = np.array(cropped_image)
     fig, ax = plt.subplots()
@@ -682,7 +760,7 @@ def Interactive_CNR(cropped_image):
 
 def Fixed_CNR(image_path, save_as, coords_signal, coords_bckgrnd):
     
-    from PIL import Image; import numpy as np; import matplotlib.pyplot as plt
+    from PIL import Image; import matplotlib.pyplot as plt
 
     image = Image.open(image_path)
     image = image.convert('L')
@@ -753,7 +831,7 @@ def Fixed_CNR(image_path, save_as, coords_signal, coords_bckgrnd):
 
 def Denoise_EdgeDetection(path, isArray, sigma_color, sigma_spatial):
 
-    import numpy as np; import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
     from skimage.restoration import denoise_bilateral; from PIL import Image
     
     if isArray == True:
@@ -786,7 +864,7 @@ def Denoise_EdgeDetection(path, isArray, sigma_color, sigma_spatial):
 
 def Denoise(array, isHann, alpha, save_as, isCrossSection):
     
-    import numpy as np; import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
     from scipy import signal; from scipy.fft import fft2, fftshift, ifft2
 
     image = array
@@ -916,8 +994,6 @@ def Plotly_Heatmap_2(array, xlim, ylim, title, x_label, y_label, sqr_1_coords, s
 
 def ClearFolder(directory):
 
-    import os
-
     if os.path.exists(directory):
         
         for file_name in os.listdir(directory):
@@ -940,7 +1016,7 @@ def CT_Loop(directory, starts_with, angles):
     elif platform.system() == "Windows":
         executable_file = "Sim.exe"
         mac_filename = 'CT.mac'
-        run_sim = f".\{executable_file} .\{mac_filename} . . ."
+        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
     else: raise EnvironmentError("Unsupported operating system")
 
     root_folder = directory + "ROOT/"
@@ -991,7 +1067,7 @@ def CT_Loop(directory, starts_with, angles):
 
         with open(os.devnull, "w") as fnull: 
             with redirect_stdout(fnull), redirect_stderr(fnull):
-                MergeRoots_Parallel(root_folder, starts_with, output_name, trim_coords = None)
+                Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
 
         merged_file_path = root_folder + output_name + '.root'
 
@@ -1002,7 +1078,7 @@ def CT_Loop(directory, starts_with, angles):
 
 def CT_Summary_Data(directory, tree, branches):
 
-    import uproot; import os
+    import uproot
 
     NumberofPhotons = 0
     EnergyDeposition = 0
@@ -1038,7 +1114,7 @@ def CT_Summary_Data(directory, tree, branches):
 
 def Calculate_Projections(directory, filename, roots, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder):
     
-    import numpy as np; from tqdm import tqdm; import matplotlib.pyplot as plt
+    from tqdm import tqdm
 
     start = roots[0]
     end = roots[1]
@@ -1058,7 +1134,7 @@ def Calculate_Projections(directory, filename, roots, tree_name, x_branch, y_bra
 
 def LoadHeatmapsFromCSV(csv_folder, roots):
 
-    import numpy as np; from tqdm import tqdm
+    from tqdm import tqdm
 
     start = roots[0]
     end = roots[1]
@@ -1075,7 +1151,7 @@ def LoadHeatmapsFromCSV(csv_folder, roots):
 
 def RadonReconstruction(roots, htmps, layers):
 
-    import numpy as np; import matplotlib.pyplot as plt; import plotly.graph_objects as go; import plotly.io as pio; from tqdm import tqdm; from skimage.transform import iradon
+    import plotly.graph_objects as go; from tqdm import tqdm; from skimage.transform import iradon
     
     initial = layers[0]
     final = layers[1]
@@ -1093,8 +1169,6 @@ def RadonReconstruction(roots, htmps, layers):
 
         p = np.array([heatmap[layer] for heatmap in htmps]).T
         reconstructed_imgs[i] = iradon(p, theta = thetas)
-
-    # plt.figure(figsize = (6,6)); plt.imshow(reconstructed_imgs[slices//2], cmap = 'gray'); plt.colorbar(); plt.show()
     
     fig = go.Figure(go.Heatmap(z = reconstructed_imgs[0]))
     fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
@@ -1105,7 +1179,7 @@ def RadonReconstruction(roots, htmps, layers):
 
 def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
 
-    import numpy as np; import plotly.graph_objects as go; import plotly.io as pio 
+    import plotly.graph_objects as go;
 
     initial = slices[0]
     final = slices[1]
@@ -1119,16 +1193,16 @@ def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
         HU_images[i] = np.round(1000 * ((reconstructed_imgs[i] - mu_water) / mu_water)).astype(int)
         HU_images[i][HU_images[i] < air_parameter] = -1000
 
-    # fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
-    # fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
-    # fig.show()
+    fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
+    fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.show()
 
     return HU_images
 
 
 def export_to_dicom(HU_images, size_y, directory, compressed):
 
-    import numpy as np; import pydicom; from pydicom.pixels import compress
+    import pydicom; from pydicom.pixels import compress
     from pydicom.dataset import Dataset, FileDataset; from pydicom.uid import RLELossless 
     from pydicom.uid import ExplicitVRLittleEndian; from pydicom.encaps import encapsulate
     
@@ -1371,8 +1445,7 @@ def LoadRoots(directory, rootnames, tree_name, x_branch, y_branch):
 
 def CT_Heatmap_from_Dask(x_data, y_data, size_x, size_y, x_shift, y_shift, pixel_size):
 
-    import matplotlib.pyplot as plt; import numpy as np
-    import dask.array as da; import dask.dataframe as dd
+    import matplotlib.pyplot as plt; import dask.array as da
 
     x_data_shifted = x_data - x_shift
     y_data_shifted = y_data - y_shift
@@ -1391,7 +1464,7 @@ def CT_Heatmap_from_Dask(x_data, y_data, size_x, size_y, x_shift, y_shift, pixel
 
 def LogaritmicTransformation(radiographs, pixel_size, sigma):
     
-    import matplotlib.pyplot as plt; import numpy as np; from scipy import ndimage; from tqdm import tqdm
+    import matplotlib.pyplot as plt; from scipy import ndimage; from tqdm import tqdm
 
     htmps = np.zeros(len(radiographs), dtype = 'object')
 
@@ -1409,7 +1482,7 @@ def MergeRoots(directory, starts_with, output_name):
 
     import uproot; from tqdm import tqdm
 
-    trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
+    trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
 
     with uproot.recreate(merged_file) as f_out:
         
@@ -1430,3 +1503,63 @@ def MergeRoots(directory, starts_with, output_name):
                             else: f_out[base_key] = new_data
 
     print("Archivo final creado en:", merged_file)
+
+def MergeRootsParallel(directory, starts_with, output_name, trim_coords):
+    
+    import uproot; from tqdm import tqdm; from concurrent.futures import ThreadPoolExecutor; import threading
+
+    max_workers = 100
+    
+    trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
+
+    lock = threading.Lock() # Crear un lock para el acceso a f_out
+
+    with uproot.recreate(merged_file) as f_out:
+        
+        with ThreadPoolExecutor(max_workers = max_workers) as executor:
+            
+            futures = [executor.submit(ProcessMerging, file, f_out, lock, trim_coords = trim_coords) for file in file_list]
+            for future in tqdm(futures, desc = "Merging ROOT files", unit = "file"): future.result()
+
+    Trash_Folder(trash_folder)
+    print("Archivo final creado en:", merged_file)
+
+def ProcessMerging(file, root_out, lock, trim_coords):
+
+    import uproot
+
+    step_size = "50 MB"
+    
+    with uproot.open(file) as root_in:
+        
+        for key in root_in.keys():
+            base_key = key.split(';')[0]
+            obj = root_in[key]
+
+            if base_key == "Hits" and isinstance(obj, uproot.TTree):
+                
+                for new_data in obj.iterate(["x_ax", "y_ax"], library="np", step_size=step_size):
+                    
+                    if trim_coords:
+                        x_min, x_max, y_min, y_max = trim_coords
+                        mask = ((new_data['x_ax'] >= x_min) & (new_data['x_ax'] <= x_max) & (new_data['y_ax'] >= y_min) & (new_data['y_ax'] <= y_max))
+                        if mask.sum() == 0: print("No data after filtering. Skipping chunk."); continue
+                        new_data = {key: value[mask] for key, value in new_data.items()}
+                    
+                    with lock: # Lock para asegurar que la escritura en f_out sea thread-safe
+                        
+                        if base_key in root_out: root_out[base_key].extend(new_data)
+                        else: root_out[base_key] = new_data
+
+            elif base_key == "Run Summary" and isinstance(obj, uproot.TTree):
+                
+                for summary_data in obj.iterate(library="np", step_size=step_size):
+                    
+                    with lock:
+                        
+                        if base_key in root_out: root_out[base_key].extend(summary_data)
+                        else: root_out[base_key] = summary_data
+            
+            else: print(f"Skipping unrecognized tree or object: {base_key}")
+
+# ===========================================================================================================================================================================

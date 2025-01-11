@@ -1,24 +1,24 @@
-# Built-in modules: 
-import os, sys, time, subprocess, shutil, platform, numpy as np
+# Python modules: 
+import os, sys, time, subprocess, shutil, platform, numpy as np, matplotlib.pyplot as plt
 from contextlib import redirect_stdout, redirect_stderr
-import matplotlib.pyplot as plt
 
 def Install_Libraries():
 
     libraries = {
-        "matplotlib.pyplot": None,
-        "tqdm": None,
-        "send2trash": None,
-        "dask": "2024.10.0",  
-        "pygame": None,
-        "ipywidgets": None,
-        "uproot": None,
-        "tqdm": None,
-        "plotly": None,
-        "scipy": None,
-        "pydicom": None,
-        "PIL": None,
-        "skimage": None,
+        "numpy"      : None,
+        "matplotlib" : None,
+        "dask"       : "2024.10.0",  
+        "tqdm"       : None,
+        "send2trash" : None,
+        "pygame"     : None,
+        "ipywidgets" : None,
+        "uproot"     : None,
+        "tqdm"       : None,
+        "plotly"     : None,
+        "scipy"      : None,
+        "pydicom"    : None,
+        "PIL"        : None,
+        "skimage"    : None,
     }
 
     def install_and_import(package, version=None):
@@ -488,7 +488,7 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
 def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x, range_y):
 
-    import uproot; import dask.array as dask_da; import matplotlib.pyplot as plt
+    import uproot, dask.array as dask_da
 
     directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
@@ -527,7 +527,7 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
 
 def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size):
 
-    import uproot; import dask.array as dask_da
+    import uproot, dask.array as dask_da
 
     directory = os.path.join(directory, '')
 
@@ -573,8 +573,6 @@ def Logarithmic_Transform(heatmap):
 
 def Plot_Heatmap(heatmap, save_as):
 
-    import matplotlib.pyplot as plt
-
     rows = heatmap.shape[0]
 
     plt.figure(figsize=(14, 4))
@@ -606,7 +604,7 @@ def Read_Heatmap_from_CSV(save_folder, csv_name):
 
 def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in, save_as, save_all):
 
-    from scipy.ndimage import gaussian_filter; import matplotlib.pyplot as plt
+    from scipy.ndimage import gaussian_filter
 
     save_as_1 = save_as[0]; save_as_2 = save_as[1]; save_as_3 = save_as[2]; save_as_4 = save_as[3]
     save_as_5 = save_as[4]; save_as_6 = save_as[5]; save_as_7 = save_as[6]; save_as_8 = save_as[7]
@@ -677,8 +675,6 @@ def BMO(SLS_Bone, SLS_Tissue):
 # 5.1 ========================================================================================================================================================
 
 def Interactive_CNR(cropped_image):
-
-    import matplotlib.pyplot as plt
 
     data = np.array(cropped_image)
     fig, ax = plt.subplots()
@@ -760,7 +756,7 @@ def Interactive_CNR(cropped_image):
 
 def Fixed_CNR(image_path, save_as, coords_signal, coords_bckgrnd):
     
-    from PIL import Image; import matplotlib.pyplot as plt
+    from PIL import Image
 
     image = Image.open(image_path)
     image = image.convert('L')
@@ -831,7 +827,6 @@ def Fixed_CNR(image_path, save_as, coords_signal, coords_bckgrnd):
 
 def Denoise_EdgeDetection(path, isArray, sigma_color, sigma_spatial):
 
-    import matplotlib.pyplot as plt
     from skimage.restoration import denoise_bilateral; from PIL import Image
     
     if isArray == True:
@@ -864,7 +859,6 @@ def Denoise_EdgeDetection(path, isArray, sigma_color, sigma_spatial):
 
 def Denoise(array, isHann, alpha, save_as, isCrossSection):
     
-    import matplotlib.pyplot as plt
     from scipy import signal; from scipy.fft import fft2, fftshift, ifft2
 
     image = array
@@ -925,7 +919,7 @@ def Denoise(array, isHann, alpha, save_as, isCrossSection):
 
 def Plotly_Heatmap_1(array, xlim, ylim, title, x_label, y_label, width, height, save_as):
 
-    import plotly.io as pio; import plotly.graph_objects as go
+    import plotly.io as pio, plotly.graph_objects as go
 
     font_family = 'Merriweather'
     family_2    = 'Optima'
@@ -953,8 +947,7 @@ def Plotly_Heatmap_1(array, xlim, ylim, title, x_label, y_label, width, height, 
 
 def Plotly_Heatmap_2(array, xlim, ylim, title, x_label, y_label, sqr_1_coords, sqr_2_coords, annotation, width, height, save_as):
 
-    import plotly.graph_objects as go
-    import plotly.io as pio
+    import plotly.graph_objects as go, plotly.io as pio
 
     font_family = 'Merriweather'
     family_2    = 'Optima'
@@ -1006,8 +999,7 @@ def ClearFolder(directory):
 
 def CT_Loop(directory, starts_with, angles):
 
-    import platform; from tqdm.notebook import tqdm;
-    import os; import subprocess; import shutil; from contextlib import redirect_stdout, redirect_stderr
+    from tqdm.notebook import tqdm
 
     if platform.system() == "Darwin":
         executable_file = "Sim"
@@ -1179,7 +1171,7 @@ def RadonReconstruction(roots, htmps, layers):
 
 def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
 
-    import plotly.graph_objects as go;
+    import plotly.graph_objects as go
 
     initial = slices[0]
     final = slices[1]
@@ -1341,6 +1333,69 @@ def export_to_dicom(HU_images, size_y, directory, compressed):
             image2d = image.astype('int16')
             ds.PixelData = image2d.tobytes()
             ds.save_as(name + '.dcm')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Deprecated ========================================================================================================================================================
 

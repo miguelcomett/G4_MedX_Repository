@@ -5,20 +5,20 @@ from contextlib import redirect_stdout, redirect_stderr
 def Install_Libraries():
 
     libraries = {
-        "numpy"      : None,
-        "matplotlib" : None,
-        "dask"       : "2024.10.0",  
-        "tqdm"       : None,
-        "send2trash" : None,
-        "pygame"     : None,
-        "ipywidgets" : None,
-        "uproot"     : None,
-        "tqdm"       : None,
-        "plotly"     : None,
-        "scipy"      : None,
-        "pydicom"    : None,
-        "PIL"        : None,
-        "skimage"    : None,
+        "numpy"           : None,
+        "matplotlib"      : None,
+        "dask"            : "2024.10.0",  
+        "tqdm"            : None,
+        "send2trash"      : None,
+        "pygame"          : None,
+        "ipywidgets"      : None,
+        "uproot"          : None,
+        "tqdm"            : None,
+        "plotly"          : None,
+        "scipy"           : None,
+        "pydicom"         : None,
+        "PIL"             : None,
+        "scikit-image"    : None,
     }
 
     def install_and_import(package, version=None):

@@ -228,7 +228,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra
     iterations = int(sim_time / iteration_time)
     
     Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
-    if iteration == 0: print('Beams to simulate:', round(Beams * iterations / 1000000, 2), 'M')
+    print('Beams to simulate:', round(Beams * iterations / 1000000, 2), 'M')
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)

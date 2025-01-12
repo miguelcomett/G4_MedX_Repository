@@ -308,7 +308,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time, spectra_mode, detector
     mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
     
     Beams40_calibration = 2000000
-    Beams80_calibration = int(Beams40_calibration / 1.68)
+    Beams80_calibration = int(Beams40_calibration / 1.5) #1.68
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)

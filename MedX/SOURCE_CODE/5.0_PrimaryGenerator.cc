@@ -1,7 +1,7 @@
 #include "5.0_PrimaryGenerator.hh"
 
-PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector) : 
-SpectraMode(0), Xpos(0.0*mm), Ypos(0.0*mm), Zpos(-450*mm), GunAngle(0.0), SpanX(1*mm), SpanY(1*mm), GeneratorMessenger(new PrimaryGeneratorMessenger(this)), G4VUserPrimaryGeneratorAction(), fDetector(detector)
+PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector) : SpectraMode(0), Xpos(0.0*mm), Ypos(0.0*mm), Zpos(-450*mm), SpanX(1*mm), SpanY(1*mm), GunAngle(0.0), 
+fDetector(detector), GeneratorMessenger(new PrimaryGeneratorMessenger(this)), G4VUserPrimaryGeneratorAction()
 {
     particleGun = new G4ParticleGun(1);
     particleTable = G4ParticleTable::GetParticleTable();
@@ -9,19 +9,7 @@ SpectraMode(0), Xpos(0.0*mm), Ypos(0.0*mm), Zpos(-450*mm), GunAngle(0.0), SpanX(
     particle = particleTable -> FindParticle(particleName);
     particleGun -> SetParticleDefinition(particle);   
 
-    if (SpectraMode == 1) 
-    {
-        spectrumFile = "fSpectrum80.txt";
-        SpectraFunction();
-    }
-    if (SpectraMode == 2) 
-    {
-        spectrumFile = "fSpectrum140.txt";
-        SpectraFunction();
-    }
-
     threadID = G4Threading::G4GetThreadId();
-
     if (threadID == 0) {std::cout << std::endl; std::cout << "------------- GUN MESSENGERS -------------" << std::endl;}
 }
 
@@ -131,10 +119,20 @@ void PrimaryGenerator::SetGunMode(G4int newMode)
 {
     if (newMode == 0) {SpectraMode = 0; 
         if (threadID == 0) {std::cout << "-> Monocromatic Mode Selected" << std::endl;}}
-    if (newMode == 1) {SpectraMode = 1; 
-        if (threadID == 0) {std::cout << "-> Real 80kVp Spectrum Selected" << std::endl;}}
-    if (newMode == 2) {SpectraMode = 2; 
-        if (threadID == 0) {std::cout << "-> Real 140kVp Spectrum Selected" << std::endl;}}
+    if (newMode == 1) 
+    {
+        SpectraMode = 1; 
+        spectrumFile = "fSpectrum80.txt";
+        if (threadID == 0) {std::cout << "-> Real 80kVp Spectrum Selected" << std::endl; std::cout << std::endl;}
+        SpectraFunction();
+    }
+    if (newMode == 2) 
+    {
+        SpectraMode = 2; 
+        spectrumFile = "fSpectrum140.txt";
+        if (threadID == 0) {std::cout << "-> Real 140kVp Spectrum Selected" << std::endl; std::cout << std::endl;}
+        SpectraFunction();
+    }
 }
 
 // Create Ratiation Spectra ====================================================================================================================
@@ -147,8 +145,14 @@ void PrimaryGenerator::SpectraFunction() // tabulated function // Y is assumed p
 
     ReadSpectrumFromFile(spectrumFile, xx, yy, fNPoints);
 
-    G4cout << "Número de puntos leídos: " << fNPoints << G4endl;
-    for (size_t i = 0; i < xx.size(); ++i) {G4cout << "Energía: " << xx[i] / keV << " keV, Intensidad: " << yy[i] << G4endl;}
+    // std::cout << "Número de puntos leídos: " << fNPoints << std::endl;
+    for (size_t i = 0; i < xx.size(); ++i) 
+    {
+        std::cout << 
+        "Energía: "     << std::fixed << std::setprecision(1) << xx[i] / keV << " keV  " <<  
+        " Intensidad: " << std::fixed << std::setprecision(3) << yy[i] * 100 
+        << std::endl;
+    }
 
 	// copy arrays in std::vector and compute fMax
     fX.resize(fNPoints); fY.resize(fNPoints);

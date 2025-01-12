@@ -157,23 +157,29 @@ def Generate_MAC_Template(
         f"/Pgun/SpanY {gun_parameters['SpanY']} mm"
     ])
 
-    if simulation_mode == 'single' or simulation_mode == 1:
+    if simulation_mode == 'single' or simulation_mode == 0:
 
-        if spectra_mode == 'mono' or spectra_mode == 1:
+        if spectra_mode == 'mono' or spectra_mode == 0:
             mac_template.extend([
                 f"/gun/energy {Energy} keV",
                 f"/run/beamOn {Beams}"
             ])
 
-        if spectra_mode == 'poly' or spectra_mode == 2:
+        if spectra_mode == '80kvp' or spectra_mode == 1:
             mac_template.extend([
                 f"/Pgun/Mode 1",
                 f"/run/beamOn {Beams}"
             ])
 
-    if simulation_mode == 'DEXA' or simulation_mode == 2:
+        if spectra_mode == '140kvp' or spectra_mode == 2:
+            mac_template.extend([
+                f"/Pgun/Mode 2",
+                f"/run/beamOn {Beams}"
+            ])
+
+    if simulation_mode == 'DEXA' or simulation_mode == 1:
         
-        if spectra_mode == 'mono' or spectra_mode == 1:
+        if spectra_mode == 'mono' or spectra_mode == 0:
             mac_template.extend([
                 f"/gun/energy 40 keV",
                 f"/run/beamOn {Beams40}",
@@ -182,7 +188,7 @@ def Generate_MAC_Template(
                 f"/run/beamOn {Beams80}",
             ])
 
-        if spectra_mode == 'poly' or spectra_mode == 2:
+        if spectra_mode == 'poly' or spectra_mode == 1:
             mac_template.extend([
                 f"/Pgun/Mode 1",
                 f"/run/beamOn {Beams40}",

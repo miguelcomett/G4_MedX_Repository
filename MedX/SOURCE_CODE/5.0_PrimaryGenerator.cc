@@ -1,8 +1,7 @@
 #include "5.0_PrimaryGenerator.hh"
 
-PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector) : SpectraMode(0), Xpos(0.0*mm), Ypos(0.0*mm), Zpos(-450*mm), 
-GunAngle(0.0), SpanX(1*mm), SpanY(1*mm), spectrumFile("fSpectrum140.txt"), 
-GeneratorMessenger(new PrimaryGeneratorMessenger(this)), G4VUserPrimaryGeneratorAction(), fDetector(detector)
+PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector) : 
+SpectraMode(0), Xpos(0.0*mm), Ypos(0.0*mm), Zpos(-450*mm), GunAngle(0.0), SpanX(1*mm), SpanY(1*mm), GeneratorMessenger(new PrimaryGeneratorMessenger(this)), G4VUserPrimaryGeneratorAction(), fDetector(detector)
 {
     particleGun = new G4ParticleGun(1);
     particleTable = G4ParticleTable::GetParticleTable();
@@ -10,7 +9,16 @@ GeneratorMessenger(new PrimaryGeneratorMessenger(this)), G4VUserPrimaryGenerator
     particle = particleTable -> FindParticle(particleName);
     particleGun -> SetParticleDefinition(particle);   
 
-    if (SpectraMode == 1) { SpectraFunction(); }
+    if (SpectraMode == 1) 
+    {
+        spectrumFile = "fSpectrum80.txt";
+        SpectraFunction();
+    }
+    if (SpectraMode == 2) 
+    {
+        spectrumFile = "fSpectrum140.txt";
+        SpectraFunction();
+    }
 
     threadID = G4Threading::G4GetThreadId();
 
@@ -100,32 +108,33 @@ void PrimaryGenerator::SetGunXcos(G4bool newXcos)
 
 void PrimaryGenerator::SetGunSpanX(G4double newSpanX)
 {
-    if(newSpanX != SpanX) {SpanX = newSpanX; 
+    if (newSpanX != SpanX) {SpanX = newSpanX; 
         if (threadID == 0) {std::cout << "-> Source X Span changed to: " << SpanX << std::endl;} 
     else if (threadID == 0) {std::cout << "-> Same Span selected." << std::endl;}}
 }
 
 void PrimaryGenerator::SetGunSpanY(G4double newSpanY)
 {
-    if(newSpanY != SpanY) {SpanY = newSpanY; 
+    if (newSpanY != SpanY) {SpanY = newSpanY; 
         if (threadID == 0) {std::cout << "-> Source Y Span changed to: " << SpanY << std::endl;}}
     else if (threadID == 0) {std::cout << "-> Same Span selected." << std::endl;}
 }
 
 void PrimaryGenerator::SetGunAngle(G4double newAngle)
 {   
-    if(newAngle != GunAngle) {GunAngle = newAngle; 
+    if (newAngle != GunAngle) {GunAngle = newAngle; 
         if (threadID == 0) {std::cout << "-> Source Angle changed to: " << GunAngle << std::endl;} 
     else if (threadID == 0) {std::cout << "-> Same Angle selected." << std::endl;}}
 }
 
 void PrimaryGenerator::SetGunMode(G4int newMode)
 {
-    if(newMode == 0) {SpectraMode = 0; 
+    if (newMode == 0) {SpectraMode = 0; 
         if (threadID == 0) {std::cout << "-> Monocromatic Mode Selected" << std::endl;}}
-    if(newMode == 1) {SpectraMode = 1; 
-        if (threadID == 0) {std::cout << "-> Real Spectrum Selected" << std::endl;}}
-    // else {G4cout << "No mode selected. Default value applied." << G4endl;}
+    if (newMode == 1) {SpectraMode = 1; 
+        if (threadID == 0) {std::cout << "-> Real 80kVp Spectrum Selected" << std::endl;}}
+    if (newMode == 2) {SpectraMode = 2; 
+        if (threadID == 0) {std::cout << "-> Real 140kVp Spectrum Selected" << std::endl;}}
 }
 
 // Create Ratiation Spectra ====================================================================================================================

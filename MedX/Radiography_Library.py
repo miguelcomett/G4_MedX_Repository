@@ -2,6 +2,8 @@
 import os, sys, time, subprocess, shutil, platform, numpy as np, matplotlib.pyplot as plt
 from contextlib import redirect_stdout, redirect_stderr
 
+# 0.1. ========================================================================================================================================================
+
 def Install_Libraries():
 
     libraries = {
@@ -45,7 +47,7 @@ def Install_Libraries():
 
     print("All libraries are installed and ready to use.")
 
-# 0.1. ========================================================================================================================================================
+# 0.2. ========================================================================================================================================================
 
 def PlayAlarm():
 
@@ -68,63 +70,137 @@ def PlayAlarm():
 
 # 1.1. ========================================================================================================================================================
 
-def RunRadiography(directory, threads, energy, sim_time, iteration_time):
+def Trash_Folder(trash_folder):
 
-    from tqdm.notebook import tqdm; from send2trash import send2trash
+    from send2trash import send2trash
+                 
+    try: send2trash(trash_folder)
+    except Exception as e: print(f"Error deleting trash folder: {e}")
+
+
+def Simulation_Setup(directory, iteration_time, sim_time):
+        
+    from send2trash import send2trash
     
     if iteration_time == 0: iteration_time = sim_time
     elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
 
+    rad_folder = directory + "ROOT/" + "Rad_temp/"
     try: send2trash(rad_folder)
     except: pass
+    os.makedirs(rad_folder, exist_ok = True)
+    
+    mac_filename = 'radiography.mac'
     
     if platform.system() == "Darwin":
         executable_file = "Sim"
-        mac_filename = 'Radiography.mac'
         run_sim = f"./{executable_file} {mac_filename} . . ."
     elif platform.system() == "Windows":
         executable_file = "Sim.exe"
-        mac_filename = 'Radiography.mac'
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
     else: raise EnvironmentError("Unsupported operating system")
 
     root_folder = directory + "ROOT/"
     mac_filepath = directory + mac_filename
     
-    rad_folder = directory + "ROOT/" + "Rad_temp/"
-    os.makedirs(rad_folder, exist_ok = True)
-
     sim_time = sim_time * 60 # s
     iteration_time = iteration_time * 60 # s 
 
-    mac_template = \
-        """ \
-        /run/numberOfThreads {Threads}
-        /run/initialize
+    return rad_folder, run_sim, root_folder, mac_filepath, sim_time, iteration_time
+
+
+def Run_Calibration(directory, run_sim):
+    
+    start_time = time.perf_counter()
+    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    except Exception as e: print(f"Error running simulation: {e}")
+    end_time = time.perf_counter()
+    calibration_time = end_time - start_time
+    print("Calibration run completed.")
+
+    return calibration_time
+
+
+def Generate_MAC_Template(
+    simulation_mode,              # Obligarory parameter: 'single (1)' or 'DEXA (2)'
+    spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
+    detector_parameters  = None,  # Optional parameter
+    gun_parameters       = None,  # Optional parameter
+):
+
+    if spectra_mode        is None: spectra_mode = 'mono'
+    if detector_parameters is None: detector_parameters = {'nColumns': 1, 'nRows': 1}
+    if gun_parameters      is None: gun_parameters = {'X': 0, 'Y': 0, 'gaussX': 'true', 'SpanX': 230, 'SpanY': 240}
+
+    Threads = '{Threads}'
+    Energy  = '{Energy}'
+    Beams   = '{Beams}'
+    Beams40 = '{Beams40}'
+    Beams80 = '{Beams80}'
+
+    mac_template = []
+
+    if platform.system() == "Darwin":
+        mac_template.append(f"/run/numberOfThreads {Threads}")
+        mac_template.append("/run/initialize")
+
+    mac_template.extend([
+        f"/myDetector/nColumns {detector_parameters['nColumns']}",
+        f"/myDetector/nRows {detector_parameters['nRows']}"
+    ])
+
+    mac_template.extend([
+        f"/Pgun/X {gun_parameters['X']} mm",
+        f"/Pgun/Y {gun_parameters['Y']} mm",
+        f"/Pgun/gaussX {gun_parameters['gaussX']}",
+        f"/Pgun/SpanX {gun_parameters['SpanX']} mm",
+        f"/Pgun/SpanY {gun_parameters['SpanY']} mm"
+    ])
+
+    if simulation_mode == 'single' or simulation_mode == 1:
+        mac_template.extend([
+            f"/gun/energy {Energy} keV",
+            f"/run/beamOn {Beams}"
+        ])
+
+    if simulation_mode == 'DEXA' or simulation_mode == 2:
         
-        /myDetector/nColumns 1
-        /myDetector/nRows 1 
+        if spectra_mode == 'mono' or spectra_mode == 1:
+            mac_template.extend([
+                f"/gun/energy 40 keV",
+                f"/run/beamOn {Beams40}",
 
-        /Pgun/X 0 mm
-        /Pgun/Y 0 mm
-        /Pgun/gaussX true
-        /Pgun/SpanX 230 mm
-        /Pgun/SpanY 240 mm
+                f"/gun/energy 80 keV",
+                f"/run/beamOn {Beams80}",
+            ])
 
-        /gun/energy {Energy} keV
-        /run/beamOn {Beams}
-        """
+        if spectra_mode == 'poly' or spectra_mode == 2:
+            mac_template.extend([
+                f"/Pgun/Mode 1",
+                f"/run/beamOn {Beams40}",
+
+                f"/Pgun/Mode 2",
+                f"/run/beamOn {Beams40}",
+            ])
+
+    return "\n".join(mac_template)  
+
+
+def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
+
+    from tqdm.notebook import tqdm
+
+    rad_folder, run_sim, root_folder, mac_filepath, sim_time, iteration_time = Simulation_Setup(directory, iteration_time, sim_time)
+
+    simulation_mode = 'single'
+    mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
     
     Beams_calibration = 2500000
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
-    with open(mac_filepath, 'w') as f: f.write(filled_template)
+    with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
     
-    start_time = time.perf_counter()
-    subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-    end_time = time.perf_counter()
-    calibration_time = end_time - start_time
-    print("Calibration run completed.")
+    calibration_time = Run_Calibration(directory, run_sim)
 
     root_name = root_folder + 'CT_00.root'
     new_name = root_folder + 'Rad_0.root'
@@ -136,16 +212,17 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
     if os.path.exists(new_name): shutil.move(new_name, rad_folder)
 
     iterations = int(sim_time / iteration_time)
+    
+    Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
+    if iteration == 0: print('Beams to simulate:', round(Beams * iterations / 1000000, 2), 'M')
+
+    filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
+    with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
+
     exit_requested = False
 
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
-        Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
-        if iteration == 0: print('Beams to simulate:', round(Beams * iterations / 1000000, 2), 'M')
-
-        filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
-        with open(mac_filepath, 'w') as f: f.write(filled_template)
-
         try: 
             subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     
@@ -180,9 +257,7 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time):
     merged_path = rad_folder + merged_name + '.root'
     if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
 
-    try: send2trash(rad_folder)
-    except FileNotFoundError: print(f"The folder '{rad_folder}' does not exist.")
-    except Exception as e: print(f"An error occurred: {e}")
+    Trash_Folder(rad_folder)
 
     print('-> Simulation completed. Files:', merged_name, 'written in', root_folder)
 
@@ -196,96 +271,62 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
     new_name_80 = root_folder + 'Rad_80kev_' + str(iteration) + '.root'
 
     try: os.rename(file_40, new_name_40)
-    except FileNotFoundError: print("The file does not exist.")
-    except PermissionError: print("You do not have permission to rename this file.")
+    except FileNotFoundError: 
+        print("The file does not exist.")
+        sys.exit()
+    except PermissionError: 
+        print("You do not have permission to rename this file.")
+        sys.exit()
 
     try: os.rename(file_80, new_name_80)
-    except FileNotFoundError: print("The file does not exist.")
-    except PermissionError: print("You do not have permission to rename this file.")
+    except FileNotFoundError: 
+        print("The file does not exist.")
+        sys.exit()
+    except PermissionError: 
+        print("You do not have permission to rename this file.")
+        sys.exit()
 
     if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
     if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
-
-def RunDEXA(directory, threads, sim_time, iteration_time):
-
-    from tqdm.notebook import tqdm; from send2trash import send2trash
-
-    if iteration_time == 0: iteration_time = sim_time
-    elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
-
-    if platform.system() == "Darwin":
-        executable_file = "Sim"
-        mac_filename = 'Radiography.mac'
-        run_sim = f"./{executable_file} {mac_filename} . . ."
-    elif platform.system() == "Windows":
-        executable_file = "Sim.exe"
-        mac_filename = 'Radiography.mac'
-        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
-    else: raise EnvironmentError("Unsupported operating system")
-
-    root_folder = directory + "ROOT/"
-    mac_filepath = directory + mac_filename
     
-    rad_folder = directory + "ROOT/" + "Rad_temp/"
-    try: send2trash(rad_folder)
-    except: pass
-    os.makedirs(rad_folder, exist_ok = True)
 
-    sim_time = sim_time * 60 # s
-    iteration_time = iteration_time * 60 # s 
+def RunDEXA(directory, threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
 
-    mac_template = \
-        """ \
-        /run/numberOfThreads {Threads}
-        /run/initialize
-        
-        /myDetector/nColumns 1
-        /myDetector/nRows 1 
+    from tqdm.notebook import tqdm
 
-        /Pgun/X 0 mm
-        /Pgun/Y 0 mm
-        /Pgun/gaussX true
-        /Pgun/SpanX 230 mm
-        /Pgun/SpanY 240 mm
+    rad_folder, run_sim, root_folder, mac_filepath, sim_time, iteration_time = Simulation_Setup(directory, iteration_time, sim_time)
 
-        /gun/energy 40 keV
-        /run/beamOn {Beams40}
-
-        /gun/energy 80 keV
-        /run/beamOn {Beams80}
-        """
+    simulation_mode = 'DEXA'
+    mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
     
     Beams40_calibration = 2000000
-    Beams80_calibration = int(Beams40_calibration / 1.7)
+    Beams80_calibration = int(Beams40_calibration / 1.68)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
-    with open(mac_filepath, 'w') as f: f.write(filled_template)
+    with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    start_time = time.perf_counter()
-    subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-    end_time = time.perf_counter()
-    calibration_time = end_time - start_time
-    print("Calibration run completed.")
+    calibration_time = Run_Calibration(directory, run_sim)
 
     Rename_and_Move(root_folder, rad_folder, 0)
     
     iterations = int(sim_time / iteration_time)
+
+    Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
+    Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterations))
+
+    print('Beams to simulate:', round(Beams40 * iterations / 1000000, 2), 'M', round(Beams80 * iterations / 1000000, 2), 'M')
+
+    filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
+    with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
+
     exit_requested = False
-
+    
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
-        
-        Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
-        Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterations))
-
-        if iteration == 0: print('Beams to simulate:', round(Beams40 * iterations / 1000000, 2), 'M', round(Beams80 * iterations / 1000000, 2), 'M')
-
-        filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
-        with open(mac_filepath, 'w') as f: f.write(filled_template)
 
         try: 
             subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     
-            Rename_and_Move(root_folder, rad_folder, iteration+1)
+            Rename_and_Move(root_folder, rad_folder, iteration + 1)
 
             if exit_requested: break
         
@@ -310,13 +351,10 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
         while os.path.exists(root_folder + merged_80 + '_' + str(counter) + '.root'): counter = counter + 1
         merged_80 = merged_80 + '_' + str(counter)
 
-    with open(os.devnull, "w") as fnull: 
-        with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_HADD(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
-
-    with open(os.devnull, "w") as fnull: 
-        with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_HADD(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+    fnull = open(os.devnull, "w")
+    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
+    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+    fnull.close()
 
     merged_40_path = rad_folder + merged_40 + '.root'
     if os.path.exists(merged_40_path): shutil.move(merged_40_path, root_folder)
@@ -324,9 +362,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time):
     merged_80_path = rad_folder + merged_80 + '.root'
     if os.path.exists(merged_80_path): shutil.move(merged_80_path, root_folder)
 
-    try: send2trash(rad_folder)
-    except FileNotFoundError: print(f"The folder '{rad_folder}' does not exist.")
-    except Exception as e: print(f"An error occurred: {e}")
+    Trash_Folder(rad_folder)
 
     print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
     print("Simulation completed.")
@@ -442,14 +478,6 @@ def Manage_Files(directory, starts_with, output_name):
         merged_file = f"{merged_file}_{counter}.root"
 
     return trash_folder, file_list, merged_file
-
-
-def Trash_Folder(trash_folder):
-
-    from send2trash import send2trash
-                 
-    try: send2trash(trash_folder)
-    except Exception as e: print(f"Error deleting trash folder: {e}")
 
 # 1.4. ========================================================================================================================================================
 
@@ -1333,36 +1361,6 @@ def export_to_dicom(HU_images, size_y, directory, compressed):
             image2d = image.astype('int16')
             ds.PixelData = image2d.tobytes()
             ds.save_as(name + '.dcm')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

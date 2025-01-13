@@ -1,6 +1,6 @@
 # Python modules: 
 import os, sys, time, subprocess, shutil, platform, numpy as np, matplotlib.pyplot as plt
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stdout, redirect_stderr; from pathlib import Path
 
 # 0.1. ========================================================================================================================================================
 
@@ -78,35 +78,37 @@ def Trash_Folder(trash_folder):
     except Exception as e: print(f"Error deleting trash folder: {e}")
 
 
-def Simulation_Setup(directory, iteration_time, sim_time):
+def Simulation_Setup():
         
     from send2trash import send2trash
-    
-    if iteration_time == 0: iteration_time = sim_time
-    elif iteration_time > sim_time: raise ValueError("Merge time cannot be greater than simulation time")
-
-    rad_folder = directory + "ROOT/" + "Rad_temp/"
-    try: send2trash(rad_folder)
-    except: pass
-    os.makedirs(rad_folder, exist_ok = True)
     
     mac_filename = 'radiography.mac'
     
     if platform.system() == "Darwin":
+        directory = Path('BUILD')
+        #  directory = 'BUILD/'
         executable_file = "Sim"
         run_sim = f"./{executable_file} {mac_filename} . . ."
+        print(run_sim)
+
     elif platform.system() == "Windows":
+        directory = Path('build') / 'Release'
+        # directory = 'build\\Release\\'
         executable_file = "Sim.exe"
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
+        print(run_sim)
+
     else: raise EnvironmentError("Unsupported operating system")
 
-    root_folder = directory + "ROOT/"
-    mac_filepath = directory + mac_filename
+    root_folder  = directory / "ROOT/"
+    mac_filepath = directory / mac_filename
     
-    sim_time = sim_time * 60 # s
-    iteration_time = iteration_time * 60 # s 
+    rad_folder = directory / "ROOT/" / "Rad_temp/"
+    try: send2trash(rad_folder)
+    except: pass
+    os.makedirs(rad_folder, exist_ok = True)
 
-    return rad_folder, run_sim, root_folder, mac_filepath, sim_time, iteration_time
+    return directory, run_sim, root_folder, mac_filepath, rad_folder
 
 
 def Run_Calibration(directory, run_sim):
@@ -200,11 +202,16 @@ def Generate_MAC_Template(
     return "\n".join(mac_template)  
 
 
-def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
+def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
 
     from tqdm.notebook import tqdm
 
-    rad_folder, run_sim, root_folder, mac_filepath, sim_time, iteration_time = Simulation_Setup(directory, iteration_time, sim_time)
+    if iteration_time == 0 or iteration_time > sim_time: iteration_time = sim_time
+
+    sim_time = sim_time * 60 # s
+    iteration_time = iteration_time * 60 # s 
+
+    directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
 
     simulation_mode = 'single'
     mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
@@ -216,14 +223,16 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra
     
     calibration_time = Run_Calibration(directory, run_sim)
 
-    root_name = root_folder + 'CT_00.root'
-    new_name = root_folder + 'Rad_0.root'
+    root_base_name= 'CT'
+    new_base_name = 'Rad'
+    old_root_name = root_folder/f"{root_base_name}{'_00.root'}"
+    new_root_name = root_folder/f"{new_base_name}{'_0.root'}"
 
-    try: os.rename(root_name, new_name)
+    try: os.rename(old_root_name, new_root_name)
     except FileNotFoundError: print("The file does not exist.")
     except PermissionError: print("You do not have permission to rename this file.")
 
-    if os.path.exists(new_name): shutil.move(new_name, rad_folder)
+    if os.path.exists(new_root_name): shutil.move(new_root_name, rad_folder)
 
     iterations = int(sim_time / iteration_time)
     
@@ -238,16 +247,14 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
         try: 
-            subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+            subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
     
-            root_name = root_folder + 'CT_00.root'
-            new_name = root_folder + 'Rad_' + str(iteration + 1) + '.root'
-
-            try: os.rename(root_name, new_name)
+            new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
+            print(new_root_name)
+            try: os.rename(old_root_name, new_root_name)
             except FileNotFoundError: print("The file does not exist.")
             except PermissionError: print("You do not have permission to rename this file.")
-
-            if os.path.exists(new_name): shutil.move(new_name, rad_folder)
+            if os.path.exists(new_root_name): shutil.move(new_root_name, rad_folder)
 
             if exit_requested: break
         
@@ -257,20 +264,19 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra
             else: print("Forcing immediate termination."); raise
 
     total_beams = int(np.ceil(Beams * iterations / 1000000))
-    merged_name = 'Rad_' + str(energy) + 'kev_' + str(total_beams) + 'M'
+    merged_name = f"{new_base_name}{'_'}{str(energy)}{'kev_'}{str(total_beams)}{'M'}"
 
-    if os.path.exists(root_folder + merged_name + '.root'):
+    if os.path.exists(root_folder / f"{merged_name}{'.root'}"):
         counter = 1
-        while os.path.exists(root_folder + merged_name + '_' + str(counter) + '.root'): counter = counter + 1
-        merged_name = merged_name + '_' + str(counter)
+        while os.path.exists(root_folder / f"{merged_name}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
+        merged_name = f"{merged_name}{'_'}{str(counter)}"
+    merged_name = f"{merged_name}{'.root'}"
 
     with open(os.devnull, "w") as fnull: 
         with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_HADD(rad_folder, 'Rad', merged_name, trim_coords = None)
+            Merge_Roots_HADD(rad_folder, new_base_name, merged_name, trim_coords = None)
 
-    merged_path = rad_folder + merged_name + '.root'
-    if os.path.exists(merged_path): shutil.move(merged_path, root_folder)
-
+    shutil.move(rad_folder/merged_name, root_folder)
     Trash_Folder(rad_folder)
 
     print('-> Simulation completed. Files:', merged_name, 'written in', root_folder)
@@ -279,10 +285,12 @@ def RunRadiography(directory, threads, energy, sim_time, iteration_time, spectra
 
 def Rename_and_Move(root_folder, rad_folder, iteration):
 
-    file_40 = root_folder + 'CT_00.root'
-    file_80 = root_folder + 'CT_01.root'
-    new_name_40 = root_folder + 'Rad_40kev_' + str(iteration) + '.root'
-    new_name_80 = root_folder + 'Rad_80kev_' + str(iteration) + '.root'
+    base_name_40 = 'Rad_40kev'
+    base_name_80 = 'Rad_80kev'
+    file_40 = root_folder / 'CT_00.root'
+    file_80 = root_folder / 'CT_01.root'
+    new_name_40 = root_folder / f"{base_name_40}{'_'}{str(iteration)}{'.root'}"
+    new_name_80 = root_folder / f"{base_name_80}{'_'}{str(iteration)}{'.root'}"
 
     try: os.rename(file_40, new_name_40)
     except FileNotFoundError: 
@@ -302,13 +310,20 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
 
     if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
     if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
+
+    return base_name_40, base_name_80
     
 
-def RunDEXA(directory, threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
+def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
 
     from tqdm.notebook import tqdm
 
-    rad_folder, run_sim, root_folder, mac_filepath, sim_time, iteration_time = Simulation_Setup(directory, iteration_time, sim_time)
+    if iteration_time == 0 or iteration_time > sim_time: iteration_time = sim_time
+
+    sim_time = sim_time * 60 # s
+    iteration_time = iteration_time * 60 # s 
+
+    directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
 
     simulation_mode = 'DEXA'
     mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
@@ -320,9 +335,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time, spectra_mode, detector
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
     calibration_time = Run_Calibration(directory, run_sim)
-
-    Rename_and_Move(root_folder, rad_folder, 0)
-    
+    base_name_40, base_name_80  = Rename_and_Move(root_folder, rad_folder, 0)
     iterations = int(sim_time / iteration_time)
 
     Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
@@ -339,9 +352,7 @@ def RunDEXA(directory, threads, sim_time, iteration_time, spectra_mode, detector
 
         try: 
             subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-    
             Rename_and_Move(root_folder, rad_folder, iteration + 1)
-
             if exit_requested: break
         
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
@@ -349,32 +360,31 @@ def RunDEXA(directory, threads, sim_time, iteration_time, spectra_mode, detector
             if not exit_requested: print("\nKeyboardInterrupt detected! Exiting after this iteration."); exit_requested = True
             else: print("Forcing immediate termination."); raise
 
-    total_beams_40 = int(np.ceil(Beams40 * iterations / 1000000))
-    total_beams_80 = int(np.ceil(Beams80 * iterations / 1000000))
+    total_beams_40 = int(np.ceil(Beams40 * iterations / 1_000_000))
+    total_beams_80 = int(np.ceil(Beams80 * iterations / 1_000_000))
 
-    merged_40 = 'Rad_40kev_' + str(total_beams_40) + 'M'
-    merged_80 = 'Rad_80kev_' + str(total_beams_80) + 'M'
+    merged_40 = f"{base_name_40}{'_'}{str(total_beams_40)}{'M'}"
+    merged_80 = f"{base_name_80}{'_'}{str(total_beams_80)}{'M'}"
 
-    if os.path.exists(root_folder + merged_40 + '.root'):
+    if os.path.exists(root_folder / f"{merged_40}{'.root'}"):
         counter = 1
-        while os.path.exists(root_folder + merged_40 + '_' + str(counter) + '.root'): counter = counter + 1
-        merged_40 = merged_40 + '_' + str(counter)
+        while os.path.exists(root_folder / f"{merged_40}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
+        merged_40 = f"{merged_40}{'_'}{str(counter)}"
+    merged_40 = f"{merged_40}{'.root'}"
 
-    if os.path.exists(root_folder + merged_80 + '.root'):
+    if os.path.exists(root_folder / f"{merged_80}{'.root'}"):
         counter = 1
-        while os.path.exists(root_folder + merged_80 + '_' + str(counter) + '.root'): counter = counter + 1
-        merged_80 = merged_80 + '_' + str(counter)
+        while os.path.exists(root_folder / f"{merged_80}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
+        merged_80 = f"{merged_80}{'_'}{str(counter)}"
+    merged_80 = f"{merged_80}{'.root'}"
 
     fnull = open(os.devnull, "w")
-    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, 'Rad_40kev', merged_40, trim_coords = None)
-    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, 'Rad_80kev', merged_80, trim_coords = None)
+    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, base_name_40, merged_40, trim_coords = None)
+    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, base_name_80, merged_80, trim_coords = None)
     fnull.close()
 
-    merged_40_path = rad_folder + merged_40 + '.root'
-    if os.path.exists(merged_40_path): shutil.move(merged_40_path, root_folder)
-
-    merged_80_path = rad_folder + merged_80 + '.root'
-    if os.path.exists(merged_80_path): shutil.move(merged_80_path, root_folder)
+    shutil.move(rad_folder/merged_40, root_folder)
+    shutil.move(rad_folder/merged_80, root_folder)
 
     Trash_Folder(rad_folder)
 
@@ -484,6 +494,7 @@ def Manage_Files(directory, starts_with, output_name):
         print("No files found. Please check your inputs.")
         sys.exit(1)
 
+    if output_name.endswith('.root'): output_name = output_name.rstrip('.root')
     merged_file = directory + output_name 
     if not os.path.exists(merged_file + ".root"): merged_file = merged_file + ".root"
     if os.path.exists(merged_file + ".root"):

@@ -53,7 +53,7 @@ def PlayAlarm():
 
     import pygame
 
-    alarm_path = '/Users/miguelcomett/Music/Spotify/México.mp3'
+    alarm_path = 'Alarm.mp3'
 
     volume_level = 40
     os.system(f"osascript -e 'set volume output volume {volume_level}'")
@@ -61,7 +61,7 @@ def PlayAlarm():
     pygame.mixer.init()
     pygame.mixer.music.load(alarm_path)
 
-    print("Script completed. Playing alarm...")
+    # print("Script completed. Playing alarm...")
     pygame.mixer.music.play(loops = -1) 
 
     time.sleep(5)
@@ -89,13 +89,19 @@ def Simulation_Setup():
         #  directory = 'BUILD/'
         executable_file = "Sim"
         run_sim = f"./{executable_file} {mac_filename} . . ."
-        print(run_sim)
 
     elif platform.system() == "Windows":
         directory = Path('build') / 'Release'
         # directory = 'build\\Release\\'
         executable_file = "Sim.exe"
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
+        print(run_sim)
+
+    elif platform.system() == "Linux":
+        directory = Path('build') / 'Release'
+        # directory = 'build\\Release\\'
+        executable_file = "Sim.exe"
+        run_sim = fr"./{executable_file} {mac_filename} . . ."
         print(run_sim)
 
     else: raise EnvironmentError("Unsupported operating system")
@@ -202,7 +208,7 @@ def Generate_MAC_Template(
     return "\n".join(mac_template)  
 
 
-def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
+def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
     from tqdm.notebook import tqdm
 
@@ -210,6 +216,8 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
     sim_time = sim_time * 60 # s
     iteration_time = iteration_time * 60 # s 
+
+    energy_name = f"{str(energy)}{'kev'}"
 
     directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
 
@@ -224,7 +232,17 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     calibration_time = Run_Calibration(directory, run_sim)
 
     root_base_name= 'CT'
-    new_base_name = 'Rad'
+
+    if spectra_mode == 'mono' or spectra_mode == 0: 
+        new_base_name = 'Rad'
+
+    if spectra_mode == '80kvp' or spectra_mode == 1: 
+        new_base_name = 'Poly'
+        energy_name = spectra_mode
+    if spectra_mode == '140kvp' or spectra_mode == 2: 
+        new_base_name = 'Poly'
+        energy_name = spectra_mode
+
     old_root_name = root_folder/f"{root_base_name}{'_00.root'}"
     new_root_name = root_folder/f"{new_base_name}{'_0.root'}"
 
@@ -250,7 +268,6 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
             subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
     
             new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
-            print(new_root_name)
             try: os.rename(old_root_name, new_root_name)
             except FileNotFoundError: print("The file does not exist.")
             except PermissionError: print("You do not have permission to rename this file.")
@@ -264,7 +281,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
             else: print("Forcing immediate termination."); raise
 
     total_beams = int(np.ceil(Beams * iterations / 1000000))
-    merged_name = f"{new_base_name}{'_'}{str(energy)}{'kev_'}{str(total_beams)}{'M'}"
+    merged_name = f"{new_base_name}{'_'}{energy_name}{'_'}{str(total_beams)}{'M'}"
 
     if os.path.exists(root_folder / f"{merged_name}{'.root'}"):
         counter = 1
@@ -280,15 +297,23 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     Trash_Folder(rad_folder)
 
     print('-> Simulation completed. Files:', merged_name, 'written in', root_folder)
+    if alarm == True or alarm == 1: PlayAlarm()
 
 # 1.2. ========================================================================================================================================================
 
-def Rename_and_Move(root_folder, rad_folder, iteration):
+def Rename_and_Move(root_folder, rad_folder, iteration, spectra_mode):
 
-    base_name_40 = 'Rad_40kev'
-    base_name_80 = 'Rad_80kev'
-    file_40 = root_folder / 'CT_00.root'
-    file_80 = root_folder / 'CT_01.root'
+    if spectra_mode == 'mono' or spectra_mode == 0:
+        base_name_40 = 'Rad_40kev'
+        base_name_80 = 'Rad_80kev'
+    if spectra_mode == 'poly' or spectra_mode == 1:
+        base_name_40 = 'Poly_80kvp'
+        base_name_80 = 'Poly_140kvp'
+    
+    old_root_name = 'CT'
+
+    file_40 = root_folder / f"{old_root_name}{'_00.root'}"
+    file_80 = root_folder / f"{old_root_name}{'_01.root'}"
     new_name_40 = root_folder / f"{base_name_40}{'_'}{str(iteration)}{'.root'}"
     new_name_80 = root_folder / f"{base_name_80}{'_'}{str(iteration)}{'.root'}"
 
@@ -314,7 +339,7 @@ def Rename_and_Move(root_folder, rad_folder, iteration):
     return base_name_40, base_name_80
     
 
-def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters):
+def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
     from tqdm.notebook import tqdm
 
@@ -335,7 +360,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
     calibration_time = Run_Calibration(directory, run_sim)
-    base_name_40, base_name_80  = Rename_and_Move(root_folder, rad_folder, 0)
+    base_name_40, base_name_80  = Rename_and_Move(root_folder, rad_folder, 0, spectra_mode)
     iterations = int(sim_time / iteration_time)
 
     Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
@@ -352,7 +377,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
         try: 
             subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-            Rename_and_Move(root_folder, rad_folder, iteration + 1)
+            Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
             if exit_requested: break
         
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
@@ -390,6 +415,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
     print("Simulation completed.")
+    if alarm == True or alarm == 1: PlayAlarm()
 
 # 1.3. ========================================================================================================================================================
 

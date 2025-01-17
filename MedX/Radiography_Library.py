@@ -55,7 +55,7 @@ def PlayAlarm():
 
     alarm_path = 'Alarm.mp3'
 
-    volume_level = 40
+    volume_level = 30
     os.system(f"osascript -e 'set volume output volume {volume_level}'")
 
     pygame.mixer.init()
@@ -64,7 +64,7 @@ def PlayAlarm():
     # print("Script completed. Playing alarm...")
     pygame.mixer.music.play(loops = -1) 
 
-    time.sleep(5)
+    time.sleep(8)
     # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
 
@@ -131,6 +131,7 @@ def Run_Calibration(directory, run_sim):
 
 def Generate_MAC_Template(
     simulation_mode,              # Obligarory parameter: 'single (1)' or 'DEXA (2)'
+    threads              = None,  # Optional parameter
     spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
     detector_parameters  = None,  # Optional parameter
     gun_parameters       = None,  # Optional parameter
@@ -140,17 +141,10 @@ def Generate_MAC_Template(
     if detector_parameters is None: detector_parameters = {'nColumns': 1, 'nRows': 1}
     if gun_parameters      is None: gun_parameters = {'X': 0, 'Y': 0, 'gaussX': 'true', 'SpanX': 230, 'SpanY': 240}
 
-    Threads = '{Threads}'
-    Energy  = '{Energy}'
-    Beams   = '{Beams}'
-    Beams40 = '{Beams40}'
-    Beams80 = '{Beams80}'
-
     mac_template = []
 
-    if platform.system() == "Darwin":
-        mac_template.append(f"/run/numberOfThreads {Threads}")
-        mac_template.append("/run/initialize")
+    if threads: mac_template.append(f"/run/numberOfThreads {'{Threads}'}")
+    mac_template.append("/run/initialize")
 
     mac_template.extend([
         f"/myDetector/nColumns {detector_parameters['nColumns']}",
@@ -169,20 +163,20 @@ def Generate_MAC_Template(
 
         if spectra_mode == 'mono' or spectra_mode == 0:
             mac_template.extend([
-                f"/gun/energy {Energy} keV",
-                f"/run/beamOn {Beams}"
+                f"/gun/energy {'{Energy}'} keV",
+                f"/run/beamOn {'{Beams}'}"
             ])
 
         if spectra_mode == '80kvp' or spectra_mode == 1:
             mac_template.extend([
                 f"/Pgun/Mode 1",
-                f"/run/beamOn {Beams}"
+                f"/run/beamOn {'{Beams}'}"
             ])
 
         if spectra_mode == '140kvp' or spectra_mode == 2:
             mac_template.extend([
                 f"/Pgun/Mode 2",
-                f"/run/beamOn {Beams}"
+                f"/run/beamOn {'{Beams}'}"
             ])
 
     if simulation_mode == 'DEXA' or simulation_mode == 1:
@@ -190,19 +184,19 @@ def Generate_MAC_Template(
         if spectra_mode == 'mono' or spectra_mode == 0:
             mac_template.extend([
                 f"/gun/energy 40 keV",
-                f"/run/beamOn {Beams40}",
+                f"/run/beamOn {'{Beams40}'}",
 
                 f"/gun/energy 80 keV",
-                f"/run/beamOn {Beams80}",
+                f"/run/beamOn {'{Beams80}'}",
             ])
 
         if spectra_mode == 'poly' or spectra_mode == 1:
             mac_template.extend([
                 f"/Pgun/Mode 1",
-                f"/run/beamOn {Beams40}",
+                f"/run/beamOn {'{Beams40}'}",
 
                 f"/Pgun/Mode 2",
-                f"/run/beamOn {Beams40}",
+                f"/run/beamOn {'{Beams80}'}",
             ])
 
     return "\n".join(mac_template)  
@@ -222,7 +216,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
 
     simulation_mode = 'single'
-    mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
+    mac_template = Generate_MAC_Template(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
     
     Beams_calibration = 2500000
 
@@ -351,10 +345,15 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
 
     simulation_mode = 'DEXA'
-    mac_template = Generate_MAC_Template(simulation_mode, spectra_mode, detector_parameters, gun_parameters)
-    
-    Beams40_calibration = 2000000
-    Beams80_calibration = int(Beams40_calibration / 1.5) #1.68
+    mac_template = Generate_MAC_Template(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
+
+    if spectra_mode == 'mono' or spectra_mode == 0:
+        Beams40_calibration = 2000000
+        Beams80_calibration = int(Beams40_calibration / 1.61)
+
+    if spectra_mode == 'poly' or spectra_mode == 1:
+        Beams40_calibration = 2000000
+        Beams80_calibration = int(Beams40_calibration * 1.05)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -416,6 +415,88 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
     print("Simulation completed.")
     if alarm == True or alarm == 1: PlayAlarm()
+
+
+def UI_RunDEXA():
+
+    import ipywidgets as widgets; from IPython.display import display, HTML
+
+    style = """
+    <style>
+    .widget-label {font-size: 18px !important;}
+    .widget-button {font-size: 18px !important;}
+    .widget-dropdown > select {font-size: 16px !important;}
+    .widget-text {font-size: 18px !important;}
+    </style>
+    """
+    display(HTML(style))
+
+    labels_width = '200px'
+    custom_layout   = widgets.Layout(width = '350px')
+
+    threads_slider  = widgets.Dropdown(
+                        options = [('None', None), ('4', 4), ('9', 9), ('10', 10)],
+                        value = 10,
+                        description = 'Number of CPU Cores',
+                        layout = custom_layout,
+                        style = {'description_width': labels_width})
+    
+    sim_time_slider = widgets.BoundedFloatText(
+                        value = 30, min = 0, max = 100000, step = 1, 
+                        description = 'Simulation Time (min)', 
+                        layout = custom_layout, 
+                        style = {'description_width': labels_width})
+    
+    iteration_time  = widgets.BoundedFloatText(
+                        value = 30, min = 0, max = 300, step = 1, 
+                        description = 'Iteration Time (min)',
+                        layout = custom_layout,
+                        style = {'description_width': labels_width})
+    
+    spectra_mode   = widgets.Dropdown(
+                        options = [('Mono', 'mono'), ('Poly', 'poly')],
+                        value = 'poly',
+                        description = 'Spectra Mode',
+                        layout = custom_layout,
+                        style = {'description_width': labels_width})
+    
+    alarm_toggle    = widgets.ToggleButton(
+                        value = True, 
+                        description = 'Alarm', 
+                        button_style = 'success',
+                        layout = widgets.Layout(width='350px', height='30px'))
+
+    run_button      = widgets.Button(
+                        description = 'Run Simulation', 
+                        button_style = 'primary', 
+                        layout = widgets.Layout(width='350px', height='50px'))
+    
+    output = widgets.Output()
+
+    def toggle_alarm_state(change):
+        alarm_toggle.description  = 'Alarm On' if change.new else 'Alarm Off'
+        alarm_toggle.button_style = 'success' if change.new else 'danger'
+    
+    alarm_toggle.observe(toggle_alarm_state, 'value')
+    
+    def on_run_clicked(change):
+        with output:
+            output.clear_output()
+            print('Simulation Started')
+            RunDEXA(threads         = threads_slider.value,
+                    sim_time        = sim_time_slider.value,
+                    iteration_time  = iteration_time.value,
+                    spectra_mode    = spectra_mode.value,
+                    detector_parameters = None, gun_parameters = None,
+                    alarm           = alarm_toggle.value)
+
+    run_button.on_click(on_run_clicked)
+
+    ui = widgets.VBox([
+            widgets.HTML(value="<h3 style = 'color:blue; font-size: 20px;'> DEXA Simulation Parameters </h3>"),
+            threads_slider, sim_time_slider, iteration_time, spectra_mode, alarm_toggle, run_button, output,])
+    
+    display(ui)
 
 # 1.3. ========================================================================================================================================================
 
@@ -623,7 +704,16 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     if tree is None: print(f"Tree '{tree_name}' not found in {root_file}"); return
     if x_branch not in tree or y_branch not in tree: print(f"Branches '{x_branch}' or '{y_branch}' not found in the tree"); return
 
-    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
+    file_size = os.path.getsize(file_path)
+    file_size_MB = file_size / (1000000)
+
+    if file_size_MB < 1000: 
+        chunk_size = int(file_size_MB / 10)
+        if chunk_size < 10: chunk_size = '10 MB'
+        else: chunk_size = f"{chunk_size} MB"
+    else: chunk_size = '50 MB'
+
+    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = chunk_size)
     x_values = dataframe[x_branch]
     y_values = dataframe[y_branch]
 
@@ -1183,85 +1273,97 @@ def CT_Summary_Data(directory, tree, branches):
         
     return NumberofPhotons, EnergyDeposition, RadiationDose
 
-def Calculate_Projections(directory, filename, roots, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder):
+
+def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, csv_folder):
     
     from tqdm import tqdm
 
-    start = roots[0]
-    end = roots[1]
-    deg = roots[2]
+    os.makedirs(csv_folder, exist_ok = True)
+
+    start = degrees[0]
+    end = degrees[1]
+    deg = degrees[2]
     projections = np.arange(start, end+1, deg)
 
-    for i in tqdm(projections, desc = 'Calculating heatmaps', unit = ' Heatmap', leave = True):
+    tree_name = root_structure[0]
+    x_branch = root_structure[1]
+    y_branch = root_structure[2]
 
-        root_name = filename + '_' + str(i) + '.root'
-        htmp_array, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
+    for i in tqdm(projections, desc = 'Calculating heatmaps', unit = ' Heatmaps', leave = True):
 
-        name = csv_folder + "/CT_" + str(i) + ".csv"
-        np.savetxt(name, htmp_array, delimiter=',', fmt='%d')
+        root_name = f"{filename}_{i}.root"
+        heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
 
-    return htmp_array, xlim, ylim
+        write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
+        np.savetxt(write_name, heatmap, delimiter=',', fmt='%d') # '%d', '%.4f'
+
+    lower = np.percentile(heatmap, 0)
+    upper = np.percentile(heatmap, 98)
+    clipped_htmp = np.clip(heatmap, lower, upper)
+    Plot_Heatmap(clipped_htmp, save_as='')
+
+    return heatmap, xlim, ylim
 
 
-def LoadHeatmapsFromCSV(csv_folder, roots):
+def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
 
-    from tqdm import tqdm
-
-    start = roots[0]
-    end = roots[1]
-    deg = roots[2]
-    sims = np.arange(start, end+1, deg)
+    import plotly.graph_objects as go; from tqdm import tqdm; from skimage.transform import iradon; from scipy import ndimage
     
-    htmps = np.zeros(len(sims), dtype=object)
-    for i, sim in tqdm(enumerate(sims), desc = 'Creating heatmaps from CSV files', unit = ' heatmaps', leave = True):
-        name = csv_folder + f"CT_{round(sim)}.csv"
-        htmps[i] = np.genfromtxt(name, delimiter = ',')
+    start = degrees[0]
+    end = degrees[1]
+    deg = degrees[2]
+    projections = np.arange(start, end+1, deg)
 
-    return htmps
-
-
-def RadonReconstruction(roots, htmps, layers):
-
-    import plotly.graph_objects as go; from tqdm import tqdm; from skimage.transform import iradon
-    
     initial = layers[0]
     final = layers[1]
     spacing = layers[2]
     slices = np.round(np.arange(initial, final, spacing))
     
-    start = roots[0]
-    end = roots[1]
-    deg = roots[2]
+    heatmap_matrix = np.zeros(len(projections), dtype = 'object')
 
-    thetas = np.arange(start, end+1, deg)
-    reconstructed_imgs = np.zeros(len(slices), dtype="object")
+    for i in tqdm(projections, desc = 'Performing Logarithmic Transformation', unit = ' Heatmaps', leave = True):
 
-    for i, layer in tqdm(enumerate(slices), desc = 'Reconstructing slices', unit = ' Slices', leave = True):
+        read_name = csv_read + f"{'CT_raw_'}{i}.csv"
+        raw_heatmap = np.genfromtxt(read_name, delimiter = ',')
+        
+        raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
+        heatmap = Logarithmic_Transform(raw_heatmap)
+        # heatmap_matrix[i] = heatmap
+        
+        write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
+        # np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
 
-        p = np.array([heatmap[layer] for heatmap in htmps]).T
-        reconstructed_imgs[i] = iradon(p, theta = thetas)
-    
-    fig = go.Figure(go.Heatmap(z = reconstructed_imgs[0]))
-    fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    # for i in tqdm(slices, desc = 'Reconstructing slices', unit = ' Slices', leave = True):
+
+    #     p = np.array([heatmap[i] for heatmap in heatmap_matrix]).T
+    #     reconstructed_slice = iradon(p, theta = projections)
+
+    #     write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
+    #     np.savetxt(write_name, reconstructed_slice, delimiter=',', fmt='%.2f')
+
+
+    fig = go.Figure(go.Heatmap(z = heatmap, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    fig.update_layout(width = 700, height = 700, yaxis = dict(autorange = 'reversed'))
     fig.show()
 
-    return reconstructed_imgs
+    Plot_Heatmap(heatmap, save_as='')
 
 
-def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
+def CoefficientstoHU(csv_slices, mu_water, air_parameter):
 
     import plotly.graph_objects as go
 
-    initial = slices[0]
-    final = slices[1]
-    spacing = slices[2]
-    slices = np.round(np.arange(initial, final, spacing))
+    # initial = slices[0]
+    # final = slices[1]
+    # spacing = slices[2]
+    # slices = np.round(np.arange(initial, final, spacing))
 
+    slices = os.listdir(csv_slices)
     HU_images = np.zeros(len(slices), dtype="object")
 
     for i in range(len(HU_images)):
 
-        HU_images[i] = np.round(1000 * ((reconstructed_imgs[i] - mu_water) / mu_water)).astype(int)
+        HU_images[i] = np.round(1000 * ((slices[i] - mu_water) / mu_water)).astype(int)
         HU_images[i][HU_images[i] < air_parameter] = -1000
 
     fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
@@ -1271,16 +1373,13 @@ def CoefficientstoHU(reconstructed_imgs, slices, mu_water, air_parameter):
     return HU_images
 
 
-def export_to_dicom(HU_images, size_y, directory, compressed):
+def Export_to_Dicom(HU_images, size_y, directory, compressed):
 
-    import pydicom; from pydicom.pixels import compress
-    from pydicom.dataset import Dataset, FileDataset; from pydicom.uid import RLELossless 
-    from pydicom.uid import ExplicitVRLittleEndian; from pydicom.encaps import encapsulate
-    
+    import pydicom; from pydicom.uid import RLELossless; from pydicom.encaps import encapsulate; from pydicom.dataset import Dataset; 
+    # from pydicom.uid import ExplicitVRLittleEndian; from pydicom.pixels import compress; from pydicom.dataset import FileDataset
+
     image2d = HU_images[0].astype('int16')
-
     print("Setting file meta information...")
-
     print("Setting pixel data...")
     
     # instanceUID =  pydicom.uid.generate_uid()
@@ -1412,21 +1511,6 @@ def export_to_dicom(HU_images, size_y, directory, compressed):
             image2d = image.astype('int16')
             ds.PixelData = image2d.tobytes()
             ds.save_as(name + '.dcm')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

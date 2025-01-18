@@ -353,7 +353,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     if spectra_mode == 'poly' or spectra_mode == 1:
         Beams40_calibration = 2000000
-        Beams80_calibration = int(Beams40_calibration * 1.05)
+        Beams80_calibration = int(Beams40_calibration * 1)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -645,6 +645,7 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
     print('-> Dose of radiation received:', f"{RadiationDose:,.5f}", 'µSv')
     
     return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
+
 
 def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x, range_y):
 
@@ -1166,75 +1167,124 @@ def ClearFolder(directory):
                 except Exception as e: print(f"Error deleting file {file_path}: {e}")
 
 
-def CT_Loop(directory, starts_with, angles):
+def Generate_CT_MAC_Template(
+    threads              = None,  # Optional parameter
+    spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
+    detector_parameters  = None,  # Optional parameter
+    gun_parameters       = None,  # Optional parameter
+):
+
+    if spectra_mode        is None: spectra_mode = 'mono'
+    if detector_parameters is None: detector_parameters = {'nColumns': 1, 'nRows': 1}
+    if gun_parameters      is None: gun_parameters = {'X': 0, 'Y': 0, 'gaussX': 'true', 'SpanX': 230, 'SpanY': 0.01}
+
+    mac_template = []
+
+    mac_template.extend([
+        f"/myDetector/Rotation {'{angle}'}",
+        f"/myDetector/nColumns {detector_parameters['nColumns']}",
+        f"/myDetector/nRows {detector_parameters['nRows']}",
+        f"/run/reinitializeGeometry"
+    ])
+
+    if threads: mac_template.append(f"/run/numberOfThreads {'{Threads}'}")
+    mac_template.append("/run/initialize")
+
+    mac_template.extend([
+        f"/Pgun/X {gun_parameters['X']} mm",
+        f"/Pgun/gaussX {gun_parameters['gaussX']}",
+        f"/Pgun/SpanX {gun_parameters['SpanX']} mm",
+        f"/Pgun/Xcos true",
+        f"/Pgun/Y {gun_parameters['Y']} mm",
+        f"/Pgun/SpanY {gun_parameters['SpanY']} mm"
+    ])
+
+    if spectra_mode == 'mono' or spectra_mode == 0:
+        mac_template.append(f"/gun/energy {'{Energy}'} keV")
+
+    if spectra_mode == '80kvp' or spectra_mode == 1:
+        mac_template.append(f"/Pgun/Mode 1")
+
+    if spectra_mode == '140kvp' or spectra_mode == 2:
+        mac_template.extend(f"/Pgun/Mode 2")
+
+    mac_template.append(f"{'{beam_lines}'}")
+
+    return "\n".join(mac_template)  
+
+
+def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     from tqdm.notebook import tqdm
 
+    mac_filename = 'CT.mac'
+    
     if platform.system() == "Darwin":
+        directory = Path('BUILD')
         executable_file = "Sim"
-        mac_filename = 'CT.mac'
         run_sim = f"./{executable_file} {mac_filename} . . ."
+
     elif platform.system() == "Windows":
+        directory = Path('build') / 'Release'
         executable_file = "Sim.exe"
-        mac_filename = 'CT.mac'
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
+        print(run_sim)
+
+    elif platform.system() == "Linux":
+        directory = Path('build') / 'Release'
+        executable_file = "Sim.exe"
+        run_sim = fr"./{executable_file} {mac_filename} . . ."
+        print(run_sim)
+
     else: raise EnvironmentError("Unsupported operating system")
 
-    root_folder = directory + "ROOT/"
-    mac_filepath = directory + mac_filename
-    ct_folder = directory + "ROOT/" + "CT/"
+    root_folder = directory / "ROOT/"
+    mac_filepath = directory / mac_filename
+    ct_folder = directory / f"ROOT/CT/"
     os.makedirs(ct_folder, exist_ok = True)
+
+    y_start = slices[0]
+    y_end = slices[1]
+    step = slices[2]
     
     for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
         
         ClearFolder(root_folder)
 
-        mac_template = \
-        """ \
-        /myDetector/Rotation {angle}
-        /myDetector/nColumns 1
-        /myDetector/nRows 1
-        /run/reinitializeGeometry
+        mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
+        
+        beam_lines = ""
+        for y in range(y_start, y_end + 1, step): 
+            beam_lines += f"""
+            /Pgun/Y {y} mm
+            /run/beamOn 150000
+            """
 
-        /run/numberOfThreads 10
-        /run/initialize
+        energy = 80
 
-        /Pgun/X 0 mm
-        /Pgun/gaussX true
-        /Pgun/Xcos true
-        /Pgun/SpanY 0.01 mm
-
-        /gun/energy 80 keV
-
-        {beam_lines}
-        """
-
-        start = -280
-        end = 245
-        step = 4
-        beam_lines = "\n".join(f"        /Pgun/Y {y} mm\n        /run/beamOn 150000" for y in range(start, end + 1, step))
-
-        filled_template = mac_template.format(angle = angle, beam_lines = beam_lines)
+        filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
         with open(mac_filepath, 'w') as f: f.write(filled_template)
 
         try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
     
-        output_name = f'Aang_{angle}'
-        if os.path.exists(ct_folder + output_name + '.root'):
+        output_name = f"Aang_{angle}"
+        if os.path.exists(ct_folder / f"{output_name}.root"):
             counter = 0
-            while os.path.exists(ct_folder + output_name + '_' + str(counter) + '.root'): counter = counter + 1
-            output_name = root_folder + output_name + '_' + str(counter)
+            while os.path.exists(ct_folder / f"{output_name}_{counter}.root"): counter = counter + 1
+            output_name = root_folder / f"{output_name}_{counter}"
 
         with open(os.devnull, "w") as fnull: 
             with redirect_stdout(fnull), redirect_stderr(fnull):
                 Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
 
-        merged_file_path = root_folder + output_name + '.root'
+        merged_file_path = root_folder / f"{output_name}.root"
 
         if os.path.exists(merged_file_path): shutil.move(merged_file_path, ct_folder)
 
         ClearFolder(root_folder)
+
+        if alarm == True: PlayAlarm()
 
 
 def CT_Summary_Data(directory, tree, branches):
@@ -1295,7 +1345,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
         heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
 
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
-        np.savetxt(write_name, heatmap, delimiter=',', fmt='%d') # '%d', '%.4f'
+        np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f') # '%d', '%.4f'
 
     lower = np.percentile(heatmap, 0)
     upper = np.percentile(heatmap, 98)
@@ -1319,7 +1369,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     spacing = layers[2]
     slices = np.round(np.arange(initial, final, spacing))
     
-    heatmap_matrix = np.zeros(len(projections), dtype = 'object')
+    heatmap_matrix = np.zeros(len(projections), dtype = object)
 
     for i in tqdm(projections, desc = 'Performing Logarithmic Transformation', unit = ' Heatmaps', leave = True):
 
@@ -1328,25 +1378,31 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
         
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
-        # heatmap_matrix[i] = heatmap
+        heatmap_matrix[i] = heatmap
         
-        write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
+        # write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
         # np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
 
-    # for i in tqdm(slices, desc = 'Reconstructing slices', unit = ' Slices', leave = True):
+    for i, y in enumerate(tqdm(slices, desc = 'Reconstructing slices', unit = ' Slices', leave = True)):
 
-    #     p = np.array([heatmap[i] for heatmap in heatmap_matrix]).T
-    #     reconstructed_slice = iradon(p, theta = projections)
+        p = []
+        for heatmap in heatmap_matrix: p.append(heatmap[y])
+        p = np.array(p).T
+
+        reconstructed_slice = iradon(p, theta = projections)
 
     #     write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
     #     np.savetxt(write_name, reconstructed_slice, delimiter=',', fmt='%.2f')
 
-
-    fig = go.Figure(go.Heatmap(z = heatmap, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    fig.update_layout(width = 700, height = 700, yaxis = dict(autorange = 'reversed'))
+    fig = go.Figure(go.Heatmap(z = p, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    fig.update_layout(width = 600, height = 600, yaxis = dict(autorange = 'reversed'))
     fig.show()
 
-    Plot_Heatmap(heatmap, save_as='')
+    fig = go.Figure(go.Heatmap(z = reconstructed_slice, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    fig.update_layout(width = 600, height = 600, yaxis = dict(autorange = 'reversed'))
+    fig.show()
+
+    # Plot_Heatmap(heatmap, save_as='')
 
 
 def CoefficientstoHU(csv_slices, mu_water, air_parameter):

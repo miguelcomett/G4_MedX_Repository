@@ -744,12 +744,13 @@ def Logarithmic_Transform(heatmap):
 def Plot_Heatmap(heatmap, save_as):
 
     rows = heatmap.shape[0]
+    cols = heatmap.shape[1]
 
     plt.figure(figsize=(14, 4))
     plt.subplot(1, 3, 1); plt.imshow(heatmap, cmap="gray"); plt.colorbar()
     if save_as: plt.savefig(save_as + ".png", bbox_inches = "tight", dpi = 900)
     plt.subplot(1, 3, 2); plt.plot(heatmap[rows//2, :])
-    plt.subplot(1, 3, 3); plt.plot(heatmap[:, rows//2])
+    plt.subplot(1, 3, 3); plt.plot(heatmap[:, cols//2])
 
 def Plot_Plotly(heatmap, xlim, ylim):
 
@@ -1284,7 +1285,8 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
         ClearFolder(root_folder)
 
-        if alarm == True: PlayAlarm()
+    print("Finished Simulating CT")
+    if alarm == True: PlayAlarm()
 
 
 def CT_Summary_Data(directory, tree, branches):
@@ -1395,14 +1397,14 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     #     np.savetxt(write_name, reconstructed_slice, delimiter=',', fmt='%.2f')
 
     fig = go.Figure(go.Heatmap(z = p, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    fig.update_layout(width = 600, height = 600, yaxis = dict(autorange = 'reversed'))
+    fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
     fig.show()
 
     fig = go.Figure(go.Heatmap(z = reconstructed_slice, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    fig.update_layout(width = 600, height = 600, yaxis = dict(autorange = 'reversed'))
+    fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
     fig.show()
 
-    # Plot_Heatmap(heatmap, save_as='')
+    Plot_Heatmap(p, save_as='')
 
 
 def CoefficientstoHU(csv_slices, mu_water, air_parameter):

@@ -1,8 +1,9 @@
+import os, subprocess, pandas as pd, matplotlib.pyplot as plt, uproot, math
+from tqdm import tqdm
+
 # 1.1 ========================================================================================================================================================
 
 def SingleEnergyBisection(directory, mac_filename, root_filename, tree_name, branch_1, branch_2, initial_energy, thick_0, thick_1, tolerance):
-    
-    import os; import subprocess; import uproot
 
     executable_file = "Sim"
     run_sim = f"./{executable_file} {mac_filename} . ."
@@ -24,18 +25,12 @@ def SingleEnergyBisection(directory, mac_filename, root_filename, tree_name, bra
         /run/reinitializeGeometry
         /run/beamOn {beam_count}
         """
-        
-        # create_mac_file
+    
         mac_filepath = os.path.join(directory, mac_filename)
         mac_content = mac_template.format(energy=initial_energy, thickness=thickness, beam_count=beam_count)
-        with open(mac_filepath, 'w') as f:
-            f.write(mac_content)
-
-        # run_simulation
-        try:
-            subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as e: 
-            print(f"Error al ejecutar la simulación: {e}")
+        with open(mac_filepath, 'w') as f: f.write(mac_content)
+        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
 
         file_path = os.path.join(directory, root_filename)
         if not os.path.isfile(file_path):
@@ -81,11 +76,9 @@ def SingleEnergyBisection(directory, mac_filename, root_filename, tree_name, bra
             if branch_2 in tree.keys():
                 coeficient = tree[branch_2].array(library="np")[0]  # Assuming you want the first entry
                 print('Coeficiente de atenuación:', coeficient)
-            else:
-                print(f"Branch '{branch_2}' not found in tree '{tree_name}' in {file_path}")
+            else: print(f"Branch '{branch_2}' not found in tree '{tree_name}' in {file_path}")
     
-    except Exception as e:
-        print(f"Error al procesar el archivo ROOT: {e}")
+    except Exception as e: print(f"Error al procesar el archivo ROOT: {e}")
 
     print('Ratio:', ratio)
     print("Número de iteraciones:", counter)
@@ -94,13 +87,6 @@ def SingleEnergyBisection(directory, mac_filename, root_filename, tree_name, bra
 # 2.1 ========================================================================================================================================================
 
 def BisectionEnergiesNIST(directory, mac_filename, root_filename, outputcsv_name, tree_name, branch_1, branch_2, input_csv, tolerance):
-    
-    import os
-    import subprocess
-    import pandas as pd
-    import uproot
-    import math
-    from tqdm import tqdm
 
     executable_file = "Sim"
     run_sim = f"./{executable_file} {mac_filename} ."
@@ -264,12 +250,6 @@ def BisectionEnergiesNIST(directory, mac_filename, root_filename, outputcsv_name
 def BisectionFixedEnergyStep(directory, mac_filename, root_filename, outputcsv_name, tree_name, 
              branch_1, branch_2, initial_energy, final_energy, energy_step, tolerance):
     
-    import os
-    import subprocess
-    import pandas as pd
-    import uproot
-    import math
-    from tqdm import tqdm
     
     executable_file = "Sim"
     run_sim = f"./{executable_file} {mac_filename} . "
@@ -428,9 +408,6 @@ def BisectionFixedEnergyStep(directory, mac_filename, root_filename, outputcsv_n
 # 4.1 ========================================================================================================================================================
 
 def PlotsFormatting():
-    
-    import pandas as pd
-    import matplotlib.pyplot as plt
     
     SIZE_DEFAULT = 16
     SIZE_LARGE = 20

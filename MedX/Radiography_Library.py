@@ -1,5 +1,5 @@
 # Python modules: 
-import os, sys, time, subprocess, shutil, platform, numpy as np, matplotlib.pyplot as plt
+import os, sys, time, subprocess, shutil, platform, numpy as np, pandas as pd, matplotlib.pyplot as plt
 from contextlib import redirect_stdout, redirect_stderr; from pathlib import Path
 
 # 0.1. ========================================================================================================================================================
@@ -353,7 +353,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     if spectra_mode == 'poly' or spectra_mode == 1:
         Beams40_calibration = 2000000
-        Beams80_calibration = int(Beams40_calibration * 1)
+        Beams80_calibration = int(Beams40_calibration * 1.05)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -1158,14 +1158,16 @@ def Plotly_Heatmap_2(array, xlim, ylim, title, x_label, y_label, sqr_1_coords, s
 
 def ClearFolder(directory):
 
-    if os.path.exists(directory):
+    from send2trash import send2trash
         
-        for file_name in os.listdir(directory):
+    for file_name in os.listdir(directory):
+
+        if file_name.startswith('CT_') and file_name.endswith('.root'):
 
             file_path = os.path.join(directory, file_name)
-            if os.path.isfile(file_path):
-                try: os.remove(file_path)
-                except Exception as e: print(f"Error deleting file {file_path}: {e}")
+            # if os.path.isfile(file_path):
+            try: send2trash(file_path)
+            except Exception as e: print(f"Error deleting file {file_path}: {e}")
 
 
 def Generate_CT_MAC_Template(
@@ -1247,44 +1249,51 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     y_start = slices[0]
     y_end = slices[1]
     step = slices[2]
+
+    exit_requested = False
     
     for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
         
-        ClearFolder(root_folder)
-
-        mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
+        # if exit_requested == True: print('breaking incorrectly'); break
         
-        beam_lines = ""
-        for y in range(y_start, y_end + 1, step): 
-            beam_lines += f"""
-            /Pgun/Y {y} mm
-            /run/beamOn 150000
-            """
+        # try:
+            ClearFolder(root_folder) # deletes residual files but doesn't delete subfolders
 
-        energy = 80
+            mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
+            
+            beam_lines = ""
+            for y in range(y_start, y_end + 1, step): 
+                beam_lines += f"""
+                /Pgun/Y {y} mm
+                /run/beamOn 150000
+                """
 
-        filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
-        with open(mac_filepath, 'w') as f: f.write(filled_template)
+            energy = 80
 
-        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
+            filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
+            with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
+
+            try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except subprocess.CalledProcessError as e: print(f"Error during simulation: {e}"); continue  # Skip to the next angle
+        
+            output_name = f"Aang_{angle}"
+            if os.path.exists(ct_folder / f"{output_name}.root"):
+                counter = 0
+                while os.path.exists(ct_folder / f"{output_name}_{counter}.root"): counter = counter + 1
+                output_name = root_folder / f"{output_name}_{counter}"
+
+            with open(os.devnull, "w") as fnull: 
+                with redirect_stdout(fnull), redirect_stderr(fnull):
+                    Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
+
+            merged_file_path = root_folder / f"{output_name}.root"
+
+            if os.path.exists(merged_file_path): shutil.move(merged_file_path, ct_folder)
+
+        # except KeyboardInterrupt:
+        #     if exit_requested == True: print("Second interrupt detected, stopping execution."); ClearFolder(root_folder); break
+        #     if exit_requested == False: print('Exit request detected, exiting after current iteration.'); exit_requested = True; continue
     
-        output_name = f"Aang_{angle}"
-        if os.path.exists(ct_folder / f"{output_name}.root"):
-            counter = 0
-            while os.path.exists(ct_folder / f"{output_name}_{counter}.root"): counter = counter + 1
-            output_name = root_folder / f"{output_name}_{counter}"
-
-        with open(os.devnull, "w") as fnull: 
-            with redirect_stdout(fnull), redirect_stderr(fnull):
-                Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
-
-        merged_file_path = root_folder / f"{output_name}.root"
-
-        if os.path.exists(merged_file_path): shutil.move(merged_file_path, ct_folder)
-
-        ClearFolder(root_folder)
-
     print("Finished Simulating CT")
     if alarm == True: PlayAlarm()
 
@@ -1328,7 +1337,7 @@ def CT_Summary_Data(directory, tree, branches):
 
 def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, csv_folder):
     
-    from tqdm import tqdm
+    from tqdm import tqdm; import dask; from dask import delayed; from dask.diagnostics import ProgressBar
 
     os.makedirs(csv_folder, exist_ok = True)
 
@@ -1341,26 +1350,37 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     x_branch = root_structure[1]
     y_branch = root_structure[2]
 
-    for i in tqdm(projections, desc = 'Calculating heatmaps', unit = ' Heatmaps', leave = True):
-
+    @delayed
+    def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder):
         root_name = f"{filename}_{i}.root"
         heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
 
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
-        np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f') # '%d', '%.4f'
+        np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
 
-    lower = np.percentile(heatmap, 0)
-    upper = np.percentile(heatmap, 98)
-    clipped_htmp = np.clip(heatmap, lower, upper)
+        return heatmap
+
+    heatmap_tasks = []
+    for i in projections: heatmap_tasks += [calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder)]
+    print('Calculating Heatmaps for Every Angle in CT:')
+    with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
+
+    read_name = csv_folder + f"{'CT_raw_'}{0}.csv"
+    raw_heatmap = np.genfromtxt(read_name, delimiter=',')
+
+    lower = np.percentile(raw_heatmap, 0)
+    upper = np.percentile(raw_heatmap, 98)
+    clipped_htmp = np.clip(raw_heatmap, lower, upper)
     Plot_Heatmap(clipped_htmp, save_as='')
 
-    return heatmap, xlim, ylim
+    return raw_heatmap
 
+def old_RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
 
-def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
+    import plotly.graph_objects as go; from skimage.transform import iradon; from scipy import ndimage
+    import dask; from dask.diagnostics import ProgressBar; from dask import delayed
+    from tqdm import tqdm
 
-    import plotly.graph_objects as go; from tqdm import tqdm; from skimage.transform import iradon; from scipy import ndimage
-    
     start = degrees[0]
     end = degrees[1]
     deg = degrees[2]
@@ -1372,39 +1392,134 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     slices = np.round(np.arange(initial, final, spacing))
     
     heatmap_matrix = np.zeros(len(projections), dtype = object)
+    sinogram_matrix = np.zeros(len(slices), dtype = object)
+    slices_matrix = np.zeros(len(slices), dtype = object)
 
     for i in tqdm(projections, desc = 'Performing Logarithmic Transformation', unit = ' Heatmaps', leave = True):
 
         read_name = csv_read + f"{'CT_raw_'}{i}.csv"
-        raw_heatmap = np.genfromtxt(read_name, delimiter = ',')
+        raw_heatmap = pd.read_csv(read_name, delimiter = ',')
         
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
         heatmap_matrix[i] = heatmap
-        
-        # write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
-        # np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
+
+    heatmap_matrix = np.stack(heatmap_matrix, axis=0)
+    print(heatmap_matrix.shape)
+    
 
     for i, y in enumerate(tqdm(slices, desc = 'Reconstructing slices', unit = ' Slices', leave = True)):
 
-        p = []
-        for heatmap in heatmap_matrix: p.append(heatmap[y])
-        p = np.array(p).T
+        sinogram = []
+        for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
+        sinogram = np.array(sinogram).T
+        sinogram_matrix[i] = sinogram
 
-        reconstructed_slice = iradon(p, theta = projections)
+        reconstructed_slice = iradon(sinogram, theta = projections)
+        slices_matrix[i] = reconstructed_slice
 
-    #     write_name = csv_write + f"{'CT_log_'}{i}mm.csv"
-    #     np.savetxt(write_name, reconstructed_slice, delimiter=',', fmt='%.2f')
-
-    fig = go.Figure(go.Heatmap(z = p, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    fig = go.Figure(go.Heatmap(z = sinogram_matrix[30], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
     fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
     fig.show()
 
-    fig = go.Figure(go.Heatmap(z = reconstructed_slice, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    Plot_Heatmap(sinogram_matrix[30], save_as='')
+
+    fig = go.Figure(go.Heatmap(z = slices_matrix[30], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
     fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
     fig.show()
 
-    Plot_Heatmap(p, save_as='')
+
+def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
+
+    import plotly.graph_objects as go; from skimage.transform import iradon; from scipy import ndimage
+    import dask; from dask.diagnostics import ProgressBar; from dask import delayed
+
+    start = degrees[0]
+    end = degrees[1]
+    deg = degrees[2]
+    projections = np.arange(start, end+1, deg)
+
+    initial = layers[0]
+    final = layers[1]
+    spacing = layers[2]
+    slices_vector = np.round(np.arange(initial, final, spacing))
+    
+    heatmap_matrix = np.zeros(len(projections), dtype = object)
+    sinogram_matrix = np.zeros(len(slices_vector), dtype = object)
+    slices_matrix = np.zeros(len(slices_vector), dtype = object)
+
+    @delayed
+    def process_heatmap(i, csv_read, sigma):
+        
+        read_name = csv_read + f"{'CT_raw_'}{i}.csv"
+        raw_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
+        raw_heatmap = raw_heatmap.to_numpy()        
+        raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
+        heatmap = Logarithmic_Transform(raw_heatmap)
+
+        return heatmap
+
+    @delayed
+    def compute_sinogram(y, heatmap_matrix):
+        
+        sinogram = []
+        for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
+        sinogram = np.array(sinogram).T
+
+        return sinogram
+
+    @delayed
+    def reconstruct_slice(i, sinogram_matrix, projections):
+        
+        sinogram = sinogram_matrix[i]
+        reconstructed_slice = iradon(sinogram, theta=projections)
+
+        # if i < 10: Plot_Heatmap(sinogram_matrix[i], save_as='')
+        suma = np.sum(reconstructed_slice)
+        if suma > 0: print('Suma:', suma)
+        
+        return reconstructed_slice
+    
+    heatmap_tasks = []
+    for i in projections: heatmap_tasks = heatmap_tasks + [process_heatmap(i, csv_read, sigma)]
+    print('Reading and Performing Logarithmic Transform:')
+    with ProgressBar(): heatmaps = dask.compute(*heatmap_tasks, scheduler='processes')
+    heatmap_matrix = np.stack(heatmaps, axis=0)
+    print('Heatmap Matrix Shape:', heatmap_matrix.shape, '\n')
+
+    sinogram_tasks = []
+    for y in slices_vector: sinogram_tasks = sinogram_tasks + [compute_sinogram(y, heatmap_matrix)]
+    print('Computing Sinograms:')
+    with ProgressBar(): sinograms = dask.compute(*sinogram_tasks)    
+    sinogram_matrix = np.stack(sinograms, axis=0)
+    print('Sinogram Matrix Shape:', sinogram_matrix.shape, '\n')
+
+    slices_tasks = []
+    for i in range(len(slices_vector)): slices_tasks = slices_tasks + [reconstruct_slice(i, sinogram_matrix, projections)]
+    print('Reconstruction slices:')
+    with ProgressBar(): slices = dask.compute(*slices_tasks) 
+    slices_matrix = np.stack(slices, axis=0)
+    print('Slices Matrix Shape:', slices_matrix.shape, '\n')
+
+    # os.makedirs(csv_write, exist_ok = True)
+    # for i, y in enumerate(slices_vector): 
+    #     slice = slices_matrix[i]
+    #     slice[np.isnan(slice)] = 0
+    #     write_name = csv_write + f"{'CT_slice_'}{y}mm.csv"
+    #     np.savetxt(write_name, slice, delimiter=',', fmt='%d') #.2f
+
+    for i in range(10):
+        Plot_Heatmap(heatmap_matrix[i], save_as='')
+        Plot_Heatmap(sinogram_matrix[i], save_as='')
+        Plot_Heatmap(slices_matrix[i], save_as='')
+
+    # fig = go.Figure(go.Heatmap(z = sinogram_matrix[30], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
+    # fig.show()
+
+    # fig = go.Figure(go.Heatmap(z = slices_matrix[10], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
+    # fig.show()
 
 
 def CoefficientstoHU(csv_slices, mu_water, air_parameter):
@@ -1610,103 +1725,6 @@ def ModifyRoot(directory, root_name, tree_name, branch_names, output_name, new_t
     with uproot.recreate(output_file) as new_file:
         new_file[new_tree_name] = {new_branch_names[0]: branches[branch_names[0]],
                                    new_branch_names[1]: branches[branch_names[1]]}
-
-def Root_to_Dask(directory, root_name, tree_name, x_branch, y_branch):
-    
-    import uproot; import numpy as np
-    import dask.array as da; import dask.dataframe as dd
-
-    file_name = directory + root_name 
-
-    with uproot.open(file_name) as root_file:
-        tree = root_file[tree_name]
-        if tree is None:
-            print(f"Tree '{tree_name}' not found in {file_name}")
-            return
-
-        x_values = tree[x_branch].array(library="np") if x_branch in tree else print('error_x')
-        y_values = tree[y_branch].array(library="np") if y_branch in tree else print('error_y')
-
-        decimal_places = 1
-
-        if x_values is not None:
-            x_values = np.round(x_values, decimal_places)
-        if y_values is not None:
-            y_values = np.round(y_values, decimal_places)
-
-        if x_values is None or y_values is None:
-            print(f"Could not retrieve data for branches {x_branch} or {y_branch}")
-            return
-
-        x_dask_array = da.from_array(x_values, chunks="auto")
-        y_dask_array = da.from_array(y_values, chunks="auto")
-
-        dask_df = dd.from_dask_array(da.stack([x_dask_array, y_dask_array], axis=1), columns=[x_branch, y_branch])
-
-        x_data = dask_df[x_branch].to_dask_array(lengths=True)
-        y_data = dask_df[y_branch].to_dask_array(lengths=True)
-        
-        return x_data, y_data
-
-def Heatmap_from_Dask(x_data, y_data, size, log_factor, x_shift, y_shift, save_as):
-
-    import matplotlib.pyplot as plt; import numpy as np
-    import dask.array as da; import dask.dataframe as dd
-    
-    x_data_shifted = x_data - x_shift
-    y_data_shifted = y_data - y_shift
-
-    pixel_size = 0.5 # mm
-    set_bins = np.arange(-size, size + pixel_size, pixel_size)
-
-    heatmap, x_edges, y_edges = da.histogram2d(x_data_shifted, y_data_shifted, bins = [set_bins, set_bins])
-    heatmap = heatmap.T
-    heatmap = np.rot90(heatmap, 2)
-    # print('Heatmap size:', heatmap.shape, '[pixels]')
-    rows = heatmap.shape[0]
-
-    heatmap = heatmap.compute()  
-    x_edges = x_edges.compute()  
-    y_edges = y_edges.compute()
-
-    heatmap[heatmap == 0] = log_factor
-    maxi = np.max(heatmap)
-    normal_map = np.log(maxi / heatmap)
-
-    plt.figure(figsize = (14, 4))
-    plt.subplot(1, 3, 1); plt.imshow(normal_map, cmap = 'gray', extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]); plt.axis('off')
-    if save_as != '': plt.savefig(save_as + '.png', bbox_inches = 'tight', dpi = 900)
-    plt.subplot(1, 3, 2); plt.plot(normal_map[2*rows//3,:])
-    plt.subplot(1, 3, 3); plt.plot(normal_map[:,rows//2])
-
-    return normal_map, x_edges, y_edges
-
-def LoadRoots(directory, rootnames, tree_name, x_branch, y_branch):
-
-    x_1, y_1 = Root_to_Dask(directory, rootnames[0], tree_name, x_branch, y_branch)
-    x_2, y_2 = Root_to_Dask(directory, rootnames[1], tree_name, x_branch, y_branch)
-    print("Dataframes created")
-
-    return x_1, y_1, x_2, y_2
-
-def CT_Heatmap_from_Dask(x_data, y_data, size_x, size_y, x_shift, y_shift, pixel_size):
-
-    import matplotlib.pyplot as plt; import dask.array as da
-
-    x_data_shifted = x_data - x_shift
-    y_data_shifted = y_data - y_shift
-
-    set_bins_x = np.arange(-size_x, size_x + pixel_size, pixel_size)
-    set_bins_y = np.arange(-size_y, size_y + pixel_size, pixel_size)
-    heatmap, x_edges, y_edges = da.histogram2d(x_data_shifted, y_data_shifted, bins = [set_bins_x, set_bins_y])
-    heatmap = heatmap.T
-    heatmap = np.rot90(heatmap, 2)
-
-    heatmap = heatmap.compute() 
-    x_edges = x_edges.compute()  
-    y_edges = y_edges.compute()
-
-    return heatmap, x_edges, y_edges
 
 def LogaritmicTransformation(radiographs, pixel_size, sigma):
     

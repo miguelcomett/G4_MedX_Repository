@@ -356,7 +356,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     if spectra_mode == 'poly' or spectra_mode == 1:
         Beams40_calibration = 2000000
-        Beams80_calibration = int(Beams40_calibration * 1.05)
+        Beams80_calibration = int(Beams40_calibration * 1.0)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -670,7 +670,9 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
     hist_y, bin_edges = dask_da.histogram(y_values, bins = bins_y, range = (range_min_y, range_max_y))
 
     with ProgressBar():
+        print('Computing X-Dimension Histogram (1/2)...')
         hist_x = hist_x.compute()
+        print('Computing Y-Dimension Histogram (2/2)...')
         hist_y = hist_y.compute()
 
     plt.figure(figsize = (14, 4)); plt.tight_layout()
@@ -724,10 +726,9 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
 
     heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0]
+    print('Computing heatmap...')
     with ProgressBar(): heatmap = heatmap.compute()
     heatmap = np.rot90(heatmap.T, 2)
-
-    return heatmap, bins_x0, bins_y0
 
 def Logarithmic_Transform(heatmap):
 
@@ -1359,8 +1360,8 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
 def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
 
-    import plotly.graph_objects as go; from skimage.transform import iradon; from scipy import ndimage
     import dask; from dask.diagnostics import ProgressBar; from dask import delayed
+    from skimage.transform import iradon; from scipy import ndimage
 
     start = degrees[0]
     end = degrees[1]
@@ -1406,24 +1407,24 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     
     heatmap_tasks = []
     for i in projections: heatmap_tasks = heatmap_tasks + [process_heatmap(i, csv_read, sigma)]
-    print('Reading and Performing Logarithmic Transform:')
+    print('Reading and Performing Logarithmic Transform (1/3)...')
     with ProgressBar(): heatmaps = dask.compute(*heatmap_tasks, scheduler='processes')
     heatmap_matrix = np.stack(heatmaps, axis=0)
-    print('Heatmap Matrix Shape:', heatmap_matrix.shape, '\n')
+    # print('Heatmap Matrix Shape:', heatmap_matrix.shape)
 
     sinogram_tasks = []
     for y in slices_vector: sinogram_tasks = sinogram_tasks + [compute_sinogram(y, heatmap_matrix)]
-    print('Computing Sinograms:')
+    print('\nComputing Sinograms (2/3)...')
     with ProgressBar(): sinograms = dask.compute(*sinogram_tasks)    
     sinogram_matrix = np.stack(sinograms, axis=0)
-    print('Sinogram Matrix Shape:', sinogram_matrix.shape, '\n')
+    # print('Sinogram Matrix Shape:', sinogram_matrix.shape)
 
     slices_tasks = []
     for i in range(len(slices_vector)): slices_tasks = slices_tasks + [reconstruct_slice(i, sinogram_matrix, projections)]
-    print('Reconstruction slices:')
+    print('\nReconstruction slices (3/3)...')
     with ProgressBar(): slices = dask.compute(*slices_tasks) 
     slices_matrix = np.stack(slices, axis=0)
-    print('Slices Matrix Shape:', slices_matrix.shape, '\n')
+    # print('Slices Matrix Shape:', slices_matrix.shape)
 
     os.makedirs(csv_write, exist_ok = True)
     for i, y in enumerate(slices_vector): 
@@ -1432,30 +1433,39 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
         write_name = csv_write + f"{'CT_slice_'}{y}mm.csv"
         np.savetxt(write_name, slice, delimiter=',', fmt='%d') #.2f
 
-    plotis = np.arange(25, 35, 1)
-    for i in plotis:
-        # Plot_Heatmap(heatmap_matrix[i], save_as='')
-        # Plot_Heatmap(sinogram_matrix[i], save_as='')
-        # Plot_Heatmap(slices_matrix[i], save_as='')
+    return heatmap_matrix, sinogram_matrix, slices_matrix
 
-        plt.figure(figsize=(14, 4))
-        plt.subplot(1, 3, 1); plt.imshow(heatmap_matrix[i],  cmap="gray"); plt.colorbar()
-        plt.subplot(1, 3, 2); plt.imshow(sinogram_matrix[i], cmap="gray"); plt.colorbar()
-        plt.subplot(1, 3, 3); plt.imshow(slices_matrix[i],   cmap="gray"); plt.colorbar()
+    
+def Ploty_CT(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
 
-    index = 30
+    import plotly.graph_objects as go; from plotly.subplots import make_subplots
 
-    # fig = go.Figure(go.Heatmap(z = heatmap_matrix[index], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
-    # fig.show()
+    fig = make_subplots(rows = 1, cols = 3, shared_xaxes = False, shared_yaxes = False, horizontal_spacing = 0.05 )
+    fig.add_trace(go.Heatmap(z = heatmap_matrix[0],  colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 1)
+    fig.add_trace(go.Heatmap(z = sinogram_matrix[slice], colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 2)
+    fig.add_trace(go.Heatmap(z = slices_matrix[slice],   colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 3)
+    fig.update_layout(
+        height = 400, width = 1150, margin = dict(l = 40, r = 40, t = 60, b = 60),
+        yaxis1 = dict(autorange = 'reversed'), yaxis2 = dict(autorange = 'reversed'), yaxis3 = dict(autorange = 'reversed'),
+        annotations = [
+        dict(text = "Radiograph Projection",    x = 0.075, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+        dict(text = "Sinogram Slice",           x = 0.500, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+        dict(text = "Reconstructed Slice",      x = 0.915, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+        dict(text = f"Slice Number: {slice+1}", x = 0.500, y =-0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=14))]
+    )
+    fig.show()
 
-    # fig = go.Figure(go.Heatmap(z = sinogram_matrix[index], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
-    # fig.show()
+def MatPlotLib_CT(heatmap_matrix, sinogram_matrix, slices_matrix, step):
 
-    # fig = go.Figure(go.Heatmap(z = slices_matrix[index], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
-    # fig.show()
+    plotis = np.arange(0, 60, step)
+    for slice in plotis:
+        plt.figure(figsize = (10.5, 3)); 
+        plt.subplot(1,3,1); plt.imshow(heatmap_matrix[slice*6], cmap="gray"); plt.colorbar(); plt.title("Radiograph Projection", fontsize=11, pad=15)
+        plt.subplot(1,3,2); plt.imshow(sinogram_matrix[slice],  cmap="gray"); plt.colorbar(); plt.title("Sinogram Slice",        fontsize=11, pad=35)
+        plt.subplot(1,3,3); plt.imshow(slices_matrix[slice],    cmap="gray"); plt.colorbar(); plt.title("Reconstructed Slice",   fontsize=11, pad=15)
+        plt.text(-250, 300, f"Slice Number: {slice}", ha = 'center', fontsize = 11, color ='gray')
+        plt.show()
+
 
 def CoefficientstoHU(csv_slices, mu_water, air_parameter):
 

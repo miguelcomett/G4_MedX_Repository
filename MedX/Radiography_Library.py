@@ -1,5 +1,5 @@
 # Python modules: 
-import os, sys, time, subprocess, shutil, platform, numpy as np, pandas as pd, matplotlib.pyplot as plt
+import os, sys, time, subprocess, shutil, platform, threading, signal, numpy as np, pandas as pd, matplotlib.pyplot as plt
 from contextlib import redirect_stdout, redirect_stderr; from pathlib import Path
 
 # 0.1. ========================================================================================================================================================
@@ -68,6 +68,19 @@ def PlayAlarm():
     # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
 
+# 0.3. ========================================================================================================================================================
+
+interrupt_flag = False
+
+def handle_keyboard_interrupt(sig, frame):
+    global interrupt_flag
+    if interrupt_flag: print('Second keyboard interrupt received. Exiting...'); sys.exit(1)
+    if not interrupt_flag: 
+        print("\nKeyboard Interrupt caught! Finishing current iteration...\n")
+        interrupt_flag = True
+
+signal.signal(signal.SIGINT, handle_keyboard_interrupt)
+
 # 1.1. ========================================================================================================================================================
 
 def Trash_Folder(trash_folder):
@@ -120,7 +133,7 @@ def Simulation_Setup():
 def Run_Calibration(directory, run_sim):
     
     start_time = time.perf_counter()
-    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e: print(f"Error running simulation: {e}")
     end_time = time.perf_counter()
     calibration_time = end_time - start_time
@@ -242,9 +255,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
     try: os.rename(old_root_name, new_root_name)
     except FileNotFoundError: print("The file does not exist.")
-    except PermissionError: print("You do not have permission to rename this file.")
-
-    if os.path.exists(new_root_name): shutil.move(new_root_name, rad_folder)
+    shutil.move(new_root_name, rad_folder)
 
     iterations = int(sim_time / iteration_time)
     
@@ -254,25 +265,17 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    exit_requested = False
-
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
         
-        try: 
-            subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-    
-            new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
-            try: os.rename(old_root_name, new_root_name)
-            except FileNotFoundError: print("The file does not exist.")
-            except PermissionError: print("You do not have permission to rename this file.")
-            if os.path.exists(new_root_name): shutil.move(new_root_name, rad_folder)
+        if interrupt_flag: print('Exiting'); break
 
-            if exit_requested: break
-        
+        try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
-        except KeyboardInterrupt: 
-            if not exit_requested: print("\nKeyboardInterrupt detected! Exiting after this iteration."); exit_requested = True
-            else: print("Forcing immediate termination."); raise
+        
+        new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
+        try: os.rename(old_root_name, new_root_name)
+        except FileNotFoundError: print("The file does not exist.")
+        shutil.move(new_root_name, rad_folder)
 
     total_beams = int(np.ceil(Beams * iterations / 1000000))
     merged_name = f"{new_base_name}{'_'}{energy_name}{'_'}{str(total_beams)}{'M'}"
@@ -369,20 +372,15 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
-
-    exit_requested = False
     
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
 
-        try: 
-            subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-            Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
-            if exit_requested: break
-        
+        if interrupt_flag: print('Exiting'); break
+
+        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
-        except KeyboardInterrupt: 
-            if not exit_requested: print("\nKeyboardInterrupt detected! Exiting after this iteration."); exit_requested = True
-            else: print("Forcing immediate termination."); raise
+
+        Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
 
     total_beams_40 = int(np.ceil(Beams40 * iterations / 1_000_000))
     total_beams_80 = int(np.ceil(Beams80 * iterations / 1_000_000))
@@ -649,7 +647,7 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
 def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x, range_y):
 
-    import uproot, dask.array as dask_da
+    import uproot, dask.array as dask_da; from dask.diagnostics import ProgressBar
 
     directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
@@ -671,8 +669,9 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
     hist_x, bin_edges = dask_da.histogram(x_values, bins = bins_x, range = (range_min_x, range_max_x))
     hist_y, bin_edges = dask_da.histogram(y_values, bins = bins_y, range = (range_min_y, range_max_y))
 
-    hist_x = hist_x.compute()
-    hist_y = hist_y.compute()
+    with ProgressBar():
+        hist_x = hist_x.compute()
+        hist_y = hist_y.compute()
 
     plt.figure(figsize = (14, 4)); plt.tight_layout()
 
@@ -688,7 +687,7 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
 
 def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size):
 
-    import uproot, dask.array as dask_da
+    import uproot, dask.array as dask_da; from dask.diagnostics import ProgressBar
 
     directory = os.path.join(directory, '')
 
@@ -724,7 +723,8 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     bins_x0 = np.arange(-xlim, xlim + pixel_size, pixel_size)
     bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
 
-    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0].compute()
+    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0]
+    with ProgressBar(): heatmap = heatmap.compute()
     heatmap = np.rot90(heatmap.T, 2)
 
     return heatmap, bins_x0, bins_y0
@@ -734,10 +734,10 @@ def Logarithmic_Transform(heatmap):
     max_values = np.max(heatmap, axis = 0, keepdims = True)
     
     heatmap[heatmap <= 0] = np.nan
+    heatmap = np.log(max_values / heatmap)
+    heatmap[np.isnan(heatmap)] = 0
 
-    with np.errstate(divide = 'warn', invalid = 'warn'): heatmap = np.log(max_values / heatmap)
-
-    # heatmap = np.where(np.isnan(heatmap), 1, 0) # for debugging
+    # heatmap = np.where(heatmap==0, 1, 0) # for debugging
 
     return heatmap
 
@@ -795,23 +795,12 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
     ACNR_SSH_Bone = SSH_Bone + (gaussian_filter(SSH_Tissue, sigma = sigma2) * wn) - 1
     ACNR_Tissue = SLS_Tissue + (gaussian_filter(SLS_Bone,   sigma = sigma1) * wn) - 1
 
-    plt.imshow(low_energy_img, cmap='gray'); plt.axis('off')
-    if save_as_1 != '': plt.savefig(save_in + save_as_1, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(high_energy_img, cmap='gray'); plt.axis('off')
-    if save_as_2 != '': plt.savefig(save_in + save_as_2, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(SLS_Bone, cmap='gray'); plt.axis('off')
-    if save_as_3 != '': plt.savefig(save_in + save_as_3, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(SLS_Tissue, cmap='gray'); plt.axis('off')
-    if save_as_4 != '': plt.savefig(save_in + save_as_4, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(SSH_Bone, cmap='gray'); plt.axis('off')
-    if save_as_5 != '': plt.savefig(save_in + save_as_5, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(SSH_Tissue, cmap='gray'); plt.axis('off')
-    if save_as_6 != '': plt.savefig(save_in + save_as_6, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(ACNR_Bone, cmap='gray'); plt.axis('off')
-    if save_as_7 != '': plt.savefig(save_in + save_as_7, bbox_inches = 'tight', dpi = 600); plt.close()
-    plt.imshow(ACNR_Tissue, cmap='gray'); plt.axis('off')
-    if save_as_8 != '': plt.savefig(save_in + save_as_8, bbox_inches = 'tight', dpi = 600); 
-    plt.close()
+    images = [low_energy_img, high_energy_img, SLS_Bone, SLS_Tissue, SSH_Bone, SSH_Tissue, ACNR_Bone, ACNR_Tissue]
+
+    for projection, save_as in zip(images, save_as):
+        plt.imshow(projection, cmap='gray'); plt.axis('off')
+        if save_as: plt.savefig(f"{save_in}{save_as}", bbox_inches='tight', dpi=600)
+        plt.close()
 
     plt.figure(figsize = (18, 10)); plt.tight_layout()
     plt.subplot(2, 4, 1); plt.imshow(low_energy_img,    cmap='gray'); plt.axis('off');  plt.title("Low Energy")
@@ -1249,50 +1238,43 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     y_start = slices[0]
     y_end = slices[1]
     step = slices[2]
-
-    exit_requested = False
     
     for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
+
+        if interrupt_flag: print('Exiting'); break
         
-        # if exit_requested == True: print('breaking incorrectly'); break
+        ClearFolder(root_folder) # deletes residual files but doesn't delete subfolders
+
+        mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
         
-        # try:
-            ClearFolder(root_folder) # deletes residual files but doesn't delete subfolders
+        beam_lines = ""
+        for y in range(y_start, y_end + 1, step): 
+            beam_lines += f"""
+            /Pgun/Y {y} mm
+            /run/beamOn 150000
+            """
 
-            mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
-            
-            beam_lines = ""
-            for y in range(y_start, y_end + 1, step): 
-                beam_lines += f"""
-                /Pgun/Y {y} mm
-                /run/beamOn 150000
-                """
+        energy = 80
 
-            energy = 80
-
-            filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
-            with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
-
-            try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except subprocess.CalledProcessError as e: print(f"Error during simulation: {e}"); continue  # Skip to the next angle
+        filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
+        with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
         
-            output_name = f"Aang_{angle}"
-            if os.path.exists(ct_folder / f"{output_name}.root"):
-                counter = 0
-                while os.path.exists(ct_folder / f"{output_name}_{counter}.root"): counter = counter + 1
-                output_name = root_folder / f"{output_name}_{counter}"
+        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as e: print(f"Error during simulation: {e}"); continue  # Skip to the next angle
 
-            with open(os.devnull, "w") as fnull: 
-                with redirect_stdout(fnull), redirect_stderr(fnull):
-                    Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
+        output_name = f"Aang_{angle}"
+        if os.path.exists(ct_folder / f"{output_name}.root"):
+            counter = 0
+            while os.path.exists(ct_folder / f"{output_name}_{counter}.root"): counter = counter + 1
+            output_name = root_folder / f"{output_name}_{counter}"
 
-            merged_file_path = root_folder / f"{output_name}.root"
+        with open(os.devnull, "w") as fnull: 
+            with redirect_stdout(fnull), redirect_stderr(fnull):
+                Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
 
-            if os.path.exists(merged_file_path): shutil.move(merged_file_path, ct_folder)
+        merged_file_path = root_folder / f"{output_name}.root"
 
-        # except KeyboardInterrupt:
-        #     if exit_requested == True: print("Second interrupt detected, stopping execution."); ClearFolder(root_folder); break
-        #     if exit_requested == False: print('Exit request detected, exiting after current iteration.'); exit_requested = True; continue
+        if os.path.exists(merged_file_path): shutil.move(merged_file_path, ct_folder)
     
     print("Finished Simulating CT")
     if alarm == True: PlayAlarm()
@@ -1375,60 +1357,6 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     return raw_heatmap
 
-def old_RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
-
-    import plotly.graph_objects as go; from skimage.transform import iradon; from scipy import ndimage
-    import dask; from dask.diagnostics import ProgressBar; from dask import delayed
-    from tqdm import tqdm
-
-    start = degrees[0]
-    end = degrees[1]
-    deg = degrees[2]
-    projections = np.arange(start, end+1, deg)
-
-    initial = layers[0]
-    final = layers[1]
-    spacing = layers[2]
-    slices = np.round(np.arange(initial, final, spacing))
-    
-    heatmap_matrix = np.zeros(len(projections), dtype = object)
-    sinogram_matrix = np.zeros(len(slices), dtype = object)
-    slices_matrix = np.zeros(len(slices), dtype = object)
-
-    for i in tqdm(projections, desc = 'Performing Logarithmic Transformation', unit = ' Heatmaps', leave = True):
-
-        read_name = csv_read + f"{'CT_raw_'}{i}.csv"
-        raw_heatmap = pd.read_csv(read_name, delimiter = ',')
-        
-        raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
-        heatmap = Logarithmic_Transform(raw_heatmap)
-        heatmap_matrix[i] = heatmap
-
-    heatmap_matrix = np.stack(heatmap_matrix, axis=0)
-    print(heatmap_matrix.shape)
-    
-
-    for i, y in enumerate(tqdm(slices, desc = 'Reconstructing slices', unit = ' Slices', leave = True)):
-
-        sinogram = []
-        for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
-        sinogram = np.array(sinogram).T
-        sinogram_matrix[i] = sinogram
-
-        reconstructed_slice = iradon(sinogram, theta = projections)
-        slices_matrix[i] = reconstructed_slice
-
-    fig = go.Figure(go.Heatmap(z = sinogram_matrix[30], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
-    fig.show()
-
-    Plot_Heatmap(sinogram_matrix[30], save_as='')
-
-    fig = go.Figure(go.Heatmap(z = slices_matrix[30], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
-    fig.show()
-
-
 def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
 
     import plotly.graph_objects as go; from skimage.transform import iradon; from scipy import ndimage
@@ -1473,10 +1401,6 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
         
         sinogram = sinogram_matrix[i]
         reconstructed_slice = iradon(sinogram, theta=projections)
-
-        # if i < 10: Plot_Heatmap(sinogram_matrix[i], save_as='')
-        suma = np.sum(reconstructed_slice)
-        if suma > 0: print('Suma:', suma)
         
         return reconstructed_slice
     
@@ -1501,26 +1425,37 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     slices_matrix = np.stack(slices, axis=0)
     print('Slices Matrix Shape:', slices_matrix.shape, '\n')
 
-    # os.makedirs(csv_write, exist_ok = True)
-    # for i, y in enumerate(slices_vector): 
-    #     slice = slices_matrix[i]
-    #     slice[np.isnan(slice)] = 0
-    #     write_name = csv_write + f"{'CT_slice_'}{y}mm.csv"
-    #     np.savetxt(write_name, slice, delimiter=',', fmt='%d') #.2f
+    os.makedirs(csv_write, exist_ok = True)
+    for i, y in enumerate(slices_vector): 
+        slice = slices_matrix[i]
+        slice[np.isnan(slice)] = 0
+        write_name = csv_write + f"{'CT_slice_'}{y}mm.csv"
+        np.savetxt(write_name, slice, delimiter=',', fmt='%d') #.2f
 
-    for i in range(10):
-        Plot_Heatmap(heatmap_matrix[i], save_as='')
-        Plot_Heatmap(sinogram_matrix[i], save_as='')
-        Plot_Heatmap(slices_matrix[i], save_as='')
+    plotis = np.arange(25, 35, 1)
+    for i in plotis:
+        # Plot_Heatmap(heatmap_matrix[i], save_as='')
+        # Plot_Heatmap(sinogram_matrix[i], save_as='')
+        # Plot_Heatmap(slices_matrix[i], save_as='')
 
-    # fig = go.Figure(go.Heatmap(z = sinogram_matrix[30], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+        plt.figure(figsize=(14, 4))
+        plt.subplot(1, 3, 1); plt.imshow(heatmap_matrix[i],  cmap="gray"); plt.colorbar()
+        plt.subplot(1, 3, 2); plt.imshow(sinogram_matrix[i], cmap="gray"); plt.colorbar()
+        plt.subplot(1, 3, 3); plt.imshow(slices_matrix[i],   cmap="gray"); plt.colorbar()
+
+    index = 30
+
+    # fig = go.Figure(go.Heatmap(z = heatmap_matrix[index], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
     # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
     # fig.show()
 
-    # fig = go.Figure(go.Heatmap(z = slices_matrix[10], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    # fig = go.Figure(go.Heatmap(z = sinogram_matrix[index], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
     # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
     # fig.show()
 
+    # fig = go.Figure(go.Heatmap(z = slices_matrix[index], colorscale = [[0, 'black'], [1, 'white']], showscale = True))
+    # fig.update_layout(width = 500, height = 500, yaxis = dict(autorange = 'reversed'))
+    # fig.show()
 
 def CoefficientstoHU(csv_slices, mu_water, air_parameter):
 

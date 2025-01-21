@@ -62,7 +62,7 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         
         const G4double pi = 3.14159265358979323846;
         G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
-        G4double x0, y0, z0, thoraxAngle, theta, phi, AngleInCarts, 
+        G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, 
                  Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, RealEnergy;
         
         void SpectraFunction(); 

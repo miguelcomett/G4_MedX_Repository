@@ -687,7 +687,7 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
 
 # 2.0. ========================================================================================================================================================
 
-def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size):
+def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size, progress_bar):
 
     import uproot, dask.array as dask_da; from dask.diagnostics import ProgressBar
 
@@ -726,9 +726,15 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
 
     heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0]
-    print('Computing heatmap...')
-    with ProgressBar(): heatmap = heatmap.compute()
+    
+    if progress_bar == True: 
+        print('Computing heatmap...')
+        with ProgressBar(): heatmap = heatmap.compute()
+    else: heatmap = heatmap.compute()
+    
     heatmap = np.rot90(heatmap.T, 2)
+
+    return heatmap, bins_x0, bins_y0
 
 def Logarithmic_Transform(heatmap):
 
@@ -1335,8 +1341,9 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     @delayed
     def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder):
+        
         root_name = f"{filename}_{i}.root"
-        heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size)
+        heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size, progress_bar=False)
 
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
         np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
@@ -1436,7 +1443,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     return heatmap_matrix, sinogram_matrix, slices_matrix
 
     
-def Ploty_CT(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
+def Plotly_CT(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
 
     import plotly.graph_objects as go; from plotly.subplots import make_subplots
 

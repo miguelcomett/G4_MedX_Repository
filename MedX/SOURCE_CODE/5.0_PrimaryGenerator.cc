@@ -17,8 +17,14 @@ PrimaryGenerator::~PrimaryGenerator() {delete particleGun; delete GeneratorMesse
 
 void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
 { 
-    if (SpectraMode == 1) {RealEnergy = InverseCumul(); particleGun -> SetParticleEnergy(RealEnergy);}
-	
+    if (SpectraMode == 1 || SpectraMode == 2) 
+    {
+        RealEnergy = InverseCumul(); 
+        particleGun -> SetParticleEnergy(RealEnergy);
+    
+    }
+
+
     if (Xgauss == true) 
     {
         x0 = G4RandGauss::shoot(0, 110*mm);
@@ -33,12 +39,12 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     if (Xcos == true) 
     {
         if (fDetector) {thoraxAngle = fDetector -> GetThoraxAngle();} else {thoraxAngle = 0;}
-        if (thoraxAngle > 90)  {thoraxAngle = thoraxAngle - 180;}
-        if (thoraxAngle > 270) {thoraxAngle = thoraxAngle - 360;}
-        thoraxAngle = thoraxAngle * (2*pi / 360);
-        x0 = x0 * std::cos(thoraxAngle/2);
+        if (thoraxAngle > 90)  {gunAngle = thoraxAngle - 180;}
+        if (thoraxAngle > 270) {gunAngle = thoraxAngle - 360;}
+        gunAngle = gunAngle * (2*pi / 360);
+        x0 = x0 * std::cos(gunAngle/2);
     }
-    
+
     x0 = x0 + Xpos; 
     
     y0 = 2 * (G4UniformRand() - 0.5);
@@ -122,8 +128,11 @@ void PrimaryGenerator::SetGunAngle(G4double newAngle)
 
 void PrimaryGenerator::SetGunMode(G4int newMode)
 {
-    if (newMode == 0) {SpectraMode = 0; 
-        if (threadID == 0) {std::cout << "-> Monocromatic Mode Selected" << std::endl;}}
+    if (newMode == 0) 
+    {   
+        SpectraMode = 0; 
+        if (threadID == 0) {std::cout << "-> Monocromatic Mode Selected" << std::endl;}
+    }
     if (newMode == 1) 
     {
         SpectraMode = 1; 
@@ -150,13 +159,17 @@ void PrimaryGenerator::SpectraFunction() // tabulated function // Y is assumed p
 
     ReadSpectrumFromFile(spectrumFile, xx, yy, fNPoints);
 
-    // std::cout << "Número de puntos leídos: " << fNPoints << std::endl;
-    for (size_t i = 0; i < xx.size(); ++i) 
+    if (threadID == 0) 
     {
-        std::cout << 
-        "Energía: "     << std::fixed << std::setprecision(1) << xx[i] / keV << " keV  " <<  
-        " Intensidad: " << std::fixed << std::setprecision(3) << yy[i] * 100 
-        << std::endl;
+        std::cout << "Número de puntos leídos: " << fNPoints << std::endl;
+        
+        for (size_t i = 0; i < xx.size(); ++i) 
+        {
+            std::cout << 
+            "Energía: "     << std::fixed << std::setprecision(1) << xx[i] / keV << " keV  " <<  
+            " Intensidad: " << std::fixed << std::setprecision(3) << yy[i] * 100 
+            << std::endl;
+        }
     }
 
 	// copy arrays in std::vector and compute fMax

@@ -49,6 +49,12 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
             analysisManager -> AddNtupleRow(1);
         }
 
+        if (arguments == 4)
+        {
+            analysisManager -> FillNtupleDColumn(0, 0, Energy);
+            analysisManager -> AddNtupleRow(0);
+        }
+
         if (arguments == 5)
         {
             Decimals = 3;
@@ -68,8 +74,8 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
             
             if (is3DModel == false)
             {
-                analysisManager -> FillNtupleDColumn(0, 0, xpos);
-                analysisManager -> FillNtupleDColumn(0, 1, ypos);
+                analysisManager -> FillNtupleFColumn(0, 0, xpos);
+                analysisManager -> FillNtupleFColumn(0, 1, ypos);
                 analysisManager -> AddNtupleRow(0);
             }
         }

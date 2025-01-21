@@ -47,6 +47,9 @@ RunAction::RunAction()
 
     if (arguments == 4)
     {
+        analysisManager -> CreateNtuple("Energy_Dist", "Energy_Dist");
+        analysisManager -> CreateNtupleDColumn("Energies");
+        analysisManager -> FinishNtuple(0);
     }
 
     if (arguments == 5)

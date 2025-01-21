@@ -1326,7 +1326,7 @@ def CT_Summary_Data(directory, tree, branches):
 
 def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, csv_folder):
     
-    from tqdm import tqdm; import dask; from dask import delayed; from dask.diagnostics import ProgressBar
+    import dask; from dask import delayed; from dask.diagnostics import ProgressBar
 
     os.makedirs(csv_folder, exist_ok = True)
 
@@ -1355,7 +1355,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     print('Calculating Heatmaps for Every Angle in CT:')
     with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
 
-    read_name = csv_folder + f"{'CT_raw_'}{0}.csv"
+    read_name = csv_folder + f"{'CT_raw_'}{start}.csv"
     raw_heatmap = np.genfromtxt(read_name, delimiter=',')
 
     lower = np.percentile(raw_heatmap, 0)
@@ -1365,7 +1365,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     return raw_heatmap
 
-def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
+def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sigma):
 
     import dask; from dask.diagnostics import ProgressBar; from dask import delayed
     from skimage.transform import iradon; from scipy import ndimage
@@ -1375,11 +1375,28 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     deg = degrees[2]
     projections = np.arange(start, end+1, deg)
 
-    initial = layers[0]
-    final = layers[1]
-    spacing = layers[2]
-    slices_vector = np.round(np.arange(initial, final, spacing))
-    
+    read_name = f"{csv_read}{'CT_raw_'}{start}.csv"
+    sample_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
+    rows = sample_heatmap.shape[1]
+
+    y0   = slices_in[0]
+    yf   = slices_in[1]
+    step = slices_in[2]
+
+    slices_num = len(np.arange(y0, yf, step))
+    proportion = int(rows/slices_num)
+
+    slice_0 = slices_out[0]
+    slice_f = slices_out[1]
+    slice_step = slices_out[2]
+
+    slice_0 = slice_0 * proportion
+    slice_f = slice_f * proportion
+    slice_step = slice_step * proportion
+
+    slices_vector = (np.arange(slice_0, slice_f, slice_step))
+    slices_vector = np.round(slices_vector).astype(int)
+
     heatmap_matrix = np.zeros(len(projections), dtype = object)
     sinogram_matrix = np.zeros(len(slices_vector), dtype = object)
     slices_matrix = np.zeros(len(slices_vector), dtype = object)
@@ -1387,7 +1404,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     @delayed
     def process_heatmap(i, csv_read, sigma):
         
-        read_name = csv_read + f"{'CT_raw_'}{i}.csv"
+        read_name = f"{csv_read}{'CT_raw_'}{i}.csv"
         raw_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
         raw_heatmap = raw_heatmap.to_numpy()        
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
@@ -1399,6 +1416,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     def compute_sinogram(y, heatmap_matrix):
         
         sinogram = []
+        # print(y)
         for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
         sinogram = np.array(sinogram).T
 
@@ -1417,28 +1435,32 @@ def RadonReconstruction(csv_read, csv_write, degrees, layers, sigma):
     print('Reading and Performing Logarithmic Transform (1/3)...')
     with ProgressBar(): heatmaps = dask.compute(*heatmap_tasks, scheduler='processes')
     heatmap_matrix = np.stack(heatmaps, axis=0)
-    # print('Heatmap Matrix Shape:', heatmap_matrix.shape)
+    print('Heatmap Matrix Shape:', heatmap_matrix.shape)
 
     sinogram_tasks = []
     for y in slices_vector: sinogram_tasks = sinogram_tasks + [compute_sinogram(y, heatmap_matrix)]
     print('\nComputing Sinograms (2/3)...')
     with ProgressBar(): sinograms = dask.compute(*sinogram_tasks)    
     sinogram_matrix = np.stack(sinograms, axis=0)
-    # print('Sinogram Matrix Shape:', sinogram_matrix.shape)
+    print('Sinogram Matrix Shape:', sinogram_matrix.shape)
 
     slices_tasks = []
     for i in range(len(slices_vector)): slices_tasks = slices_tasks + [reconstruct_slice(i, sinogram_matrix, projections)]
     print('\nReconstruction slices (3/3)...')
     with ProgressBar(): slices = dask.compute(*slices_tasks) 
     slices_matrix = np.stack(slices, axis=0)
-    # print('Slices Matrix Shape:', slices_matrix.shape)
-
+    print('Slices Matrix Shape:', slices_matrix.shape)
+        
     os.makedirs(csv_write, exist_ok = True)
     for i, y in enumerate(slices_vector): 
+        
         slice = slices_matrix[i]
         slice[np.isnan(slice)] = 0
-        write_name = csv_write + f"{'CT_slice_'}{y}mm.csv"
-        np.savetxt(write_name, slice, delimiter=',', fmt='%d') #.2f
+
+        write_name = f"{csv_write}{'CT_slice_'}{i}.csv"
+        np.savetxt(write_name, slice, delimiter=',', fmt='%.8f') # .8f
+
+    print(f"\n Succesfully written slices to: {csv_write}")
 
     return heatmap_matrix, sinogram_matrix, slices_matrix
 
@@ -1478,21 +1500,18 @@ def CoefficientstoHU(csv_slices, mu_water, air_parameter):
 
     import plotly.graph_objects as go
 
-    # initial = slices[0]
-    # final = slices[1]
-    # spacing = slices[2]
-    # slices = np.round(np.arange(initial, final, spacing))
-
     slices = os.listdir(csv_slices)
     HU_images = np.zeros(len(slices), dtype="object")
 
-    for i in range(len(HU_images)):
+    for i in range(len(slices)):
 
-        HU_images[i] = np.round(1000 * ((slices[i] - mu_water) / mu_water)).astype(int)
+        slice = np.genfromtxt(f"{csv_slices}{slices[i]}", delimiter=',')
+        
+        HU_images[i] = np.round(1000 * ((slice - mu_water) / mu_water)).astype(int)
         HU_images[i][HU_images[i] < air_parameter] = -1000
 
     fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = 600, height = 600, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.update_layout(width = 500, height = 500, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
     fig.show()
 
     return HU_images
@@ -1503,10 +1522,9 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
     import pydicom; from pydicom.uid import RLELossless; from pydicom.encaps import encapsulate; from pydicom.dataset import Dataset; 
     # from pydicom.uid import ExplicitVRLittleEndian; from pydicom.pixels import compress; from pydicom.dataset import FileDataset
 
-    image2d = HU_images[0].astype('int16')
-    print("Setting file meta information...")
-    print("Setting pixel data...")
-    
+    os.makedirs(directory, exist_ok = True)
+
+    image2d = HU_images[0].astype('int16'
     # instanceUID =  pydicom.uid.generate_uid()
     seriesUID = pydicom.uid.generate_uid()
     studyInstance = pydicom.uid.generate_uid()
@@ -1637,19 +1655,9 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
             ds.PixelData = image2d.tobytes()
             ds.save_as(name + '.dcm')
 
+    print(f"Written DICOMS to {directory}")
 
-
-
-
-
-
-
-
-
-
-
-
-
+# end ========================================================================================================================================================
 
 
 

@@ -1520,12 +1520,10 @@ def CoefficientstoHU(csv_slices, mu_water, air_parameter):
 def Export_to_Dicom(HU_images, size_y, directory, compressed):
 
     import pydicom; from pydicom.uid import RLELossless; from pydicom.encaps import encapsulate; from pydicom.dataset import Dataset; 
-    # from pydicom.uid import ExplicitVRLittleEndian; from pydicom.pixels import compress; from pydicom.dataset import FileDataset
 
     os.makedirs(directory, exist_ok = True)
 
     image2d = HU_images[0].astype('int16'
-    # instanceUID =  pydicom.uid.generate_uid()
     seriesUID = pydicom.uid.generate_uid()
     studyInstance = pydicom.uid.generate_uid()
     frameOfReference = pydicom.uid.generate_uid()
@@ -1536,14 +1534,9 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
             meta.MediaStorageSOPClassUID = pydicom.uid.CTImageStorage
             instanceUID_var = pydicom.uid.generate_uid()
             meta.MediaStorageSOPInstanceUID = instanceUID_var
-            # meta.TransferSyntaxUID = '1.2.840.10008.1.2.4.70' #LOSSLESS
             meta.TransferSyntaxUID= pydicom.uid.ImplicitVRLittleEndian
-            # instanceUID_var = instanceUID[:-7]+f".000{i+1}.0"
             ds = Dataset()
             ds.file_meta = meta
-
-            # ds.is_little_endian = True
-            # ds.is_implicit_VR = False
 
             ds.SOPInstanceUID = instanceUID_var
             ds.SOPClassUID = pydicom.uid.CTImageStorage 
@@ -1575,21 +1568,15 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
             ds.PixelSpacing = r"0.5\0.5"
             ds.PhotometricInterpretation = "MONOCHROME2"
             ds.PixelRepresentation = 1
-            # ds.RescaleIntercept = "-1024"
             ds.RescaleType = 'HU'
             name = directory + f"/I{i}"
-            # pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)
             thickness = (size_y * 2)/len(HU_images)
             ds.SliceThickness = str(thickness)
             ds.SpacingBetweenSlices = str(thickness)
             ds.ImagePositionPatient = f"0\\0\\{thickness * i}"
             ds.SliceLocation = str(thickness * i)+'00'
             ds.InstanceNumber = i+1
-            # instanceUID_var = instanceUID[:-7]+f".000{i+1}.0"
-            # meta.MediaStorageSOPInstanceUID = instanceUID_var
-            # ds.SOPInstanceUID = instanceUID_var
             image2d = image.astype('int16')
-            # ds.PixelData = image2d.tobytes()
             ds.PixelData = encapsulate([image2d.tobytes()])
             ds.compress(RLELossless)
             pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)
@@ -1601,9 +1588,7 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
             meta = pydicom.Dataset()
             meta.MediaStorageSOPClassUID = pydicom.uid.CTImageStorage
             instanceUID_var = pydicom.uid.generate_uid()
-            # instanceUID_var = instanceUID[:-7]+f".000{i+1}.0"
             meta.MediaStorageSOPInstanceUID = instanceUID_var
-            # meta.TransferSyntaxUID = '1.2.840.10008.1.2.4.70' #LOSSLESS
             meta.TransferSyntaxUID= pydicom.uid.ImplicitVRLittleEndian
             ds = Dataset()
             ds.file_meta = meta
@@ -1641,7 +1626,6 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
             ds.PixelSpacing = r"0.5\0.5"
             ds.PhotometricInterpretation = "MONOCHROME2"
             ds.PixelRepresentation = 1
-            # ds.RescaleIntercept = "-1024"
             ds.RescaleType = 'HU'
             name = directory + f"/I{i}"
             pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)

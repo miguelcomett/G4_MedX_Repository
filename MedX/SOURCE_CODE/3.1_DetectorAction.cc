@@ -13,9 +13,6 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
 
     if (particleName == "gamma" && energyKeV >= 1.0)
     {
-        // G4cout << "Photon energy (keV): " << energyKeV << G4endl;
-        // G4cout << "Particle name: " << particleName << G4endl;
-
         G4StepPoint * preStepPoint = aStep -> GetPreStepPoint();
         G4StepPoint * postStepPoint = aStep -> GetPostStepPoint();
         

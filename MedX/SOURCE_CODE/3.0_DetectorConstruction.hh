@@ -81,8 +81,7 @@ class DetectorConstruction:public G4VUserDetectorConstruction
 
         G4GenericMessenger * DetectorMessenger;
 
-        G4int numPores, numTumores;
-        G4int DetColumnNum = 1, DetRowNum = 1; 
+        G4int DetectorColumnsCount, DetectorRowsCount, numPores, numTumores;
         
         G4double innerBoneRadius, outerBoneRadius, boneHeight, poreRadius, xWorld, yWorld, zWorld, 
                  regionMinZ, regionMaxZ, regionMinRadius, regionMaxRadius, r, theta, z, x, y,

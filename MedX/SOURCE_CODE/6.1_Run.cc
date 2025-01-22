@@ -20,7 +20,7 @@ void Run::CountProcesses(G4String processName)
         std::map <G4String, G4int> ::iterator it = processCounter.find(processName);
         if ( it == processCounter.end()) {processCounter[processName] = 1;} else {processCounter[processName]++;}
     }
-} 
+}
 
 void Run::EndOfRun()
 {

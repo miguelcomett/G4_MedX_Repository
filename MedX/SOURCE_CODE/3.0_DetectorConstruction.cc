@@ -8,10 +8,13 @@ DetectorConstruction::DetectorConstruction()
     stlReader = new STLGeometryReader();
 
     DetectorMessenger = new G4GenericMessenger(this, "/myDetector/", "Detector Construction");
-    DetectorMessenger -> DeclareProperty("nColumns", DetColumnNum, "Number of columns");
-    DetectorMessenger -> DeclareProperty("nRows", DetRowNum, "Number of rows");
+    DetectorMessenger -> DeclareProperty("nColumns", DetectorColumnsCount, "Number of columns");
+    DetectorMessenger -> DeclareProperty("nRows", DetectorRowsCount, "Number of rows");
     DetectorMessenger -> DeclareProperty("ThicknessTarget", targetThickness, "Thickness of the target");
     DetectorMessenger -> DeclareProperty("Rotation", thoraxAngle, "Rotate the 3D model");
+
+    DetectorColumnsCount = 1;
+    DetectorRowsCount = 1;
 
     targetThickness = 12 * mm;
 
@@ -72,13 +75,13 @@ G4VPhysicalVolume * DetectorConstruction::Construct()
         ConstructEllipsoid(100, 25, 40, new G4RotationMatrix(-100*deg, 0*deg, 0*deg), ellipsoidPosition2, "RightLung");
     }
 
-    solidDetector = new G4Box("solidDetector", xWorld/DetRowNum, yWorld/DetColumnNum, 0.01*m);
+    solidDetector = new G4Box("solidDetector", xWorld/DetectorRowsCount, yWorld/DetectorColumnsCount, 0.01*m);
     logicDetector = new G4LogicalVolume(solidDetector, Silicon, "logicalDetector");
     checkOverlaps = false;
-    for(G4int i = 0; i < DetRowNum; i++) for (G4int j = 0; j < DetColumnNum; j++)
+    for(G4int i = 0; i < DetectorRowsCount; i++) for (G4int j = 0; j < DetectorColumnsCount; j++)
     {
-        DetectorPosition = G4ThreeVector(-0.5*m + (i+0.5)*m/DetRowNum, -0.5*m + (j+0.5)*m/DetColumnNum, 0.49*m);
-        physicalDetector = new G4PVPlacement(0, DetectorPosition, logicDetector, "physicalDetector", logicWorld, false, j+(i*DetColumnNum), checkOverlaps);
+        DetectorPosition = G4ThreeVector(-0.5*m + (i+0.5)*m/DetectorRowsCount, -0.5*m + (j+0.5)*m/DetectorColumnsCount, 0.49*m);
+        physicalDetector = new G4PVPlacement(0, DetectorPosition, logicDetector, "physicalDetector", logicWorld, false, j+(i*DetectorColumnsCount), checkOverlaps);
     }
 
     return physicalWorld;

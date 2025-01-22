@@ -12,13 +12,18 @@
 class ActionInitialization:public G4VUserActionInitialization
 {
     public:
+
         ActionInitialization(DetectorConstruction * detector);
         ~ActionInitialization();
 
-        virtual void Build() const;
         virtual void BuildForMaster() const;
-
-        DetectorConstruction * fDetector; 
+        virtual void Build() const;
+    
+        DetectorConstruction * myDetector; 
+        PrimaryGenerator * myGenerator;
+        RunAction * myRunAction;
+        EventAction * myEventAction;
+        SteppingAction * mySteppingAction;
 };
 
 #endif

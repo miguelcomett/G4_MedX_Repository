@@ -2,36 +2,34 @@
 
 ActionInitialization::ActionInitialization(DetectorConstruction * detector)
 {
-    fDetector = detector;
+    myDetector = detector;
 }
-ActionInitialization::~ActionInitialization(){}
 
-void ActionInitialization::BuildForMaster() const 
+ActionInitialization::~ActionInitialization()
 {
-    RunAction * runAction = new RunAction();
-    SetUserAction(runAction);
+    delete myGenerator;
+    delete myRunAction;
+    delete myEventAction;
+    delete mySteppingAction;
 }
 
-// ActionInitialization::~ActionInitialization()
-// {
-//     // Cleanup dynamically allocated memory
-//     delete generator;
-//     delete fRunAction;
-//     delete fEventAction;
-//     delete fSteppingAction;
-// }
+void ActionInitialization::BuildForMaster() const
+{
+    RunAction * myRunAction = new RunAction();
+    SetUserAction(myRunAction);
+}
 
 void ActionInitialization::Build() const
 {
-    PrimaryGenerator * generator = new PrimaryGenerator(fDetector);
-    SetUserAction(generator);
+    PrimaryGenerator * myGenerator = new PrimaryGenerator(myDetector);
+    SetUserAction(myGenerator);
     
-    RunAction * runAction = new RunAction();
-    SetUserAction(runAction);
+    RunAction * myRunAction = new RunAction();
+    SetUserAction(myRunAction);
 
-    EventAction * eventAction = new EventAction(runAction);
-    SetUserAction(eventAction);
+    EventAction * myEventAction = new EventAction(myRunAction);
+    SetUserAction(myEventAction);
 
-    SteppingAction * steppingAction = new SteppingAction(eventAction);
-    SetUserAction(steppingAction);
+    SteppingAction * mySteppingAction = new SteppingAction(myEventAction);
+    SetUserAction(mySteppingAction);
 }

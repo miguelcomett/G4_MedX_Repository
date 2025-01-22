@@ -1,6 +1,9 @@
 #include "4.0_ActionInitialization.hh"
 
-ActionInitialization::ActionInitialization(DetectorConstruction * detector) : G4VUserActionInitialization(), fDetector(detector) {}
+ActionInitialization::ActionInitialization(DetectorConstruction * detector)
+{
+    fDetector = detector;
+}
 ActionInitialization::~ActionInitialization(){}
 
 void ActionInitialization::BuildForMaster() const 
@@ -8,6 +11,15 @@ void ActionInitialization::BuildForMaster() const
     RunAction * runAction = new RunAction();
     SetUserAction(runAction);
 }
+
+// ActionInitialization::~ActionInitialization()
+// {
+//     // Cleanup dynamically allocated memory
+//     delete generator;
+//     delete fRunAction;
+//     delete fEventAction;
+//     delete fSteppingAction;
+// }
 
 void ActionInitialization::Build() const
 {

@@ -1,6 +1,6 @@
 #include "3.0_DetectorConstruction.hh"
 
-DetectorConstruction::DetectorConstruction() : gen(rd()), randomDist(0.0, 1.0), radiusDist(5.0*mm, 20.0*mm), posDist(-1.0*mm, 1.0*mm), posYDist(-40*mm, 40*mm)
+DetectorConstruction::DetectorConstruction()
 {
     G4GeometryManager::GetInstance() -> SetWorldMaximumExtent(100.0 * cm);
 
@@ -22,16 +22,23 @@ DetectorConstruction::DetectorConstruction() : gen(rd()), randomDist(0.0, 1.0), 
     outerBoneRadius = 22.5 * mm;
     armRotation = new G4RotationMatrix(0, 90*deg, 0);
 
-    // thoraxAngle = 45;
+    thoraxAngle = 0;
     
     ellipsoidPosition1 = G4ThreeVector(88.0 * mm, 5.0 * mm, -8.0 * mm); if (isDebug) {G4cout << "Posición rotada pulmón derecho: " << ellipsoidPosition1 << G4endl;}
     ellipsoidPosition2 = G4ThreeVector(-93 * mm, 5.0 * mm, -13.0 * mm); if (isDebug) {G4cout << "Posición rotada pulmón izquierdo: " << ellipsoidPosition2 << G4endl;}
+    
+    gen = std::mt19937(rd());
+    randomDist = std::uniform_real_distribution<>( 0.0, 1.0);
+    radiusDist = std::uniform_real_distribution<>( 05.0 * mm, 20.0 * mm);
+    posXDist   = std::uniform_real_distribution<>(-01.0 * mm, 01.0 * mm);
+    posYDist   = std::uniform_real_distribution<>(-40.0 * mm, 40.0 * mm);
+    posXDist   = std::uniform_real_distribution<>(-01.0 * mm, 01.0 * mm);
 
     isArm = false;
         isBoneDivided = false;
         isHealthyBone = true;
         isOsteoBone = false;
-    is3DModel = true;
+    is3DModel = false;
         isHeart = true;
         isLungs = true;
             isTraquea = false;
@@ -298,7 +305,7 @@ void DetectorConstruction::ConstructThorax()
             for (int i = 1; i <= numTumores; i++)
             {
                 ConstructTumor(i); 
-                G4ThreeVector correctedTumorPosition = G4ThreeVector(-tumorPosition.x(), tumorPosition.z(), tumorPosition.y());
+                correctedTumorPosition = G4ThreeVector(-tumorPosition.x(), tumorPosition.z(), tumorPosition.y());
                 AccumulatedLungs = new G4SubtractionSolid("LungsWithTumorHole", AccumulatedLungs, tumorSphere, Model3DRotation, correctedTumorPosition);
             }
 
@@ -431,9 +438,9 @@ void DetectorConstruction::ConstructTumor(int i)
         while (true)
         {
             // Generar coordenadas aleatorias dentro del elipsoide // Reducir semiejes para incluir el radio
-            x = (2.0 * posDist(gen) - 1.0) * (a - tumorRadius); 
+            x = (2.0 * posXDist(gen) - 1.0) * (a - tumorRadius); 
             y = (2.0 * posYDist(gen) - 1.0) * (b - tumorRadius);
-            z = (2.0 * posDist(gen) - 1.0) * (c - tumorRadius);
+            z = (2.0 * posZDist(gen) - 1.0) * (c - tumorRadius);
 
             verify = (x * x) / (a * a) + (y * y) / (b * b) + (z * z) / (c * c); 
             

@@ -9,7 +9,7 @@
 #include "6.1_Run.hh"
 #include "8.0_SteppingAction.hh"
 
-class ActionInitialization : public G4VUserActionInitialization
+class ActionInitialization:public G4VUserActionInitialization
 {
     public:
         ActionInitialization(DetectorConstruction * detector);

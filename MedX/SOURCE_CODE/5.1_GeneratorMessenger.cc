@@ -1,7 +1,9 @@
 #include "5.1_GeneratorMessenger.hh"
 
-PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator * gun) : fGun(gun)
+PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator * gun)
 {
+	fGun = gun;
+
 	fPgunX = new G4UIcmdWithADoubleAndUnit("/Pgun/X", this);
 	fPgunX -> SetGuidance("Set the source X position.");
 	fPgunX -> SetParameterName("GunXpos", true);

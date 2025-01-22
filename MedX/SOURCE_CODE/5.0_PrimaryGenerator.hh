@@ -39,6 +39,8 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         void SetGunSpanY(G4double newSpanY);
         void SetGunAngle(G4double newAngle); 
         void SetGunMode(G4int newMode); 
+
+        // const std::vector<G4double> & GetEnergySpectrum() const {return energySpectrum;}
 	
         G4ParticleGun * GetParticleGun() const {return particleGun;}
         
@@ -64,6 +66,8 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
         G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, 
                  Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, RealEnergy;
+
+        std::vector<G4double> energySpectrum;
         
         void SpectraFunction(); 
         

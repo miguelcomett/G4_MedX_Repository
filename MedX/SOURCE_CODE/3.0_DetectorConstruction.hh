@@ -40,7 +40,7 @@
 
 extern int arguments;
 
-class DetectorConstruction : public G4VUserDetectorConstruction
+class DetectorConstruction:public G4VUserDetectorConstruction
 {   
     public:
 
@@ -105,7 +105,8 @@ class DetectorConstruction : public G4VUserDetectorConstruction
                           * physMuscle, * physGrasa, * physSkin, * physOs, * physHealthy;
                         
         G4ThreeVector samplePosition, DetectorPosition, porePosition, osteo_position, healthy_position, Radiator_Position, 
-                      tumorPosition, selectedCenter, ellipsoidPosition1, ellipsoidPosition2, leftEllipsoidCenter, rightEllipsoidCenter;
+                      tumorPosition, correctedTumorPosition, selectedCenter, ellipsoidPosition1, ellipsoidPosition2, leftEllipsoidCenter, rightEllipsoidCenter;
+                    
         G4RotationMatrix * armRotation, * Model3DRotation, * originMatrix, * elipsoidRot, * elipsoidRot2; 
 
         G4Element  * C, * Al, * N, * O, * Ca, * Mg, * V, * Cd, * Te, * W;
@@ -126,8 +127,9 @@ class DetectorConstruction : public G4VUserDetectorConstruction
         std::mt19937 gen;
         std::uniform_real_distribution<> randomDist;
         std::uniform_real_distribution<> radiusDist;
-        std::uniform_real_distribution<> posDist;
+        std::uniform_real_distribution<> posXDist;
         std::uniform_real_distribution<> posYDist;
+        std::uniform_real_distribution<> posZDist;
 };
 
 #endif 

@@ -1,6 +1,11 @@
 #include "7.0_EventAction.hh"
 
-EventAction::EventAction(RunAction * runAction) : fRunAction(runAction) {fEDep = 0.0;}
+EventAction::EventAction(RunAction * runAction)
+{
+    fRunAction = runAction;
+    fEDep = 0.0;
+}
+
 EventAction::~EventAction(){}
 
 void EventAction::BeginOfEventAction(const G4Event * event) {fEDep = 0.0;}

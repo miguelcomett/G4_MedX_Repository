@@ -1,13 +1,26 @@
 #include "5.0_PrimaryGenerator.hh"
 
-PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector) : SpectraMode(0), Xpos(0.0*mm), Ypos(0.0*mm), Zpos(-450*mm), SpanX(1*mm), SpanY(1*mm), GunAngle(0.0), 
-fDetector(detector), GeneratorMessenger(new PrimaryGeneratorMessenger(this)), G4VUserPrimaryGeneratorAction()
+PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector)
 {
+    fDetector = detector;
+
     particleGun = new G4ParticleGun(1);
     particleTable = G4ParticleTable::GetParticleTable();
     particleName = "gamma";
     particle = particleTable -> FindParticle(particleName);
     particleGun -> SetParticleDefinition(particle);   
+
+    GeneratorMessenger = new PrimaryGeneratorMessenger(this);
+
+    SpectraMode = 0;
+    Xpos =  000.0 * mm;
+    Ypos =  000.0 * mm;
+    Zpos = -450.0 * mm;
+    
+    SpanX = 100.0 * mm;
+    SpanY = 100.0 * mm;
+
+    GunAngle = 0.0;
 
     threadID = G4Threading::G4GetThreadId();
     if (threadID == 0) {std::cout << std::endl; std::cout << "------------- GUN MESSENGERS -------------" << std::endl;}
@@ -21,8 +34,19 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
-    
+
+        // energySpectrum.push_back(RealEnergy / keV); 
     }
+
+    // if (!energySpectrum.empty())
+    // {
+    //     for (G4int energy : energySpectrum)
+    //     {
+    //         G4cout << "Energy: " << energy << G4endl;
+    //     }
+    // }
+
+    // G4cout << "size: " << energySpectrum.size() << G4endl;
 
 
     if (Xgauss == true) 
@@ -159,18 +183,18 @@ void PrimaryGenerator::SpectraFunction() // tabulated function // Y is assumed p
 
     ReadSpectrumFromFile(spectrumFile, xx, yy, fNPoints);
 
-    if (threadID == 0) 
-    {
-        std::cout << "Número de puntos leídos: " << fNPoints << std::endl;
+    // if (threadID == 0) 
+    // {
+    //     std::cout << "Número de puntos leídos: " << fNPoints << std::endl;
         
-        for (size_t i = 0; i < xx.size(); ++i) 
-        {
-            std::cout << 
-            "Energía: "     << std::fixed << std::setprecision(1) << xx[i] / keV << " keV  " <<  
-            " Intensidad: " << std::fixed << std::setprecision(3) << yy[i] * 100 
-            << std::endl;
-        }
-    }
+    //     for (size_t i = 0; i < xx.size(); ++i) 
+    //     {
+    //         std::cout << 
+    //         "Energía: "     << std::fixed << std::setprecision(1) << xx[i] / keV << " keV  " <<  
+    //         " Intensidad: " << std::fixed << std::setprecision(3) << yy[i] * 100 
+    //         << std::endl;
+    //     }
+    // }
 
 	// copy arrays in std::vector and compute fMax
     fX.resize(fNPoints); fY.resize(fNPoints);

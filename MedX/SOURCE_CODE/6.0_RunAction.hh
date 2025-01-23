@@ -40,10 +40,8 @@ class RunAction : public G4UserRunAction
 
         void AddEdep (G4double edep);
 
-        void MergeRootFiles(const std::string & fileName);
-        void RemoveJunkDataFromRoot(const std::string & mergedFilePath);
-
         void MergeEnergySpectra();
+        void MergeRootFiles(const std::string & fileName);
 
     private:
 

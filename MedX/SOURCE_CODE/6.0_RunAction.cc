@@ -1,7 +1,7 @@
 #include "6.0_RunAction.hh"
 
 G4Mutex mergeMutex = G4MUTEX_INITIALIZER;
-std::vector<G4double> masterData;
+std::vector<G4double> masterEnergySpectra;
 
 RunAction::RunAction()
 {
@@ -141,6 +141,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     G4AccumulableManager * accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> Merge();
     MergeEnergySpectra();
+    // G4cout << masterEnergySpectra.size() << G4endl;
     
     if (isMaster && arguments != 3) 
     { 
@@ -186,7 +187,10 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
         if (arguments == 5)
         {
             analysisManager -> FillNtupleDColumn(1, 0, numberOfEvents);
-            photonsEnergy = masterData; 
+            
+            if (masterEnergySpectra.size() > 0)  {photonsEnergy = masterEnergySpectra;}
+            if (masterEnergySpectra.size() <= 0) {photonsEnergy.push_back(primaryEnergy/keV);}
+            
             analysisManager -> FillNtupleDColumn(1, 2, totalMass/kg);
             analysisManager -> FillNtupleDColumn(1, 3, TotalEnergyDeposit);
             analysisManager -> FillNtupleDColumn(1, 4, radiationDose);
@@ -209,7 +213,7 @@ void RunAction::MergeEnergySpectra()
     if (primaryGenerator) {energySpectra = primaryGenerator -> GetEnergySpectra();}
 
     G4MUTEXLOCK(&mergeMutex);  
-    masterData.insert(masterData.end(), energySpectra.begin(), energySpectra.end());
+    masterEnergySpectra.insert(masterEnergySpectra.end(), energySpectra.begin(), energySpectra.end());
     G4MUTEXUNLOCK(&mergeMutex); 
 }
 

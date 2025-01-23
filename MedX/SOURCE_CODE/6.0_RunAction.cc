@@ -141,7 +141,6 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     G4AccumulableManager * accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> Merge();
     MergeEnergySpectra();
-    // G4cout << masterEnergySpectra.size() << G4endl;
     
     if (isMaster && arguments != 3) 
     { 

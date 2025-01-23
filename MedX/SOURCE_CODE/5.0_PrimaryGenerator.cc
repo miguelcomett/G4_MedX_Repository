@@ -35,6 +35,8 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
+
+        energySpectra.push_back(RealEnergy / keV);
     }
 
     if (Xgauss == true) 
@@ -182,7 +184,7 @@ void PrimaryGenerator::SpectraFunction()
             // "Energy: "    << std::fixed << std::setprecision(1) << EnergyVector[i] / keV << " keV   " <<  
             // "Intensity: " << std::fixed << std::setprecision(3) << IntensityVector[i] * 100 << std::endl;
 
-            for (int j=0; j<std::ceil(IntensityVector[i] * 1000); j++){energySpectra.push_back(EnergyVector[i] / keV);}
+            // for (int j=0; j<std::ceil(IntensityVector[i] * 1000); j++){energySpectra.push_back(EnergyVector[i] / keV);}
         }
     }
 

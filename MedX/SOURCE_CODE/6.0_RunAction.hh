@@ -9,18 +9,17 @@
 #include <filesystem>
 #include <string>
 #include <regex>
+#include <thread>
 
 #include "Randomize.hh"
+#include <G4RunManager.hh>
+#include <G4AccumulableManager.hh>
 #include "G4UIManager.hh"
 #include "G4UserRunAction.hh"
 #include "G4AnalysisManager.hh"
 #include "G4Run.hh"
-#include <G4AccumulableManager.hh>
 #include "G4Threading.hh"
-#include "TFileMerger.h"
-#include <TFile.h>
-#include <TTree.h>
-#include "G4Threading.hh"
+
 #include "3.0_DetectorConstruction.hh"
 #include "5.0_PrimaryGenerator.hh"
 #include "6.1_Run.hh"
@@ -41,17 +40,23 @@ class RunAction : public G4UserRunAction
 
         void AddEdep (G4double edep);
 
-        void MergeRootFiles();
+        void MergeRootFiles(const std::string & fileName);
         void RemoveJunkDataFromRoot(const std::string & mergedFilePath);
+
+        void MergeEnergySpectra();
 
     private:
 
         Run * customRun = nullptr;
 
         const DetectorConstruction * detectorConstruction;
-
         const PrimaryGenerator * primaryGenerator;
+
         G4Accumulable <G4double> fEdep = 0.0;
+        std::vector <G4LogicalVolume*> scoringVolumes;
+        std::vector<G4double> photonsEnergy;
+        std::vector<G4double> energySpectra;
+        
         std::chrono::system_clock::time_point simulationStartTime, simulationEndTime;
         std::time_t now_end;
         std::tm * now_tm_1;

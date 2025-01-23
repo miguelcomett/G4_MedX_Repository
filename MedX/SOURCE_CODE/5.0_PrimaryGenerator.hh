@@ -43,7 +43,7 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         G4ParticleGun * GetParticleGun() const {return particleGun;}
 
         void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & energyDataPoints);
-        std::vector<G4double> GetEnergySpectra() const {return energySpectra;}
+        std::vector<G4float> GetEnergySpectra() const {return energySpectra;}
         G4double InverseCumul();
         
     private:
@@ -66,7 +66,7 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         
         void SpectraFunction(); 
         
-        std::vector<G4double> energySpectra;
+        std::vector<G4float> energySpectra;
         G4String spectrumFile; 	       
         G4int energyDataPoints = 0; //nb of points
         G4double fYmax;             //max(Y)

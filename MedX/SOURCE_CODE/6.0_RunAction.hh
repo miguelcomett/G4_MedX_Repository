@@ -52,8 +52,8 @@ class RunAction : public G4UserRunAction
 
         G4Accumulable <G4double> fEdep = 0.0;
         std::vector <G4LogicalVolume*> scoringVolumes;
-        std::vector<G4double> photonsEnergy;
-        std::vector<G4double> energySpectra;
+        std::vector<G4float> photonsEnergy;
+        std::vector<G4float> energySpectra;
         
         std::chrono::system_clock::time_point simulationStartTime, simulationEndTime;
         std::time_t now_end;
@@ -63,7 +63,8 @@ class RunAction : public G4UserRunAction
 
         G4String particleName, directory, fileName;
         G4int numberOfEvents, runID, index, totalNumberOfEvents, threadID;
-        G4double energy, sampleMass, primaryEnergy, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose;
+        G4float primaryEnergy;
+        G4double energy, sampleMass, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose;
 
         const G4double milligray = 1.0e-3*gray;
         const G4double microgray = 1.0e-6*gray;

@@ -1,7 +1,7 @@
 #include "6.0_RunAction.hh"
 
 G4Mutex mergeMutex = G4MUTEX_INITIALIZER;
-std::vector<G4double> masterEnergySpectra;
+std::vector<G4float> masterEnergySpectra;
 
 RunAction::RunAction()
 {
@@ -64,7 +64,7 @@ RunAction::RunAction()
 
         analysisManager -> CreateNtuple("Run Summary", "Run Summary");
         analysisManager -> CreateNtupleDColumn("Number_of_Photons");
-        analysisManager -> CreateNtupleDColumn("Initial_Energy_keV", photonsEnergy);
+        analysisManager -> CreateNtupleFColumn("Initial_Energy_keV", photonsEnergy);
         analysisManager -> CreateNtupleDColumn("Sample_Mass_kg");
         analysisManager -> CreateNtupleDColumn("EDep_Value_TeV");
         analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");

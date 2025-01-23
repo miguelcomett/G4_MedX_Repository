@@ -1523,7 +1523,7 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
 
     os.makedirs(directory, exist_ok = True)
 
-    image2d = HU_images[0].astype('int16'
+    image2d = HU_images[0].astype('int16')
     seriesUID = pydicom.uid.generate_uid()
     studyInstance = pydicom.uid.generate_uid()
     frameOfReference = pydicom.uid.generate_uid()

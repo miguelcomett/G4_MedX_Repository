@@ -17,6 +17,7 @@ class SensitiveDetector : public G4VSensitiveDetector
         SensitiveDetector(G4String);
         ~SensitiveDetector();
     
+        
     private: 
 
         virtual G4bool ProcessHits(G4Step *, G4TouchableHistory *);
@@ -24,6 +25,7 @@ class SensitiveDetector : public G4VSensitiveDetector
         G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor;
         G4float xpos, ypos;
         G4double Wavelength, Energy;
+
 };
 
 #endif

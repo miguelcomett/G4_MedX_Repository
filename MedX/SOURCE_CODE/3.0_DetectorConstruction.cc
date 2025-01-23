@@ -41,7 +41,7 @@ DetectorConstruction::DetectorConstruction()
         isBoneDivided = false;
         isHealthyBone = true;
         isOsteoBone = false;
-    is3DModel = false;
+    is3DModel = true;
         isHeart = true;
         isLungs = true;
             isTraquea = false;

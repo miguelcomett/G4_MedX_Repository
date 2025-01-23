@@ -39,48 +39,41 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         void SetGunSpanY(G4double newSpanY);
         void SetGunAngle(G4double newAngle); 
         void SetGunMode(G4int newMode); 
-
-        // const std::vector<G4double> & GetEnergySpectrum() const {return energySpectrum;}
 	
         G4ParticleGun * GetParticleGun() const {return particleGun;}
-        
-        void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & fNPoints);
+
+        void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & energyDataPoints);
+        std::vector<G4double> GetEnergySpectra() const {return energySpectra;}
         G4double InverseCumul();
-    
+        
     private:
 
         G4ParticleGun * particleGun;        
         PrimaryGeneratorMessenger * GeneratorMessenger;
-        DetectorConstruction * fDetector;
+        DetectorConstruction * detectorConstruction;
 
         G4String particleName;
         G4ParticleTable * particleTable;
         G4ParticleDefinition * particle;
 
-        G4int threadID;
-        G4double random, peak, min, max;
+        const G4double pi = 3.14159265358979323846;
+        G4int threadID, SpectraMode;
+        G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
+        G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, 
+                 Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, RealEnergy, random, peak, min, max;
 
         G4ThreeVector photonPosition, photonMomentum;
         
-        const G4double pi = 3.14159265358979323846;
-        G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
-        G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, 
-                 Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, RealEnergy;
-
-        std::vector<G4double> energySpectrum;
-        
         void SpectraFunction(); 
         
-        G4int SpectraMode;
-        G4double energy;
-        
+        std::vector<G4double> energySpectra;
         G4String spectrumFile; 	       
-        G4int                  fNPoints = 0; //nb of points
-        std::vector<G4double>  fX;           //abscisses X
-        std::vector<G4double>  fY;           //values of Y(X)
-        std::vector<G4double>  fSlp;         //slopes
-        std::vector<G4double>  fYC;          //cumulative function of Y
-        G4double               fYmax = 0.;   //max(Y)
+        G4int energyDataPoints = 0; //nb of points
+        G4double fYmax;             //max(Y)
+        std::vector<G4double> fX;   //abscisses X
+        std::vector<G4double> fY;   //values of Y(X)
+        std::vector<G4double> fSlp; //slopes
+        std::vector<G4double> fYC;  //cumulative function of Y
 };
 
 #endif

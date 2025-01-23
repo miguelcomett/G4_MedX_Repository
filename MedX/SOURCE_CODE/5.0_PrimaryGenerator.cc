@@ -2,13 +2,14 @@
 
 PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector)
 {
-    fDetector = detector;
+    detectorConstruction = detector;
 
     particleGun = new G4ParticleGun(1);
     particleTable = G4ParticleTable::GetParticleTable();
     particleName = "gamma";
     particle = particleTable -> FindParticle(particleName);
     particleGun -> SetParticleDefinition(particle);   
+    particleGun -> SetParticleEnergy(111.111 * eV); 
 
     GeneratorMessenger = new PrimaryGeneratorMessenger(this);
 
@@ -21,7 +22,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector)
     SpanY = 100.0 * mm;
 
     GunAngle = 0.0;
-
+    
     threadID = G4Threading::G4GetThreadId();
     if (threadID == 0) {std::cout << std::endl; std::cout << "------------- GUN MESSENGERS -------------" << std::endl;}
 }
@@ -34,20 +35,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
-
-        // energySpectrum.push_back(RealEnergy / keV); 
     }
-
-    // if (!energySpectrum.empty())
-    // {
-    //     for (G4int energy : energySpectrum)
-    //     {
-    //         G4cout << "Energy: " << energy << G4endl;
-    //     }
-    // }
-
-    // G4cout << "size: " << energySpectrum.size() << G4endl;
-
 
     if (Xgauss == true) 
     {
@@ -62,7 +50,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     
     if (Xcos == true) 
     {
-        if (fDetector) {thoraxAngle = fDetector -> GetThoraxAngle();} else {thoraxAngle = 0;}
+        if (detectorConstruction) {thoraxAngle = detectorConstruction -> GetThoraxAngle();} else {thoraxAngle = 0;}
         if (thoraxAngle > 90)  {gunAngle = thoraxAngle - 180;}
         if (thoraxAngle > 270) {gunAngle = thoraxAngle - 360;}
         gunAngle = gunAngle * (2*pi / 360);
@@ -175,45 +163,50 @@ void PrimaryGenerator::SetGunMode(G4int newMode)
 
 // Create Ratiation Spectra ====================================================================================================================
 
-void PrimaryGenerator::SpectraFunction() // tabulated function // Y is assumed positive, linear per segment, continuous
+// tabulated function // Y is assumed positive, linear per segment, continuous
+void PrimaryGenerator::SpectraFunction() 
 {
-    std::vector<G4double> xx;
-    std::vector<G4double> yy;
-    fNPoints = 0;
+    std::vector<G4double> EnergyVector;
+    std::vector<G4double> IntensityVector;
+    energyDataPoints = 0;
 
-    ReadSpectrumFromFile(spectrumFile, xx, yy, fNPoints);
+    ReadSpectrumFromFile(spectrumFile, EnergyVector, IntensityVector, energyDataPoints);
 
-    // if (threadID == 0) 
-    // {
-    //     std::cout << "Número de puntos leídos: " << fNPoints << std::endl;
+    if (threadID == 0) 
+    {
+        // std::cout << "Energy Data Points Read: " << energyDataPoints << std::endl; std::cout << std::endl;
         
-    //     for (size_t i = 0; i < xx.size(); ++i) 
-    //     {
-    //         std::cout << 
-    //         "Energía: "     << std::fixed << std::setprecision(1) << xx[i] / keV << " keV  " <<  
-    //         " Intensidad: " << std::fixed << std::setprecision(3) << yy[i] * 100 
-    //         << std::endl;
-    //     }
-    // }
+        for (size_t i = 0; i < EnergyVector.size(); ++i) 
+        {
+            // std::cout << 
+            // "Energy: "    << std::fixed << std::setprecision(1) << EnergyVector[i] / keV << " keV   " <<  
+            // "Intensity: " << std::fixed << std::setprecision(3) << IntensityVector[i] * 100 << std::endl;
+
+            for (int j=0; j<std::ceil(IntensityVector[i] * 1000); j++){energySpectra.push_back(EnergyVector[i] / keV);}
+        }
+    }
+
+    // for (auto energy : energySpectra){G4cout << "Photon's energy: " << energy << G4endl;}
 
 	// copy arrays in std::vector and compute fMax
-    fX.resize(fNPoints); fY.resize(fNPoints);
+    fX.resize(energyDataPoints); fY.resize(energyDataPoints);
     fYmax = 0.0;
-    for (G4int j=0; j<fNPoints; j++) {fX[j] = xx[j]; fY[j] = yy[j]; if (fYmax < fY[j]) fYmax = fY[j];};
+    for (G4int j=0; j<energyDataPoints; j++) {fX[j] = EnergyVector[j]; fY[j] = IntensityVector[j]; if (fYmax < fY[j]) fYmax = fY[j];};
 
-    fSlp.resize(fNPoints); //compute slopes
-    for (G4int j=0; j<fNPoints-1; j++) {fSlp[j] = (fY[j+1] - fY[j])/(fX[j+1] - fX[j]);};
+    fSlp.resize(energyDataPoints); //compute slopes
+    for (G4int j=0; j<energyDataPoints-1; j++) {fSlp[j] = (fY[j+1] - fY[j])/(fX[j+1] - fX[j]);};
 
-    fYC.resize(fNPoints); // compute cumulative function
+    fYC.resize(energyDataPoints); // compute cumulative function
     fYC[0] = 0.;
-    for (G4int j=1; j<fNPoints; j++) {fYC[j] = fYC[j-1] + 0.5*(fY[j] + fY[j-1])*(fX[j] - fX[j-1]);};     
+    for (G4int j=1; j<energyDataPoints; j++) {fYC[j] = fYC[j-1] + 0.5*(fY[j] + fY[j-1])*(fX[j] - fX[j-1]);};     
 }
 
-G4double PrimaryGenerator::InverseCumul() // Function to estimate counts // --> cumulative function is second order polynomial // (see Particle Data Group: pdg.lbl.gov --> Monte Carlo techniques)
+// Function to estimate counts --> cumulative function is second order polynomial
+G4double PrimaryGenerator::InverseCumul() 
 { 
-    G4double Yrndm = G4UniformRand() * fYC[fNPoints-1]; //choose y randomly
+    G4double Yrndm = G4UniformRand() * fYC[energyDataPoints-1]; //choose y randomly
  
-    G4int j = fNPoints - 2;  // find bin
+    G4int j = energyDataPoints - 2;  // find bin
     while ((fYC[j] > Yrndm) && (j > 0)) j--; // y_rndm --> x_rndm :  fYC(x) is second order polynomial
     
     G4double Xrndm = fX[j];
@@ -231,19 +224,20 @@ G4double PrimaryGenerator::InverseCumul() // Function to estimate counts // --> 
     return Xrndm;
 }
 
-void PrimaryGenerator::ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & fNPoints) // Function to fill the vectors
+// Function to fill the vectors:
+void PrimaryGenerator::ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & EnergyVector, std::vector<G4double> & IntensityVector, G4int & energyDataPoints) 
 { 
     std::ifstream infile(filename);
     if (!infile) {G4cerr << "Error opening file: " << filename << G4endl; return;}
     
     G4double energy, intensity;
-    fNPoints = 0; 
+    energyDataPoints = 0; 
 
     while (infile >> energy >> intensity) // Convertir energía de keV a las unidades internas de Geant4
     {
-        xx.push_back(energy * keV);
-        yy.push_back(intensity);
-        fNPoints++; 
+        EnergyVector.push_back(energy * keV);
+        IntensityVector.push_back(intensity);
+        energyDataPoints++; 
     }
 
     infile.close();

@@ -189,12 +189,17 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
         
         if (arguments == 5)
         {
+            primaryEnergy = primaryEnergy / keV;
+            totalMass = totalMass / kg;
+            TotalEnergyDeposit = TotalEnergyDeposit / TeV;
+            radiationDose = radiationDose / microgray;
+
             analysisManager -> FillNtupleDColumn(1, 0, numberOfEvents);
             
             if (masterEnergySpectra.size() > 0)  {photonsEnergy = masterEnergySpectra;}
-            if (masterEnergySpectra.size() <= 0) {photonsEnergy.push_back(primaryEnergy/keV);}
+            if (masterEnergySpectra.size() <= 0) {photonsEnergy.push_back(primaryEnergy);}
             
-            analysisManager -> FillNtupleDColumn(1, 2, totalMass/kg);
+            analysisManager -> FillNtupleDColumn(1, 2, totalMass);
             analysisManager -> FillNtupleDColumn(1, 3, TotalEnergyDeposit);
             analysisManager -> FillNtupleDColumn(1, 4, radiationDose);
             analysisManager -> AddNtupleRow(1);

@@ -141,47 +141,51 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     G4AccumulableManager * accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> Merge();
     MergeEnergySpectra();
-    
-    if (isMaster && arguments != 3) 
+
+    if (isMaster) 
     { 
-        detectorConstruction = static_cast <const DetectorConstruction*> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());   
-        scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
+        if (arguments != 3)
+        {
 
-        totalMass = 0;
-        index = 1;
+            detectorConstruction = static_cast <const DetectorConstruction*> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());   
+            scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
-        for (G4LogicalVolume * volume : scoringVolumes) 
-        { 
-            if (volume) {sampleMass = volume -> GetMass(); totalMass = totalMass + sampleMass;} 
-            // G4cout << "Mass " << index << ": " << G4BestUnit(sampleMass, "Mass") << G4endl;
-            index = index + 1;
+            totalMass = 0;
+            index = 1;
+
+            for (G4LogicalVolume * volume : scoringVolumes) 
+            { 
+                if (volume) {sampleMass = volume -> GetMass(); totalMass = totalMass + sampleMass;} 
+                // G4cout << "Mass " << index << ": " << G4BestUnit(sampleMass, "Mass") << G4endl;
+                index = index + 1;
+            }
+            
+            const Run * currentRun = static_cast<const Run *>(thisRun);
+            particleName = currentRun -> GetPrimaryParticleName();
+            primaryEnergy = currentRun -> GetPrimaryEnergy();
+            numberOfEvents = thisRun -> GetNumberOfEvent();
+
+            TotalEnergyDeposit = fEdep.GetValue();
+            radiationDose = TotalEnergyDeposit / totalMass;
+
+            simulationEndTime = std::chrono::system_clock::now();
+            now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
+            now_tm_1 = std::localtime(&now_end);
+            
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(simulationEndTime - simulationStartTime);
+            durationInSeconds = duration.count() * second;
+
+            G4cout << G4endl; 
+            G4cout << "\033[32mRun Summary:" << G4endl;
+            G4cout << "--> Total mass of sample: " << G4BestUnit(totalMass, "Mass") << G4endl;
+            G4cout << "--> Total energy deposition: " << G4BestUnit(TotalEnergyDeposit, "Energy") << G4endl;
+            G4cout << "--> Radiation dose : " << G4BestUnit(radiationDose, "Dose") << G4endl;
+            G4cout << G4endl;
+            G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
+            G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
+            G4cout << "========================================== \033[0m" << G4endl;
+            G4cout << G4endl;
         }
-        
-        const Run * currentRun = static_cast<const Run *>(thisRun);
-        particleName = currentRun -> GetPrimaryParticleName();
-        primaryEnergy = currentRun -> GetPrimaryEnergy();
-        numberOfEvents = thisRun -> GetNumberOfEvent();
-
-        TotalEnergyDeposit = fEdep.GetValue();
-        radiationDose = TotalEnergyDeposit / totalMass;
-
-        simulationEndTime = std::chrono::system_clock::now();
-        now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
-        now_tm_1 = std::localtime(&now_end);
-        
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(simulationEndTime - simulationStartTime);
-        durationInSeconds = duration.count() * second;
-
-        G4cout << G4endl; 
-        G4cout << "\033[32mRun Summary:" << G4endl;
-        G4cout << "--> Total mass of sample: " << G4BestUnit(totalMass, "Mass") << G4endl;
-        G4cout << "--> Total energy deposition: " << G4BestUnit(TotalEnergyDeposit, "Energy") << G4endl;
-        G4cout << "--> Radiation dose : " << G4BestUnit(radiationDose, "Dose") << G4endl;
-        G4cout << G4endl;
-        G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
-        G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
-        G4cout << "========================================== \033[0m" << G4endl;
-        G4cout << G4endl;
         
         if (arguments == 5)
         {
@@ -195,9 +199,9 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             analysisManager -> FillNtupleDColumn(1, 4, radiationDose);
             analysisManager -> AddNtupleRow(1);
         }
+        
+        customRun -> EndOfRun();
     }
-
-    if (isMaster) {customRun -> EndOfRun();}
 
     analysisManager -> Write();
     analysisManager -> CloseFile();
@@ -248,7 +252,7 @@ void RunAction::MergeRootFiles(const std::string & fileName)
 
     if (std::system(haddCommand.c_str()) == 0) 
     {
-        G4cout << "~ Successfully merged ROOT files using hadd ~" << G4endl;
+        G4cout << "~ Successfully merged ROOT files ~" << G4endl; G4cout << G4endl;
         std::filesystem::remove_all(rootDirectory);
     } 
     else {G4cerr << "Error: ROOT files merging with hadd failed!" << G4endl;}

@@ -35,8 +35,10 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
-
-        energySpectra.push_back(RealEnergy / keV);
+        
+        RealEnergy = RealEnergy/keV;
+        RealEnergy = std::round(RealEnergy * 10) / 10;
+        energySpectra.push_back(RealEnergy);
     }
 
     if (Xgauss == true) 

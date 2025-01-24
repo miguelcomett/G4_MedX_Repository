@@ -52,8 +52,8 @@ class RunAction : public G4UserRunAction
 
         G4Accumulable <G4double> fEdep = 0.0;
         std::vector <G4LogicalVolume*> scoringVolumes;
-        std::vector<G4float> photonsEnergy;
-        std::vector<G4float> energySpectra;
+        std::vector <G4float> photonsEnergy;
+        std::vector <G4float> energySpectra;
         
         std::chrono::system_clock::time_point simulationStartTime, simulationEndTime;
         std::time_t now_end;

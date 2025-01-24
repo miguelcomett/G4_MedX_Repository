@@ -225,7 +225,7 @@ void RunAction::MergeRootFiles(const std::string & fileName)
         std::string outputDirectory = std::filesystem::path(currentPath).string() + "/ROOT";
     #else
         std::string rootDirectory = std::filesystem::path(currentPath).parent_path().string() + "\\ROOT_temp\\";
-        std::string outputDirectory = std::filesystem::path(currentPath).string() + "\\ROOT\\";
+        std::string outputDirectory = std::filesystem::path(currentPath).string() + "\\ROOT";
     #endif
 
     if (!std::filesystem::exists(outputDirectory)) {std::filesystem::create_directory(outputDirectory);}
@@ -243,8 +243,7 @@ void RunAction::MergeRootFiles(const std::string & fileName)
     
     for (const auto& entry : std::filesystem::directory_iterator(rootDirectory)) 
     {
-        if (entry.is_regular_file() && entry.path().extension() == ".root") 
-        {haddCommand += " " + entry.path().string();}
+        if (entry.is_regular_file() && entry.path().extension() == ".root") {haddCommand += " " + entry.path().string();}
     }
 
     if (std::system(haddCommand.c_str()) == 0) 

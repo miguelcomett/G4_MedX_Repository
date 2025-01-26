@@ -11,6 +11,8 @@
 #include <regex>
 #include <thread>
 
+#include <TFile.h>
+#include <TTree.h>
 #include "Randomize.hh"
 #include <G4RunManager.hh>
 #include <G4AccumulableManager.hh>
@@ -38,32 +40,47 @@ class RunAction : public G4UserRunAction
 
         G4Run * GenerateRun() override;
 
-        void AddEdep (G4double edep);
-
+        void AddEdep(G4double edep) {fEdep += edep;}
         void MergeEnergySpectra();
         void MergeRootFiles(const std::string & fileName);
 
     private:
 
-        Run * customRun = nullptr;
+        G4AnalysisManager * analysisManager;
+        G4AccumulableManager * accumulableManager;
 
-        const DetectorConstruction * detectorConstruction;
-        const PrimaryGenerator * primaryGenerator;
+        Run * customRun = nullptr;
+        const Run * currentRun;
+
+        const PrimaryGenerator * primaryGenerator = static_cast <const PrimaryGenerator*> 
+        (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction());
+        const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> 
+        (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());   
 
         G4Accumulable <G4double> fEdep = 0.0;
         std::vector <G4LogicalVolume*> scoringVolumes;
-        std::vector <G4float> photonsEnergy;
-        std::vector <G4float> energySpectra;
+
+        std::map<G4float, G4int> energyHistogram;
         
+        std::string currentPath;
+        std::string rootDirectory;
+
+        std::string outputDirectory;
+        G4int fileIndex = 0;
+        std::string mergedFileName;
+        std::string haddCommand;
+
         std::chrono::system_clock::time_point simulationStartTime, simulationEndTime;
+        std::time_t now_start;
+        std::tm * now_tm_0;
         std::time_t now_end;
         std::tm * now_tm_1;
 
         G4ParticleDefinition * particle;
 
         G4String particleName, directory, fileName;
-        G4int numberOfEvents, runID, index, totalNumberOfEvents, threadID;
-        G4float primaryEnergy;
+        G4int numberOfEvents, runID, index, totalNumberOfEvents, threadID, GunMode, frequency;
+        G4float primaryEnergy, energies;
         G4double energy, sampleMass, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose;
 
         const G4double milligray = 1.0e-3*gray;

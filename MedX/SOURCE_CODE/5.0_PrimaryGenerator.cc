@@ -9,7 +9,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector)
     particleName = "gamma";
     particle = particleTable -> FindParticle(particleName);
     particleGun -> SetParticleDefinition(particle);   
-    particleGun -> SetParticleEnergy(111.111 * eV); 
+    particleGun -> SetParticleEnergy(0 * eV); 
 
     GeneratorMessenger = new PrimaryGeneratorMessenger(this);
 
@@ -37,8 +37,9 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
         particleGun -> SetParticleEnergy(RealEnergy);
         
         RealEnergy = RealEnergy/keV;
-        RealEnergy = std::round(RealEnergy * 10) / 10;
-        energySpectra.push_back(RealEnergy);
+        // RealEnergy = std::round(RealEnergy * 100) / 100;
+
+        energyHistogram[RealEnergy]++;
     }
 
     if (Xgauss == true) 

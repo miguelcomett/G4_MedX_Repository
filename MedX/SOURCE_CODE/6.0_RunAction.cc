@@ -1,7 +1,7 @@
 #include "6.0_RunAction.hh"
 
 G4Mutex mergeMutex = G4MUTEX_INITIALIZER;
-std::vector<G4float> masterEnergySpectra;
+std::map<G4float, G4int> masterEnergySpectra;
 
 RunAction::RunAction()
 {
@@ -10,10 +10,10 @@ RunAction::RunAction()
     new G4UnitDefinition("nanogray" , "nanoGy"  , "Dose", nanogray);
     new G4UnitDefinition("picogray" , "picoGy"  , "Dose", picogray);
 
-    G4AccumulableManager * accumulableManager = G4AccumulableManager::Instance();
+    accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> RegisterAccumulable(fEdep);
 
-    G4AnalysisManager * analysisManager = G4AnalysisManager::Instance();
+    analysisManager = G4AnalysisManager::Instance();
     analysisManager -> SetDefaultFileType("root");
     analysisManager -> SetVerboseLevel(0);
 
@@ -64,11 +64,15 @@ RunAction::RunAction()
 
         analysisManager -> CreateNtuple("Run Summary", "Run Summary");
         analysisManager -> CreateNtupleDColumn("Number_of_Photons");
-        analysisManager -> CreateNtupleFColumn("Initial_Energy_keV", photonsEnergy);
         analysisManager -> CreateNtupleDColumn("Sample_Mass_kg");
         analysisManager -> CreateNtupleDColumn("EDep_Value_TeV");
         analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");
         analysisManager -> FinishNtuple(1);
+        
+        analysisManager -> CreateNtuple("Energy Spectra keV", "Energy Spectra keV");
+        analysisManager -> CreateNtupleFColumn("Energies");
+        analysisManager -> CreateNtupleIColumn("Counts");
+        analysisManager -> FinishNtuple(2);
     }
 }
 
@@ -76,27 +80,21 @@ RunAction::~RunAction(){}
 
 G4Run * RunAction::GenerateRun() {customRun = new Run(); return customRun;}
 
-void RunAction::AddEdep(G4double edep) {fEdep += edep;}
-
 void RunAction::BeginOfRunAction(const G4Run * thisRun)
 {
-    threadID = G4Threading::G4GetThreadId();
-
-    G4AccumulableManager * accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> Reset();
 
-    std::string currentPath = std::filesystem::current_path().string(); // Obtener la ruta actual
+    currentPath = std::filesystem::current_path().string();
 
     #ifdef __APPLE__
-        std::string rootDirectory = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
+        rootDirectory = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
     #else
-        std::string rootDirectory = std::filesystem::path(currentPath).parent_path().string() + "/ROOT_temp/";
+        rootDirectory = std::filesystem::path(currentPath).parent_path().string() + "/ROOT_temp/";
     #endif
 
     if (!std::filesystem::exists(rootDirectory)) {std::filesystem::create_directory(rootDirectory);}
 
-    primaryGenerator = static_cast < const PrimaryGenerator *> (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction()); 
-    if (primaryGenerator && primaryGenerator -> GetParticleGun()) 
+    if (primaryGenerator) 
     {
         particle = primaryGenerator -> GetParticleGun() -> GetParticleDefinition();
         energy = primaryGenerator -> GetParticleGun() -> GetParticleEnergy();
@@ -104,7 +102,6 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
     }   
 
     runID = thisRun -> GetRunID();
-    directory = std::string(ROOT_OUTPUT_DIR);
 
     if (arguments == 1) {fileName = "/Sim_" + std::to_string(runID);}
     if (arguments == 2) {fileName = "/Sim_" + std::to_string(runID);}
@@ -112,24 +109,34 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
     if (arguments == 4) {fileName = "/Xray_" + std::to_string(runID);}
     if (arguments == 5) {fileName = "/CT_" + std::to_string(runID);}
 
-    G4AnalysisManager * analysisManager = G4AnalysisManager::Instance();
+    directory = std::string(ROOT_OUTPUT_DIR);
     analysisManager -> SetFileName(directory + fileName);
     analysisManager -> OpenFile();
 
-    const Run * currentRun = static_cast<const Run *>(thisRun);
+    currentRun = static_cast<const Run *>(thisRun);
     particleName = currentRun -> GetPrimaryParticleName();
     totalNumberOfEvents = currentRun -> GetNumberOfEventToBeProcessed();
     primaryEnergy = currentRun -> GetPrimaryEnergy();   
+    
+    if (primaryGenerator) {GunMode = primaryGenerator -> GetGunMode();} 
+    if (GunMode == 1) {primaryEnergy = 80;}
+    if (GunMode == 2) {primaryEnergy = 140;}
 
     simulationStartTime = std::chrono::system_clock::now();
-    std::time_t now_start = std::chrono::system_clock::to_time_t(simulationStartTime);
-    std::tm * now_tm_0 = std::localtime(&now_start);
+    now_start = std::chrono::system_clock::to_time_t(simulationStartTime);
+    now_tm_0 = std::localtime(& now_start);
     
-    if (!isMaster && threadID == 0)
+    threadID = G4Threading::G4GetThreadId();
+
+    if (threadID == 0)
     {
         std::cout << std::endl;
         std::cout << "\033[32m================= RUN " << runID + 1 << " ==================" << std::endl;
-        std::cout << "    The run is: " << totalNumberOfEvents << " " << particleName << " of " << G4BestUnit(primaryEnergy, "Energy") << std::endl;
+        std::cout << "    The run is: " << totalNumberOfEvents << " " << particleName << " of " ;
+        
+        if (GunMode == 0) {std::cout << G4BestUnit(primaryEnergy, "Energy") << std::endl;}
+        if (GunMode  > 0) {std::cout << primaryEnergy << " kVp" << std::endl;}
+
         std::cout << "Start time: " << std::put_time(now_tm_0, "%H:%M:%S") << "    Date: " << std::put_time(now_tm_0, "%d-%m-%Y") << std::endl;
         std::cout << "\033[0m" << std::endl;
     }
@@ -137,8 +144,6 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
 
 void RunAction::EndOfRunAction(const G4Run * thisRun)
 {  
-    G4AnalysisManager * analysisManager = G4AnalysisManager::Instance();
-    G4AccumulableManager * accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> Merge();
     MergeEnergySpectra();
 
@@ -146,8 +151,6 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     { 
         if (arguments != 3)
         {
-
-            detectorConstruction = static_cast <const DetectorConstruction*> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());   
             scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
             totalMass = 0;
@@ -160,7 +163,6 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                 index = index + 1;
             }
             
-            const Run * currentRun = static_cast<const Run *>(thisRun);
             particleName = currentRun -> GetPrimaryParticleName();
             primaryEnergy = currentRun -> GetPrimaryEnergy();
             numberOfEvents = thisRun -> GetNumberOfEvent();
@@ -188,21 +190,38 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
         }
         
         if (arguments == 5)
-        {
-            primaryEnergy = primaryEnergy / keV;
+        {   
             totalMass = totalMass / kg;
             TotalEnergyDeposit = TotalEnergyDeposit / TeV;
             radiationDose = radiationDose / microgray;
+            primaryEnergy = primaryEnergy / keV;
 
             analysisManager -> FillNtupleDColumn(1, 0, numberOfEvents);
-            
-            if (masterEnergySpectra.size() > 0)  {photonsEnergy = masterEnergySpectra;}
-            if (masterEnergySpectra.size() <= 0) {photonsEnergy.push_back(primaryEnergy);}
-            
-            analysisManager -> FillNtupleDColumn(1, 2, totalMass);
-            analysisManager -> FillNtupleDColumn(1, 3, TotalEnergyDeposit);
-            analysisManager -> FillNtupleDColumn(1, 4, radiationDose);
+            analysisManager -> FillNtupleDColumn(1, 1, totalMass);
+            analysisManager -> FillNtupleDColumn(1, 2, TotalEnergyDeposit);
+            analysisManager -> FillNtupleDColumn(1, 3, radiationDose);
             analysisManager -> AddNtupleRow(1);
+            
+            if (masterEnergySpectra.size() == 0) 
+            {
+                frequency = 1;
+                analysisManager -> FillNtupleFColumn(2, 0, primaryEnergy);
+                analysisManager -> FillNtupleIColumn(2, 1, frequency);
+                analysisManager -> AddNtupleRow(2);
+            }
+            
+            if (masterEnergySpectra.size() > 0)
+            {
+                for (const auto & entry : masterEnergySpectra) 
+                {
+                    energies = entry.first;
+                    frequency = entry.second;
+
+                    analysisManager -> FillNtupleFColumn(2, 0, energies);
+                    analysisManager -> FillNtupleIColumn(2, 1, frequency);
+                    analysisManager -> AddNtupleRow(2);
+                }
+            }
         }
         
         customRun -> EndOfRun();
@@ -216,31 +235,27 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
 
 void RunAction::MergeEnergySpectra()
 {
-    primaryGenerator = static_cast <const PrimaryGenerator*> (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction());
+    if (primaryGenerator) {energyHistogram = primaryGenerator -> GetEnergySpectra();}
     
-    if (primaryGenerator) {energySpectra = primaryGenerator -> GetEnergySpectra();}
-
-    G4MUTEXLOCK(&mergeMutex);  
-    masterEnergySpectra.insert(masterEnergySpectra.end(), energySpectra.begin(), energySpectra.end());
-    G4MUTEXUNLOCK(&mergeMutex); 
+    G4MUTEXLOCK(&mergeMutex);
+    for (const auto & entry : energyHistogram) {masterEnergySpectra[entry.first] += entry.second;}
+    G4MUTEXUNLOCK(&mergeMutex);
 }
 
 void RunAction::MergeRootFiles(const std::string & fileName) 
 {
-    std::string currentPath = std::filesystem::current_path().string();
+    currentPath = std::filesystem::current_path().string();
 
     #ifdef __APPLE__
-        std::string rootDirectory = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
-        std::string outputDirectory = std::filesystem::path(currentPath).string() + "/ROOT";
+        rootDirectory   = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
+        outputDirectory = std::filesystem::path(currentPath).string() + "/ROOT";
     #else
-        std::string rootDirectory = std::filesystem::path(currentPath).parent_path().string() + "\\ROOT_temp\\";
-        std::string outputDirectory = std::filesystem::path(currentPath).string() + "\\ROOT";
+        rootDirectory   = std::filesystem::path(currentPath).parent_path().string() + "\\ROOT_temp\\";
+        outputDirectory = std::filesystem::path(currentPath).string() + "\\ROOT";
     #endif
 
     if (!std::filesystem::exists(outputDirectory)) {std::filesystem::create_directory(outputDirectory);}
 
-    int fileIndex = 0;
-    std::string mergedFileName;
     do 
     {
         mergedFileName = outputDirectory + fileName + std::to_string(fileIndex) + ".root";
@@ -248,9 +263,9 @@ void RunAction::MergeRootFiles(const std::string & fileName)
     } 
     while (std::filesystem::exists(mergedFileName));
 
-    std::string haddCommand = "hadd -f -v 0 " + mergedFileName;
+    haddCommand = "hadd -f -v 0 " + mergedFileName;
     
-    for (const auto& entry : std::filesystem::directory_iterator(rootDirectory)) 
+    for (const auto & entry : std::filesystem::directory_iterator(rootDirectory)) 
     {
         if (entry.is_regular_file() && entry.path().extension() == ".root") {haddCommand += " " + entry.path().string();}
     }

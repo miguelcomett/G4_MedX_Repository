@@ -119,9 +119,9 @@ void DetectorConstruction::ConstructArm()
 
     if (isBoneDivided) {ConstructBoneDivided();} else if (isHealthyBone) {ConstructHealthyBone();} else if (isOsteoBone) {ConstructOsteoporoticBone();}
 
-    solidMuscle = new G4Tubs("Muscle",  innerMuscleRadius, outerMuscleRadius, boneHeight/2, 0.0, 360.0*deg);
-    solidGrasa  = new G4Tubs("Grasa",   innerGrasaRadius, outerGrasaRadius,   boneHeight/2, 0.0, 360.0*deg);
-    solidSkin   = new G4Tubs("Skin",    innerSkinRadius, outerSkinRadius,     boneHeight/2, 0.0, 360.0*deg);
+    solidMuscle = new G4Tubs("Muscle", innerMuscleRadius, outerMuscleRadius, boneHeight/2, 0.0, 360.0*deg);
+    solidGrasa  = new G4Tubs("Grasa",  innerGrasaRadius, outerGrasaRadius,   boneHeight/2, 0.0, 360.0*deg);
+    solidSkin   = new G4Tubs("Skin",   innerSkinRadius, outerSkinRadius,     boneHeight/2, 0.0, 360.0*deg);
 
     logicMuscle = new G4LogicalVolume(solidMuscle, Muscle, "LogicMuscle");
     logicGrasa = new G4LogicalVolume(solidGrasa, Adipose, "LogicGrasa");

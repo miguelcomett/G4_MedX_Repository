@@ -45,11 +45,11 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
 	
         G4ParticleGun * GetParticleGun() const {return particleGun;}
 
-        void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & energyDataPoints);
-        std::map<G4float, G4int> GetEnergySpectra() const {return energyHistogram;}
-        G4double InverseCumul();
-
         G4int GetGunMode() const {return SpectraMode;}
+        std::map<G4float, G4int> GetEnergySpectra() const {return energyHistogram;}
+        void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & energyDataPoints);
+        G4double InverseCumul();
+        void SpectraFunction(); 
         
     private:
 
@@ -66,23 +66,15 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         const G4double pi = 3.14159265358979323846;
         G4int threadID, SpectraMode;
         G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
-        G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, 
-                 Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, random, peak, min, max;
-
         G4float RealEnergy;
+        G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, random, peak, min, max;
 
         G4ThreeVector photonPosition, photonMomentum;
         
-        void SpectraFunction(); 
-        
-        std::vector<G4float> energySpectra;
         G4String spectrumFile; 	       
-        G4int energyDataPoints = 0; //nb of points
-        G4double fYmax;             //max(Y)
-        std::vector<G4double> fX;   //abscisses X
-        std::vector<G4double> fY;   //values of Y(X)
-        std::vector<G4double> fSlp; //slopes
-        std::vector<G4double> fYC;  //cumulative function of Y
+        G4int energyDataPoints, bins, sign;
+        G4double Y_max, X_random, Y_random, Alfa, Beta, Gamma, Delta, energy, intensity;
+        std::vector<G4double> EnergyVector, IntensityVector, X_vector, Y_vector, Slopes_vector, Y_Cumulative;
 };
 
 #endif

@@ -83,6 +83,7 @@ G4Run * RunAction::GenerateRun() {customRun = new Run(); return customRun;}
 void RunAction::BeginOfRunAction(const G4Run * thisRun)
 {
     accumulableManager -> Reset();
+    masterEnergySpectra.clear();
 
     currentPath = std::filesystem::current_path().string();
 
@@ -215,6 +216,9 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             
             if (masterEnergySpectra.size() > 0)
             {
+                energies = 0.0;
+                frequency = 0;
+                
                 for (const auto & entry : masterEnergySpectra) 
                 {
                     energies = entry.first;
@@ -246,12 +250,13 @@ void RunAction::MergeEnergySpectra()
 }
 
 void RunAction::MergeRootFiles(const std::string & baseName, const std::string & tempDirectory, const std::string & rootDirectory) 
-{
-    mergedFileName = rootDirectory + baseName + "_" + std::to_string(0) + std::to_string(runID) + ".root";
+{   
+    fileIndex = 0;
+    mergedFileName = rootDirectory + baseName + "_" + std::to_string(fileIndex) + std::to_string(runID) + ".root";
     while (std::filesystem::exists(mergedFileName))
     {
+        fileIndex += 1;
         mergedFileName = rootDirectory + baseName + "_" + std::to_string(fileIndex) + std::to_string(runID) + ".root";
-        fileIndex++;
     } 
 
     haddCommand = "hadd -f -v 0 " + mergedFileName;
@@ -263,7 +268,9 @@ void RunAction::MergeRootFiles(const std::string & baseName, const std::string &
 
     if (std::system(haddCommand.c_str()) == 0) 
     {
-        G4cout << "~ Successfully merged ROOT files ~" << G4endl; G4cout << G4endl;
+        G4cout << "~ Successfully Merged Root Files." << G4endl; 
+        G4cout << "~ File written: " << mergedFileName << G4endl;
+        G4cout << G4endl;
         std::filesystem::remove_all(tempDirectory);
     } 
     else {G4cerr << "Error: ROOT files merging with hadd failed!" << G4endl;}

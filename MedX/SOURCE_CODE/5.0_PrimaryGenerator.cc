@@ -35,10 +35,8 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
-        
-        RealEnergy = RealEnergy/keV;
-        // RealEnergy = std::round(RealEnergy * 100) / 100;
 
+        RealEnergy = RealEnergy/keV;
         energyHistogram[RealEnergy]++;
     }
 
@@ -81,6 +79,120 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     particleGun -> SetParticleMomentumDirection(photonMomentum);
 
     particleGun -> GeneratePrimaryVertex(anEvent);
+}
+
+// Create Ratiation Spectra ====================================================================================================================
+
+void PrimaryGenerator::ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & EnergyVector, std::vector<G4double> & IntensityVector, G4int & energyDataPoints) 
+{ 
+    std::ifstream spectraFile(filename);
+    if (!spectraFile) {G4cerr << "Error opening file: " << filename << G4endl; return;}
+
+    EnergyVector.clear();
+    IntensityVector.clear();
+    energyDataPoints = 0;
+    energy = 0.0;
+    intensity = 0.0;
+
+    // G4cout << EnergyVector.size() << IntensityVector.size() << energyDataPoints << G4endl;
+
+    while (spectraFile >> energy >> intensity) // Convertir energía de keV a las unidades internas de Geant4
+    {
+        EnergyVector.push_back(energy * keV);
+        IntensityVector.push_back(intensity);
+        energyDataPoints++; 
+    }
+
+    spectraFile.close();
+}
+
+void PrimaryGenerator::SpectraFunction() 
+{
+    // tabulated function, Y is assumed positive, linear per segment, continuous
+
+    X_vector.clear();
+    Y_vector.clear();
+    Slopes_vector.clear();
+    Y_Cumulative.clear();
+    Y_max = 0.0;
+
+    ReadSpectrumFromFile(spectrumFile, EnergyVector, IntensityVector, energyDataPoints);
+
+    if (threadID == 0) 
+    {
+        // std::cout << "Energy Data Points Read: " << energyDataPoints << std::endl; std::cout << std::endl;
+        
+        for (size_t i = 0; i < EnergyVector.size(); ++i) 
+        {
+            // std::cout << 
+            // "Energy: "    << std::fixed << std::setprecision(1) << EnergyVector[i] / keV << " keV   " <<  
+            // "Intensity: " << std::fixed << std::setprecision(3) << IntensityVector[i] * 100 << std::endl;
+
+            // for (int j=0; j<std::ceil(IntensityVector[i] * 1000); j++){energySpectra.push_back(EnergyVector[i] / keV);}
+        }
+    }
+
+    X_vector.resize(energyDataPoints); 
+    Y_vector.resize(energyDataPoints);
+    
+    for (G4int j=0; j<energyDataPoints; j++) 
+    {
+        X_vector[j] = EnergyVector[j]; 
+        Y_vector[j] = IntensityVector[j]; 
+        if (Y_max < Y_vector[j]) {Y_max = Y_vector[j];}
+    }
+
+    Slopes_vector.resize(energyDataPoints); 
+    for (G4int j=0; j<energyDataPoints-1; j++) 
+    {
+        Slopes_vector[j] = (Y_vector[j+1] - Y_vector[j])/(X_vector[j+1] - X_vector[j]);
+    }
+
+    Y_Cumulative.resize(energyDataPoints);
+    Y_Cumulative[0] = 0.0;
+    for (G4int j=1; j<energyDataPoints; j++) 
+    {
+        Y_Cumulative[j] = Y_Cumulative[j-1] + 0.5 * (Y_vector[j] + Y_vector[j-1]) * (X_vector[j] - X_vector[j-1]);
+    }     
+}
+
+G4double PrimaryGenerator::InverseCumul() 
+{ 
+    // Function to estimate counts --> cumulative function is second order polynomial
+
+    X_random = 0.0;
+    Y_random = 0.0;
+    Alfa = 0.0;
+    Beta = 0.0;
+    Gamma = 0.0;
+    Delta = 0.0;
+
+    Y_random = G4UniformRand() * Y_Cumulative[energyDataPoints-1]; 
+ 
+    bins = energyDataPoints - 2; 
+    while ( (Y_Cumulative[bins] > Y_random) && (bins > 0) ) {bins--;} // y_rndm --> x_rndm :  Y_Cumulative(x) is second order polynomial
+    
+    X_random = X_vector[bins];
+    Alfa = Slopes_vector[bins];
+
+    sign = 1;
+    
+    if (Alfa != 0.0) 
+    {
+        Beta = Y_vector[bins] / Alfa, 
+        Gamma = 2 * (Y_random - Y_Cumulative[bins]) / Alfa;
+        Delta = Beta * Beta + Gamma;
+        
+        if (Alfa < 0.0) {sign = -1;}
+        
+        X_random += sign * std::sqrt(Delta) - Beta;    
+    } 
+    else if (Y_vector[bins] > 0.0) 
+    {
+        X_random += (Y_random - Y_Cumulative[bins]) / Y_vector[bins];
+    }
+    
+    return X_random;
 }
 
 // Messengers ==============================================================================================================================
@@ -149,6 +261,7 @@ void PrimaryGenerator::SetGunMode(G4int newMode)
     {   
         SpectraMode = 0; 
         if (threadID == 0) {std::cout << "-> Monocromatic Mode Selected" << std::endl;}
+        energyHistogram.clear();
     }
     if (newMode == 1) 
     {
@@ -156,6 +269,7 @@ void PrimaryGenerator::SetGunMode(G4int newMode)
         spectrumFile = "fSpectrum80.txt";
         if (threadID == 0) {std::cout << "-> Real 80kVp Spectrum Selected" << std::endl; std::cout << std::endl;}
         SpectraFunction();
+        energyHistogram.clear();
     }
     if (newMode == 2) 
     {
@@ -163,87 +277,6 @@ void PrimaryGenerator::SetGunMode(G4int newMode)
         spectrumFile = "fSpectrum140.txt";
         if (threadID == 0) {std::cout << "-> Real 140kVp Spectrum Selected" << std::endl; std::cout << std::endl;}
         SpectraFunction();
+        energyHistogram.clear();
     }
-}
-
-// Create Ratiation Spectra ====================================================================================================================
-
-// tabulated function // Y is assumed positive, linear per segment, continuous
-void PrimaryGenerator::SpectraFunction() 
-{
-    std::vector<G4double> EnergyVector;
-    std::vector<G4double> IntensityVector;
-    energyDataPoints = 0;
-
-    ReadSpectrumFromFile(spectrumFile, EnergyVector, IntensityVector, energyDataPoints);
-
-    if (threadID == 0) 
-    {
-        // std::cout << "Energy Data Points Read: " << energyDataPoints << std::endl; std::cout << std::endl;
-        
-        for (size_t i = 0; i < EnergyVector.size(); ++i) 
-        {
-            // std::cout << 
-            // "Energy: "    << std::fixed << std::setprecision(1) << EnergyVector[i] / keV << " keV   " <<  
-            // "Intensity: " << std::fixed << std::setprecision(3) << IntensityVector[i] * 100 << std::endl;
-
-            // for (int j=0; j<std::ceil(IntensityVector[i] * 1000); j++){energySpectra.push_back(EnergyVector[i] / keV);}
-        }
-    }
-
-    // for (auto energy : energySpectra){G4cout << "Photon's energy: " << energy << G4endl;}
-
-	// copy arrays in std::vector and compute fMax
-    fX.resize(energyDataPoints); fY.resize(energyDataPoints);
-    fYmax = 0.0;
-    for (G4int j=0; j<energyDataPoints; j++) {fX[j] = EnergyVector[j]; fY[j] = IntensityVector[j]; if (fYmax < fY[j]) fYmax = fY[j];};
-
-    fSlp.resize(energyDataPoints); //compute slopes
-    for (G4int j=0; j<energyDataPoints-1; j++) {fSlp[j] = (fY[j+1] - fY[j])/(fX[j+1] - fX[j]);};
-
-    fYC.resize(energyDataPoints); // compute cumulative function
-    fYC[0] = 0.;
-    for (G4int j=1; j<energyDataPoints; j++) {fYC[j] = fYC[j-1] + 0.5*(fY[j] + fY[j-1])*(fX[j] - fX[j-1]);};     
-}
-
-// Function to estimate counts --> cumulative function is second order polynomial
-G4double PrimaryGenerator::InverseCumul() 
-{ 
-    G4double Yrndm = G4UniformRand() * fYC[energyDataPoints-1]; //choose y randomly
- 
-    G4int j = energyDataPoints - 2;  // find bin
-    while ((fYC[j] > Yrndm) && (j > 0)) j--; // y_rndm --> x_rndm :  fYC(x) is second order polynomial
-    
-    G4double Xrndm = fX[j];
-    G4double a = fSlp[j];
-    
-    if (a != 0.0) 
-    {
-        G4double b = fY[j]/a, c = 2*(Yrndm - fYC[j])/a;
-        G4double delta = b*b + c;
-        G4int sign = 1; if (a < 0.) sign = -1;
-        Xrndm += sign*std::sqrt(delta) - b;    
-    } 
-    else if (fY[j] > 0.0) {Xrndm += (Yrndm - fYC[j])/fY[j];};
-    
-    return Xrndm;
-}
-
-// Function to fill the vectors:
-void PrimaryGenerator::ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & EnergyVector, std::vector<G4double> & IntensityVector, G4int & energyDataPoints) 
-{ 
-    std::ifstream infile(filename);
-    if (!infile) {G4cerr << "Error opening file: " << filename << G4endl; return;}
-    
-    G4double energy, intensity;
-    energyDataPoints = 0; 
-
-    while (infile >> energy >> intensity) // Convertir energía de keV a las unidades internas de Geant4
-    {
-        EnergyVector.push_back(energy * keV);
-        IntensityVector.push_back(intensity);
-        energyDataPoints++; 
-    }
-
-    infile.close();
 }

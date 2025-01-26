@@ -269,7 +269,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         
         if interrupt_flag: print('Exiting'); break
 
-        try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)#, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
         
         new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
@@ -293,7 +293,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     shutil.move(rad_folder/merged_name, root_folder)
     Trash_Folder(rad_folder)
 
-    print('-> Simulation completed. Files:', merged_name, 'written in', root_folder)
+    print('-> Simulation completed. Files:', merged_name, 'written in', root_folder, '\n')
     if alarm == True or alarm == 1: PlayAlarm()
 
 # 1.2. ========================================================================================================================================================
@@ -377,7 +377,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
         if interrupt_flag: print('Exiting'); break
 
-        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)#, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
 
         Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
@@ -411,7 +411,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     Trash_Folder(rad_folder)
 
     print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
-    print("Simulation completed.")
+    print("Simulation completed. \n")
     if alarm == True or alarm == 1: PlayAlarm()
 
 
@@ -611,9 +611,9 @@ def Manage_Files(directory, starts_with, output_name):
 
 # 1.4. ========================================================================================================================================================
 
-def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, summary_branches):
+def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, summary_branches, spectra_tree, spectra_branches):
 
-    import uproot
+    import uproot; 
 
     directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
@@ -621,31 +621,51 @@ def Summary_Data(directory, root_file, data_tree, data_branch, summary_tree, sum
 
     opened_file = uproot.open(file_path)
         
-    Hits_tree = uproot.dask(opened_file[data_tree], library='np', step_size = '50 MB')
-    if data_branch not in Hits_tree.keys(): raise ValueError(f"Branch: '{data_branch}', not found in tree: '{data_tree}'.")
-    Hits = Hits_tree[data_branch]
-    NumberofHits = len(Hits)
+    hits_tree = opened_file[hits_tree]
 
-    branches_num = (len(summary_branches))
+    for i in range(len(hits_branches)): 
+        if hits_branches[i] not in hits_tree.keys(): raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
+    
+    hits = hits_tree[hits_branches[0]]
+    Number_of_Hits = len(hits)
+
     summary_tree = opened_file[summary_tree]
-    for i in range(branches_num): 
+
+    for i in range(len(summary_branches)): 
         if summary_branches[i] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
 
-    Photons_Energy   = int(summary_tree[summary_branches[0]].array(library="np").mean())
-    NumberofPhotons  = int(summary_tree[summary_branches[1]].array(library="np").sum())
-    EnergyDeposition = summary_tree[summary_branches[2]].array(library="np").sum()
-    RadiationDose    = summary_tree[summary_branches[3]].array(library="np").sum()
+    Number_of_Photons = np.array(summary_tree[summary_branches[0]])
+    Sample_Mass       = np.array(summary_tree[summary_branches[1]])
+    Energy_Deposition = np.array(summary_tree[summary_branches[2]])
+    Radiation_Dose    = np.array(summary_tree[summary_branches[3]])
 
-    print('-> Photons energy:', Photons_Energy, 'keV')
-    print('-> Initial photons in simulation:', f"{NumberofPhotons:,}")
-    print('-> Total photon hits in detector:', f"{NumberofHits:,}")
-    print('-> Total energy deposited in tissue:', f"{EnergyDeposition:,.5f}", 'TeV')
-    print('-> Dose of radiation received:', f"{RadiationDose:,.5f}", 'µSv')
+    Number_of_Photons = int(Number_of_Photons.sum())
+    Sample_Mass       = Sample_Mass.mean()
+    Energy_Deposition = Energy_Deposition.sum()
+    Radiation_Dose    = Radiation_Dose.sum()
+
+    spectra_tree = opened_file[spectra_tree]
+
+    for i in range(len(spectra_branches)): 
+        if spectra_branches[i] not in spectra_tree.keys(): raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree}'.")
     
-    return NumberofHits, NumberofPhotons, EnergyDeposition, RadiationDose
+    Energy    = spectra_tree[spectra_branches[0]]
+    Frequency = spectra_tree[spectra_branches[1]]
+
+    Energy    = np.array(Energy)
+    Frequency = np.array(Frequency)
+
+    Mean_Energy = np.sum(Energy * Frequency) / np.sum(Frequency)
+
+    print('-> Initial photons in simulation:',    f"{Number_of_Photons:,}")
+    print('-> Mean Energy of Photons:',           f"{Mean_Energy:,.2f}", 'keV')
+    print('-> Total photon hits in detector:',    f"{Number_of_Hits:,}")
+    print('-> Mass of tissue sample:',            f"{Sample_Mass:,.3f}", 'kg')
+    print('-> Total energy deposited in tissue:', f"{Energy_Deposition:,.3f}", 'TeV')
+    print('-> Dose of radiation received:',       f"{Radiation_Dose:,.5f}", 'µSv \n')
 
 
-def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x, range_y):
+def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree, spectra_branches, range_x, range_y, range_spectra):
 
     import uproot, dask.array as dask_da; from dask.diagnostics import ProgressBar
 
@@ -654,9 +674,13 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
     file_path = directory + root_file
     opened_file = uproot.open(file_path)
 
-    dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = '50 MB')
-    x_values = dataframe[x_branch]
-    y_values = dataframe[y_branch]
+    hits_tree = uproot.dask(opened_file[hits_tree], library='np', step_size = '50 MB')
+
+    for i in range(len(hits_branches)): 
+        if hits_branches[i] not in hits_tree.keys(): raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
+
+    x_values = hits_tree[hits_branches[0]]
+    y_values = hits_tree[hits_branches[1]]
 
     range_min_x = range_x[0]
     range_max_x = range_x[1]
@@ -675,15 +699,38 @@ def XY_1D_Histogram(directory, root_file, tree_name, x_branch, y_branch, range_x
         print('Computing Y-Dimension Histogram (2/2)...')
         hist_y = hist_y.compute()
 
+    spectra_tree = opened_file[spectra_tree]
+
+    for i in range(len(spectra_branches)): 
+        if spectra_branches[i] not in spectra_tree.keys(): raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree}'.")
+    
+    Energy    = spectra_tree[spectra_branches[0]]
+    Frequency = spectra_tree[spectra_branches[1]]
+
+    Energy    = np.array(Energy)
+    Frequency = np.array(Frequency)
+
+    range_spectrum = [range_spectra[0], range_spectra[1]]
+
     plt.figure(figsize = (14, 4)); plt.tight_layout()
 
-    plt.subplot(1, 2, 1)
-    plt.bar(bin_edges[:-1], hist_x, width = (bin_edges[1] - bin_edges[0]), align = 'edge', edgecolor = 'gray', linewidth = 0.8)
-    plt.xlabel('Distance in X (mm)'); plt.ylabel('Frequency'); #plt.title('1D Histogram with Dask')
+    plt.subplot(1, 3, 1)
+    plt.bar(bin_edges[:-1], hist_x, width = (bin_edges[1] - bin_edges[0]), align = 'edge', 
+            color = 'blue', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+    
+    plt.xlabel('Distance in X (mm)'); plt.ylabel('Frequency'); plt.title('Hits in X')
 
-    plt.subplot(1, 2, 2)
-    plt.bar(bin_edges[:-1], hist_y, width = (bin_edges[1] - bin_edges[0]), align = 'edge', edgecolor = 'gray', linewidth = 0.8)
-    plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); # plt.title('')
+    plt.subplot(1, 3, 2)
+    plt.bar(bin_edges[:-1], hist_y, width = (bin_edges[1] - bin_edges[0]), align = 'edge', 
+            color = 'green', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+    
+    plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); plt.title('Hits in Y')
+
+    plt.subplot(1, 3, 3)
+    plt.hist(Energy, weights = Frequency, range = range_spectrum, bins = range_spectra[2], 
+             color = 'red', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+    
+    plt.xlabel('Energy (keV)'); plt.ylabel('Frequency'); plt.title('Energy Spectrum')
 
 # 2.0. ========================================================================================================================================================
 

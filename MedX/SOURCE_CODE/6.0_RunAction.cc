@@ -87,31 +87,34 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
     currentPath = std::filesystem::current_path().string();
 
     #ifdef __APPLE__
-        rootDirectory = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
+        tempDirectory = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
+        rootDirectory = std::filesystem::path(currentPath).string() + "/ROOT";
     #else
-        rootDirectory = std::filesystem::path(currentPath).parent_path().string() + "/ROOT_temp/";
+        tempDirectory = std::filesystem::path(currentPath).parent_path().string() + "/ROOT_temp";
+        rootDirectory = std::filesystem::path(currentPath).string() + "\\ROOT\\";
     #endif
 
+    if (!std::filesystem::exists(tempDirectory)) {std::filesystem::create_directory(tempDirectory);}
     if (!std::filesystem::exists(rootDirectory)) {std::filesystem::create_directory(rootDirectory);}
 
+    if (arguments == 1) {baseName = "/Sim";}
+    if (arguments == 2) {baseName = "/Sim";}
+    if (arguments == 3) {baseName = "/AttCoeff";}
+    if (arguments == 4) {baseName = "/Xray";}
+    if (arguments == 5) {baseName = "/CT";}
+
+    runID = thisRun -> GetRunID();
+    fileName = baseName + std::to_string(runID);
+
+    analysisManager -> SetFileName(tempDirectory + baseName);
+    analysisManager -> OpenFile();
+    
     if (primaryGenerator) 
     {
         particle = primaryGenerator -> GetParticleGun() -> GetParticleDefinition();
         energy = primaryGenerator -> GetParticleGun() -> GetParticleEnergy();
         customRun -> SetPrimary(particle, energy);
-    }   
-
-    runID = thisRun -> GetRunID();
-
-    if (arguments == 1) {fileName = "/Sim_" + std::to_string(runID);}
-    if (arguments == 2) {fileName = "/Sim_" + std::to_string(runID);}
-    if (arguments == 3) {fileName = "/AttCoeff_" + std::to_string(runID);}
-    if (arguments == 4) {fileName = "/Xray_" + std::to_string(runID);}
-    if (arguments == 5) {fileName = "/CT_" + std::to_string(runID);}
-
-    directory = std::string(ROOT_OUTPUT_DIR);
-    analysisManager -> SetFileName(directory + fileName);
-    analysisManager -> OpenFile();
+    }
 
     currentRun = static_cast<const Run *>(thisRun);
     particleName = currentRun -> GetPrimaryParticleName();
@@ -230,7 +233,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     analysisManager -> Write();
     analysisManager -> CloseFile();
     
-    if (isMaster && arguments > 1) {MergeRootFiles(fileName);}
+    if (isMaster && arguments > 1) {MergeRootFiles(baseName, tempDirectory, rootDirectory);}
 }
 
 void RunAction::MergeEnergySpectra()
@@ -242,30 +245,18 @@ void RunAction::MergeEnergySpectra()
     G4MUTEXUNLOCK(&mergeMutex);
 }
 
-void RunAction::MergeRootFiles(const std::string & fileName) 
+void RunAction::MergeRootFiles(const std::string & baseName, const std::string & tempDirectory, const std::string & rootDirectory) 
 {
-    currentPath = std::filesystem::current_path().string();
-
-    #ifdef __APPLE__
-        rootDirectory   = std::filesystem::path(currentPath).string() + "/ROOT_temp/";
-        outputDirectory = std::filesystem::path(currentPath).string() + "/ROOT";
-    #else
-        rootDirectory   = std::filesystem::path(currentPath).parent_path().string() + "\\ROOT_temp\\";
-        outputDirectory = std::filesystem::path(currentPath).string() + "\\ROOT";
-    #endif
-
-    if (!std::filesystem::exists(outputDirectory)) {std::filesystem::create_directory(outputDirectory);}
-
-    do 
+    mergedFileName = rootDirectory + baseName + "_" + std::to_string(0) + std::to_string(runID) + ".root";
+    while (std::filesystem::exists(mergedFileName))
     {
-        mergedFileName = outputDirectory + fileName + std::to_string(fileIndex) + ".root";
+        mergedFileName = rootDirectory + baseName + "_" + std::to_string(fileIndex) + std::to_string(runID) + ".root";
         fileIndex++;
     } 
-    while (std::filesystem::exists(mergedFileName));
 
     haddCommand = "hadd -f -v 0 " + mergedFileName;
     
-    for (const auto & entry : std::filesystem::directory_iterator(rootDirectory)) 
+    for (const auto & entry : std::filesystem::directory_iterator(tempDirectory)) 
     {
         if (entry.is_regular_file() && entry.path().extension() == ".root") {haddCommand += " " + entry.path().string();}
     }
@@ -273,7 +264,7 @@ void RunAction::MergeRootFiles(const std::string & fileName)
     if (std::system(haddCommand.c_str()) == 0) 
     {
         G4cout << "~ Successfully merged ROOT files ~" << G4endl; G4cout << G4endl;
-        std::filesystem::remove_all(rootDirectory);
+        std::filesystem::remove_all(tempDirectory);
     } 
     else {G4cerr << "Error: ROOT files merging with hadd failed!" << G4endl;}
 }

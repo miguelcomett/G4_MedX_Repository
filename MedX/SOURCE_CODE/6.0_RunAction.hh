@@ -42,7 +42,7 @@ class RunAction : public G4UserRunAction
 
         void AddEdep(G4double edep) {fEdep += edep;}
         void MergeEnergySpectra();
-        void MergeRootFiles(const std::string & fileName);
+        void MergeRootFiles(const std::string & fileName, const std::string & tempDirectory, const std::string & rootDirectory);
 
     private:
 
@@ -61,14 +61,6 @@ class RunAction : public G4UserRunAction
         std::vector <G4LogicalVolume*> scoringVolumes;
 
         std::map<G4float, G4int> energyHistogram;
-        
-        std::string currentPath;
-        std::string rootDirectory;
-
-        std::string outputDirectory;
-        G4int fileIndex = 0;
-        std::string mergedFileName;
-        std::string haddCommand;
 
         std::chrono::system_clock::time_point simulationStartTime, simulationEndTime;
         std::time_t now_start;
@@ -78,8 +70,9 @@ class RunAction : public G4UserRunAction
 
         G4ParticleDefinition * particle;
 
-        G4String particleName, directory, fileName;
-        G4int numberOfEvents, runID, index, totalNumberOfEvents, threadID, GunMode, frequency;
+        std::string currentPath, tempDirectory, rootDirectory, mergedFileName;
+        G4String particleName, baseName, fileName, haddCommand;
+        G4int numberOfEvents, runID, index, totalNumberOfEvents, threadID, GunMode, frequency, fileIndex = 0;
         G4float primaryEnergy, energies;
         G4double energy, sampleMass, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose;
 

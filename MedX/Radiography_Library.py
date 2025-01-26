@@ -626,8 +626,10 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     for i in range(len(hits_branches)): 
         if hits_branches[i] not in hits_tree.keys(): raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
     
-    hits = hits_tree[hits_branches[0]]
-    Number_of_Hits = len(hits)
+    Number_of_Hits = hits_tree[hits_branches[0]]
+    Number_of_Hits = np.array(Number_of_Hits)
+    Number_of_Hits = len(Number_of_Hits)
+    Number_of_Hits = int(Number_of_Hits)
 
     summary_tree = opened_file[summary_tree]
 

@@ -714,7 +714,7 @@ def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree
 
     range_spectrum = [range_spectra[0], range_spectra[1]]
 
-    plt.figure(figsize = (14, 4)); plt.tight_layout()
+    plt.figure(figsize = (18, 4)); plt.tight_layout()
 
     plt.subplot(1, 3, 1)
     plt.bar(bin_edges[:-1], hist_x, width = (bin_edges[1] - bin_edges[0]), align = 'edge', 

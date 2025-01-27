@@ -137,7 +137,6 @@ def Run_Calibration(directory, run_sim):
     except Exception as e: print(f"Error running simulation: {e}")
     end_time = time.perf_counter()
     calibration_time = end_time - start_time
-    print("Calibration run completed.")
 
     return calibration_time
 
@@ -260,7 +259,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     iterations = int(sim_time / iteration_time)
     
     Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
-    print('Beams to simulate:', round(Beams * iterations / 1000000, 2), 'M')
+    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M \n")
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -293,7 +292,8 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     shutil.move(rad_folder/merged_name, root_folder)
     Trash_Folder(rad_folder)
 
-    print('-> Simulation completed. Files:', merged_name, 'written in', root_folder, '\n')
+    print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m \n")
+
     if alarm == True or alarm == 1: PlayAlarm()
 
 # 1.2. ========================================================================================================================================================
@@ -356,7 +356,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     if spectra_mode == 'poly' or spectra_mode == 1:
         Beams40_calibration = 2000000
-        Beams80_calibration = int(Beams40_calibration * 1.0)
+        Beams80_calibration = round(Beams40_calibration / 1.19)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -368,7 +368,9 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
     Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterations))
 
-    print('Beams to simulate:', round(Beams40 * iterations / 1000000, 2), 'M', round(Beams80 * iterations / 1000000, 2), 'M')
+    Beams40_str = f"{round(Beams40 * iterations / 1_000_000, 2)}M"
+    Beams80_str = f"{round(Beams80 * iterations / 1_000_000, 2)}M"
+    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{Beams40_str}, {Beams80_str} \n")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -410,8 +412,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     Trash_Folder(rad_folder)
 
-    print('Files:', merged_40, 'and', merged_80, 'written in', root_folder)
-    print("Simulation completed. \n")
+    print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m \n")
     if alarm == True or alarm == 1: PlayAlarm()
 
 
@@ -595,9 +596,7 @@ def Manage_Files(directory, starts_with, output_name):
             shutil.move(file_path, trash_folder)
             file_list.append(os.path.join(trash_folder, file))
 
-    if file_list == []: 
-        print("No files found. Please check your inputs.")
-        sys.exit(1)
+    if file_list == []: raise RuntimeError("No files found. Please check your inputs.")
 
     if output_name.endswith('.root'): output_name = output_name.rstrip('.root')
     merged_file = directory + output_name 

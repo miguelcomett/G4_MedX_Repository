@@ -133,7 +133,7 @@ def Simulation_Setup():
 def Run_Calibration(directory, run_sim):
     
     start_time = time.perf_counter()
-    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     except Exception as e: print(f"Error running simulation: {e}")
     end_time = time.perf_counter()
     calibration_time = end_time - start_time
@@ -259,7 +259,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     iterations = int(sim_time / iteration_time)
     
     Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
-    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M \n")
+    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M. \n")
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -268,7 +268,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         
         if interrupt_flag: print('Exiting'); break
 
-        try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)#, stderr=subprocess.DEVNULL)
+        try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
         
         new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
@@ -292,7 +292,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     shutil.move(rad_folder/merged_name, root_folder)
     Trash_Folder(rad_folder)
 
-    print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m \n")
+    print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
 
     if alarm == True or alarm == 1: PlayAlarm()
 
@@ -370,7 +370,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     Beams40_str = f"{round(Beams40 * iterations / 1_000_000, 2)}M"
     Beams80_str = f"{round(Beams80 * iterations / 1_000_000, 2)}M"
-    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{Beams40_str}, {Beams80_str} \n")
+    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}. \n")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -379,7 +379,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
         if interrupt_flag: print('Exiting'); break
 
-        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)#, stderr=subprocess.DEVNULL)
+        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
 
         Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
@@ -412,7 +412,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     Trash_Folder(rad_folder)
 
-    print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m \n")
+    print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
     if alarm == True or alarm == 1: PlayAlarm()
 
 
@@ -1314,7 +1314,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
         filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
         with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
         
-        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as e: print(f"Error during simulation: {e}"); continue  # Skip to the next angle
 
         output_name = f"Aang_{angle}"

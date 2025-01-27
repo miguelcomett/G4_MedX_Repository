@@ -259,7 +259,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     iterations = int(sim_time / iteration_time)
     
     Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
-    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M. \n")
+    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M.")
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -356,7 +356,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     if spectra_mode == 'poly' or spectra_mode == 1:
         Beams40_calibration = 2000000
-        Beams80_calibration = round(Beams40_calibration / 1.19)
+        Beams80_calibration = round(Beams40_calibration / 1.30)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -370,7 +370,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     Beams40_str = f"{round(Beams40 * iterations / 1_000_000, 2)}M"
     Beams80_str = f"{round(Beams80 * iterations / 1_000_000, 2)}M"
-    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}. \n")
+    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -612,59 +612,71 @@ def Manage_Files(directory, starts_with, output_name):
 
 def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, summary_branches, spectra_tree, spectra_branches):
 
-    import uproot; 
+    import uproot, dask.array as da; from dask.diagnostics import ProgressBar
 
     directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
     file_path = directory + root_file
-
     opened_file = uproot.open(file_path)
+
+    if hits_tree is not None:
         
-    hits_tree = opened_file[hits_tree]
-
-    for i in range(len(hits_branches)): 
-        if hits_branches[i] not in hits_tree.keys(): raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
+        hits_tree = opened_file[hits_tree]
+        
+        for i in range(len(hits_branches)): 
+            if hits_branches[i] not in hits_tree.keys(): 
+                raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
+        
+        Number_of_Hits = hits_tree[hits_branches[0]]
+        Number_of_Hits = np.array(Number_of_Hits)
+        Number_of_Hits = len(Number_of_Hits)
+        Number_of_Hits = round(Number_of_Hits/1_000_000, 2)
     
-    Number_of_Hits = hits_tree[hits_branches[0]]
-    Number_of_Hits = np.array(Number_of_Hits)
-    Number_of_Hits = len(Number_of_Hits)
-    Number_of_Hits = int(Number_of_Hits)
+    if summary_tree is not None:
 
-    summary_tree = opened_file[summary_tree]
-
-    for i in range(len(summary_branches)): 
-        if summary_branches[i] not in summary_tree.keys(): raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
-
-    Number_of_Photons = np.array(summary_tree[summary_branches[0]])
-    Sample_Mass       = np.array(summary_tree[summary_branches[1]])
-    Energy_Deposition = np.array(summary_tree[summary_branches[2]])
-    Radiation_Dose    = np.array(summary_tree[summary_branches[3]])
-
-    Number_of_Photons = int(Number_of_Photons.sum())
-    Sample_Mass       = Sample_Mass.mean()
-    Energy_Deposition = Energy_Deposition.sum()
-    Radiation_Dose    = Radiation_Dose.sum()
-
-    spectra_tree = opened_file[spectra_tree]
-
-    for i in range(len(spectra_branches)): 
-        if spectra_branches[i] not in spectra_tree.keys(): raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree}'.")
+        summary_tree = opened_file[summary_tree]
+        
+        for i in range(len(summary_branches)): 
+            if summary_branches[i] not in summary_tree.keys(): 
+                raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
+        
+        Number_of_Photons = np.array(summary_tree[summary_branches[0]])
+        Sample_Mass       = np.array(summary_tree[summary_branches[1]])
+        Energy_Deposition = np.array(summary_tree[summary_branches[2]])
+        Radiation_Dose    = np.array(summary_tree[summary_branches[3]])
+        Number_of_Photons = Number_of_Photons.sum()
+        Number_of_Photons = round(Number_of_Photons/1_000_000, 2)
+        Sample_Mass       = Sample_Mass.mean()
+        Energy_Deposition = Energy_Deposition.sum()
+        Radiation_Dose    = Radiation_Dose.sum() 
     
-    Energy    = spectra_tree[spectra_branches[0]]
-    Frequency = spectra_tree[spectra_branches[1]]
+    if spectra_tree is not None:
 
-    Energy    = np.array(Energy)
-    Frequency = np.array(Frequency)
+        spectra_tree = uproot.dask(opened_file[spectra_tree], library = 'np', step_size = '50 MB')
+        
+        for i in range(len(spectra_branches)): 
+            if spectra_branches[i] not in spectra_tree.keys(): 
+                raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree}'.")
+        
+        Energy    = spectra_tree[spectra_branches[0]]
+        Frequency = spectra_tree[spectra_branches[1]]
+        Mean_Energy = da.sum(Energy * Frequency) / da.sum(Frequency)
+        Mean_Energy = Mean_Energy.compute()
 
-    Mean_Energy = np.sum(Energy * Frequency) / np.sum(Frequency)
 
-    print('-> Initial photons in simulation:',    f"{Number_of_Photons:,}")
-    print('-> Mean Energy of Photons:',           f"{Mean_Energy:,.2f}", 'keV')
-    print('-> Total photon hits in detector:',    f"{Number_of_Hits:,}")
-    print('-> Mass of tissue sample:',            f"{Sample_Mass:,.3f}", 'kg')
-    print('-> Total energy deposited in tissue:', f"{Energy_Deposition:,.3f}", 'TeV')
-    print('-> Dose of radiation received:',       f"{Radiation_Dose:,.5f}", 'µSv \n')
-
+    try: print(f"-> Initial Photons in Simulation:  \033[1m{Number_of_Photons:,.2f} M   \033[0m")
+    except: pass
+    try: print(f"-> Mean Energy of Photons:         \033[1m{Mean_Energy:,.2f} keV       \033[0m")
+    except: pass
+    try: print(f"-> Photon's Hit Count in Detector: \033[1m{Number_of_Hits:,.2f} M      \033[0m")
+    except: pass
+    try: print(f"-> Mass of Sample Scanned:         \033[1m{Sample_Mass:,.3f} kg        \033[0m")
+    except: pass
+    try: print(f"-> Energy Deposited in Tissue:     \033[1m{Energy_Deposition:,.3f} TeV \033[0m")
+    except: pass
+    try: print(f"-> Dose of Radiation Received:     \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
+    except: pass
+    
 
 def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree, spectra_branches, range_x, range_y, range_spectra):
 
@@ -675,63 +687,61 @@ def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree
     file_path = directory + root_file
     opened_file = uproot.open(file_path)
 
-    hits_tree = uproot.dask(opened_file[hits_tree], library='np', step_size = '50 MB')
-
-    for i in range(len(hits_branches)): 
-        if hits_branches[i] not in hits_tree.keys(): raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
-
-    x_values = hits_tree[hits_branches[0]]
-    y_values = hits_tree[hits_branches[1]]
-
-    range_min_x = range_x[0]
-    range_max_x = range_x[1]
-    bins_x = range_x[2]
-
-    range_min_y = range_y[0]
-    range_max_y = range_y[1]
-    bins_y = range_y[2]
-
-    hist_x, bin_edges = dask_da.histogram(x_values, bins = bins_x, range = (range_min_x, range_max_x))
-    hist_y, bin_edges = dask_da.histogram(y_values, bins = bins_y, range = (range_min_y, range_max_y))
-
-    with ProgressBar():
-        print('Computing X-Dimension Histogram (1/2)...')
-        hist_x = hist_x.compute()
-        print('Computing Y-Dimension Histogram (2/2)...')
-        hist_y = hist_y.compute()
-
-    spectra_tree = opened_file[spectra_tree]
-
-    for i in range(len(spectra_branches)): 
-        if spectra_branches[i] not in spectra_tree.keys(): raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree}'.")
-    
-    Energy    = spectra_tree[spectra_branches[0]]
-    Frequency = spectra_tree[spectra_branches[1]]
-
-    Energy    = np.array(Energy)
-    Frequency = np.array(Frequency)
-
-    range_spectrum = [range_spectra[0], range_spectra[1]]
-
     plt.figure(figsize = (18, 4)); plt.tight_layout()
 
-    plt.subplot(1, 3, 1)
-    plt.bar(bin_edges[:-1], hist_x, width = (bin_edges[1] - bin_edges[0]), align = 'edge', 
-            color = 'blue', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
-    
-    plt.xlabel('Distance in X (mm)'); plt.ylabel('Frequency'); plt.title('Hits in X')
+    if hits_tree is not None:
 
-    plt.subplot(1, 3, 2)
-    plt.bar(bin_edges[:-1], hist_y, width = (bin_edges[1] - bin_edges[0]), align = 'edge', 
-            color = 'green', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
-    
-    plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); plt.title('Hits in Y')
+        hits_tree = uproot.dask(opened_file[hits_tree], library='np', step_size = '50 MB')
 
-    plt.subplot(1, 3, 3)
-    plt.hist(Energy, weights = Frequency, range = range_spectrum, bins = range_spectra[2], 
-             color = 'red', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+        for i in range(len(hits_branches)): 
+            if hits_branches[i] not in hits_tree.keys(): 
+                raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
+
+        x_values = hits_tree[hits_branches[0]]
+        y_values = hits_tree[hits_branches[1]]
+        
+        hist_x, range_x = dask_da.histogram(x_values, bins = range_x[2], range = (range_x[0], range_x[1]))
+        hist_y, range_y = dask_da.histogram(y_values, bins = range_y[2], range = (range_y[0], range_y[1]))
+
+        with ProgressBar():
+            print('\nComputing X-Dimension Histogram (1/3)...')
+            hist_x = hist_x.compute()
+            print('Computing Y-Dimension Histogram (2/3)...')
+            hist_y = hist_y.compute()
+
+        plt.subplot(1, 3, 1)
+        width_x = (range_x[1] - range_x[0])
+        plt.bar(range_x[:-1], hist_x, width = width_x, align = 'edge', color = 'blue',  alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+        plt.xlabel('Distance in X (mm)'); plt.ylabel('Frequency'); plt.title('Hits in X')
+
+        plt.subplot(1, 3, 2)
+        width_y = (range_y[1] - range_y[0])
+        plt.bar(range_y[:-1], hist_y, width = width_y, align = 'edge', color = 'green', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+        plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); plt.title('Hits in Y')
+
+
+    if spectra_tree is not None:
+
+        spectra_tree = uproot.dask(opened_file[spectra_tree], library='np', step_size='50 MB')
+        
+        for i in range(len(spectra_branches)): 
+            if spectra_branches[i] not in spectra_tree.keys(): 
+                raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree}'.")
+        
+        Energy    = spectra_tree[spectra_branches[0]]
+        Frequency = spectra_tree[spectra_branches[1]]
+        
+        hist_z, range_z = dask_da.histogram(Energy, weights = Frequency, bins = range_spectra[2], range = (range_spectra[0], range_spectra[1])) 
+
+        with ProgressBar():
+            print('Computing Z-Dimension Histogram (3/3)...')
+            hist_z = hist_z.compute()
+
+        plt.subplot(1, 3, 3)
+        width_z = (range_z[1] - range_z[0])
+        plt.bar(range_z[:-1], hist_z, width = width_z, align = 'edge', color = 'red',   alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+        plt.xlabel('Energy (keV)'); plt.ylabel('Frequency'); plt.title('Energy Spectrum')
     
-    plt.xlabel('Energy (keV)'); plt.ylabel('Frequency'); plt.title('Energy Spectrum')
 
 # 2.0. ========================================================================================================================================================
 
@@ -1293,6 +1303,10 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     y_start = slices[0]
     y_end = slices[1]
     step = slices[2]
+
+    if step == 0: angle_step_str = f"at Every Angle"
+    if step >  1: angle_step_str = f"Every {step} Angles"
+    print(f"Calculating Projections {angle_step_str}.")
     
     for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
 
@@ -1335,41 +1349,56 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     if alarm == True: PlayAlarm()
 
 
-def CT_Summary_Data(directory, tree, branches):
+def CT_Summary_Data(directory, summary_tree_name, summary_branches, spectra_tree_name, spectra_branches):
 
-    import uproot
+    import uproot, dask.array as da
 
-    NumberofPhotons = 0
-    EnergyDeposition = 0
-    RadiationDose = 0
-
-    num_of_files = 0
+    NumberofPhotons = Mean_Energy_Sum = EnergyDeposition = RadiationDose = num_of_files = 0
 
     for file in os.listdir(directory):
 
         file_path = os.path.join(directory, file)
         if not file_path.endswith('.root'): continue
+        opened_file = uproot.open(file_path)
 
-        with uproot.open(file_path) as root_file:
+        if summary_tree_name is not None:
 
-            tree_data = root_file[tree]
-            if branches[0] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[0]}', not found in tree: '{tree}'.")
-            if branches[1] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[1]}', not found in tree: '{tree}'.")
-            if branches[2] not in tree_data.keys(): raise ValueError(f"Branch: '{branches[2]}', not found in tree: '{tree}'.")
+            summary_tree = opened_file[summary_tree_name]
 
-            NumberofPhotons  = NumberofPhotons  + tree_data[branches[0]].array(library="np").sum()
-            EnergyDeposition = EnergyDeposition + tree_data[branches[1]].array(library="np").sum()
-            RadiationDose    = RadiationDose    + tree_data[branches[2]].array(library="np").sum()
+            for i in range(len(summary_branches)):
+                if summary_branches[i] not in summary_tree.keys(): 
+                    raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree_name}'.")
+
+            NumberofPhotons  += (np.array(summary_tree[summary_branches[0]])).sum()
+            EnergyDeposition += (np.array(summary_tree[summary_branches[1]])).sum()
+            RadiationDose    += (np.array(summary_tree[summary_branches[2]])).sum()
+
+        if spectra_tree_name is not None:
+
+            spectra_tree = uproot.dask(opened_file[spectra_tree_name], library='np', step_size='50 MB')
+            
+            for i in range(len(spectra_branches)): 
+                if spectra_branches[i] not in spectra_tree.keys(): 
+                    raise ValueError(f"Branch: '{spectra_branches[i]}', not found in tree: '{spectra_tree_name}'.")
+            
+            Energy    = spectra_tree[spectra_branches[0]]
+            Frequency = spectra_tree[spectra_branches[1]]
+
+            Mean_Energy = da.sum(Energy * Frequency) / da.sum(Frequency)
+            Mean_Energy_Sum = Mean_Energy.compute()
         
-        num_of_files = num_of_files + 1
+        num_of_files += 1
 
-    print('Files processed: ', num_of_files)
+    NumberofPhotons = round(NumberofPhotons/1_0000_000, 2)
+    Mean_Energy = np.mean(Mean_Energy_Sum)
+    EnergyDeposition = round(EnergyDeposition, 3)
+    RadiationDose = round(RadiationDose, 5)
 
-    print('Initial photons in simulation:', NumberofPhotons)
-    print('Total energy deposited in tissue (TeV):', round(EnergyDeposition, 5))
-    print('Dose of radiation received (uSv):', round(RadiationDose, 5))
-        
-    return NumberofPhotons, EnergyDeposition, RadiationDose
+    print(f"Files processed: {num_of_files}")
+    print(f"-> Initial Photons in CT:      \033[1m{NumberofPhotons:,.2f} M    \033[0m")
+    if spectra_tree_name is not None: print(f"-> Mean Energy of Photons:     \033[1m {Mean_Energy:,.2f} keV      \033[0m")
+    print(f"-> Energy Deposited in Tissue: \033[1m{EnergyDeposition:,.3f} TeV \033[0m")
+    print(f"-> Dose of Radiation Received: \033[1m{RadiationDose:,.5f} uSv    \033[0m")
 
 
 def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, csv_folder):

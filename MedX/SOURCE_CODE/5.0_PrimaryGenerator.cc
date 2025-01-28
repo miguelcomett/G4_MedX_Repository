@@ -6,9 +6,8 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction * detector)
 
     particleGun = new G4ParticleGun(1);
     particleTable = G4ParticleTable::GetParticleTable();
-    particleName = "gamma";
-    particle = particleTable -> FindParticle(particleName);
-    particleGun -> SetParticleDefinition(particle);   
+    particleName = particleTable -> FindParticle("gamma");
+    particleGun -> SetParticleDefinition(particleName);   
     particleGun -> SetParticleEnergy(0 * eV); 
 
     GeneratorMessenger = new PrimaryGeneratorMessenger(this);
@@ -37,10 +36,13 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
         particleGun -> SetParticleEnergy(RealEnergy);
 
         RealEnergy = RealEnergy / keV;
-        decimals = 2;
-        roundingScale = std::pow(10, decimals);
-        RealEnergy = std::round(RealEnergy * roundingScale) / roundingScale;
-        energyHistogram[RealEnergy]++;
+        
+        Decimals = 2;
+        roundingScale = std::pow(10, Decimals);
+        intRealEnergy = RealEnergy * roundingScale;
+        roundedRealEnergy = static_cast<G4float>(intRealEnergy) / roundingScale;
+        
+        energyHistogram[roundedRealEnergy]++;
     }
 
     if (Xgauss == true) 
@@ -75,10 +77,10 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     particleGun -> SetParticlePosition(photonPosition);
 
     AngleInCarts = std::tan(GunAngle * (2*pi / 360.0));
-    theta = AngleInCarts * (G4UniformRand() - 0.5) * 2;
-    phi   = AngleInCarts * (G4UniformRand() - 0.5) * 2;
+    Theta = AngleInCarts * (G4UniformRand() - 0.5) * 2;
+    Phi   = AngleInCarts * (G4UniformRand() - 0.5) * 2;
     
-    photonMomentum = G4ThreeVector(theta, phi, 1.0);
+    photonMomentum = G4ThreeVector(Theta, Phi, 1.0);
     particleGun -> SetParticleMomentumDirection(photonMomentum);
 
     particleGun -> GeneratePrimaryVertex(anEvent);

@@ -59,15 +59,14 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         PrimaryGeneratorMessenger * GeneratorMessenger;
         DetectorConstruction * detectorConstruction;
 
-        G4String particleName;
         G4ParticleTable * particleTable;
-        G4ParticleDefinition * particle;
+        G4ParticleDefinition * particleName;
 
-        const G4double pi = 3.14159265358979323846;
-        G4int threadID, SpectraMode, decimals, roundingScale;
         G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
-        G4float RealEnergy;
-        G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, random, peak, min, max;
+        G4int threadID, SpectraMode, Decimals, roundingScale, intRealEnergy;
+        G4float RealEnergy, roundedRealEnergy;
+        const G4double pi = 3.14159265358979323846;
+        G4double x0, y0, z0, thoraxAngle, gunAngle, Theta, Phi, AngleInCarts, Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, random, peak, min, max;
 
         G4ThreeVector photonPosition, photonMomentum;
         

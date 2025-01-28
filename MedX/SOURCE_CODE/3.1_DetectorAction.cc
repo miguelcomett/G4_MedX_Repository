@@ -56,23 +56,27 @@ G4bool SensitiveDetector::ProcessHits(G4Step * aStep, G4TouchableHistory * ROhis
         {
             Decimals = 3;
             scaleFactor = std::pow(10, Decimals);
-            xpos = std::round(posPhoton[0] * scaleFactor) / scaleFactor;
-            ypos = std::round(posPhoton[1] * scaleFactor) / scaleFactor;
+
+            intXpos = posPhoton[0] * scaleFactor;
+            intYpos = posPhoton[1] * scaleFactor;
+
+            Xpos = static_cast<G4float>(intXpos) / scaleFactor;
+            Ypos = static_cast<G4float>(intYpos) / scaleFactor;
 
             const DetectorConstruction * detectorConstruction = static_cast<const DetectorConstruction*>(G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
             is3DModel = detectorConstruction -> Getis3DModel();
 
             if ( (is3DModel == true) && (posPhoton[0]<230*mm && posPhoton[0]>-230*mm && posPhoton[1]<240*mm && posPhoton[1]>-240*mm))
             { 
-                analysisManager -> FillNtupleFColumn(0, 0, xpos);
-                analysisManager -> FillNtupleFColumn(0, 1, ypos);
+                analysisManager -> FillNtupleFColumn(0, 0, Xpos);
+                analysisManager -> FillNtupleFColumn(0, 1, Ypos);
                 analysisManager -> AddNtupleRow(0);
             }
             
             if (is3DModel == false)
             {
-                analysisManager -> FillNtupleFColumn(0, 0, xpos);
-                analysisManager -> FillNtupleFColumn(0, 1, ypos);
+                analysisManager -> FillNtupleFColumn(0, 0, Xpos);
+                analysisManager -> FillNtupleFColumn(0, 1, Ypos);
                 analysisManager -> AddNtupleRow(0);
             }
         }

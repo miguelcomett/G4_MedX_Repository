@@ -17,15 +17,14 @@ class SensitiveDetector : public G4VSensitiveDetector
         SensitiveDetector(G4String);
         ~SensitiveDetector();
     
+        virtual G4bool ProcessHits(G4Step *, G4TouchableHistory *);
         
     private: 
 
-        virtual G4bool ProcessHits(G4Step *, G4TouchableHistory *);
         G4bool is3DModel;
-        G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor;
-        G4float xpos, ypos;
+        G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor, intXpos, intYpos;
+        G4float Xpos, Ypos;
         G4double Wavelength, Energy;
-
 };
 
 #endif

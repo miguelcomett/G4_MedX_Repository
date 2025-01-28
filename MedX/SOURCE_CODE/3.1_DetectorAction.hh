@@ -10,7 +10,7 @@
 
 extern int arguments;
 
-class SensitiveDetector : public G4VSensitiveDetector
+class SensitiveDetector:public G4VSensitiveDetector
 {
     public:
 
@@ -20,11 +20,20 @@ class SensitiveDetector : public G4VSensitiveDetector
         virtual G4bool ProcessHits(G4Step *, G4TouchableHistory *);
         
     private: 
+    
+        G4AnalysisManager * analysisManager;
+        G4VPhysicalVolume * detectorVolume;
+        const G4VTouchable * touchable;
+        G4StepPoint * preStepPoint, * postStepPoint;
+        G4Track * particleTrack;
 
         G4bool is3DModel;
-        G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor, intXpos, intYpos;
+        G4String particleName;
+        G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor;
         G4float Xpos, Ypos;
-        G4double Wavelength, Energy;
+        G4double Wavelength, Energy, energyKeV;
+        
+        G4ThreeVector posPhoton, momPhoton, posDetector;
 };
 
 #endif

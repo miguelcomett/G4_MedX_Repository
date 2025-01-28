@@ -43,8 +43,6 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator * gun)
 	fSpectraMode -> SetGuidance("1: 80kVp real custom spectrum"); 
 	fSpectraMode -> SetGuidance("2: 140kVp real custom spectrum"); 
 	fSpectraMode -> SetParameterName("GunMode", true);
-
-	threadID = G4Threading::G4GetThreadId();
 }
 
 PrimaryGeneratorMessenger::~PrimaryGeneratorMessenger()

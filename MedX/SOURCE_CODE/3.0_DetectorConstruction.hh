@@ -16,7 +16,6 @@
 #include "G4LogicalVolume.hh"
 #include "G4GenericMessenger.hh"
 #include "G4UnionSolid.hh"
-
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4Material.hh"
 #include "G4Tubs.hh"
@@ -30,7 +29,6 @@
 #include "G4Ellipsoid.hh"
 #include "G4MultiUnion.hh"
 #include "G4UserLimits.hh"
-
 #include "G4GeometryManager.hh"
 #include "G4GeometryTolerance.hh"
 

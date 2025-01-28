@@ -37,18 +37,17 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
 
         RealEnergy = RealEnergy / keV;
         
-        Decimals = 2;
+        Decimals = 1;
         roundingScale = std::pow(10, Decimals);
-        intRealEnergy = RealEnergy * roundingScale;
-        roundedRealEnergy = static_cast<G4float>(intRealEnergy) / roundingScale;
+        RealEnergy = std::round(RealEnergy * roundingScale) / roundingScale;
         
-        energyHistogram[roundedRealEnergy]++;
+        energyHistogram[RealEnergy]++;
     }
 
     if (Xgauss == true) 
     {
-        x0 = G4RandGauss::shoot(0, 110*mm);
-        while (x0 > SpanX || x0 < -SpanX) {x0 = G4RandGauss::shoot(0, 110*mm);}
+        x0 = G4RandGauss::shoot(0, SpanX / 2.5); // Origin, Std Deviation (Sigma) 
+        while (x0 > SpanX || x0 < -SpanX) {x0 = G4RandGauss::shoot(0, SpanX);}
     }
     if (Xgauss == false) 
     {

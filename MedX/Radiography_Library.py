@@ -64,7 +64,7 @@ def PlayAlarm():
     # print("Script completed. Playing alarm...")
     pygame.mixer.music.play(loops = -1) 
 
-    time.sleep(8)
+    time.sleep(6)
     # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
 

@@ -64,7 +64,7 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
         G4ParticleDefinition * particle;
 
         const G4double pi = 3.14159265358979323846;
-        G4int threadID, SpectraMode;
+        G4int threadID, SpectraMode, decimals, roundingScale;
         G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
         G4float RealEnergy;
         G4double x0, y0, z0, thoraxAngle, gunAngle, theta, phi, AngleInCarts, Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, random, peak, min, max;

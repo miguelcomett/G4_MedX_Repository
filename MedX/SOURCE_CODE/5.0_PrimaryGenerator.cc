@@ -36,7 +36,10 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
 
-        RealEnergy = RealEnergy/keV;
+        RealEnergy = RealEnergy / keV;
+        decimals = 2;
+        roundingScale = std::pow(10, decimals);
+        RealEnergy = std::round(RealEnergy * roundingScale) / roundingScale;
         energyHistogram[RealEnergy]++;
     }
 
@@ -90,9 +93,7 @@ void PrimaryGenerator::ReadSpectrumFromFile(const std::string & filename, std::v
 
     EnergyVector.clear();
     IntensityVector.clear();
-    energyDataPoints = 0;
-    energy = 0.0;
-    intensity = 0.0;
+    energyDataPoints = energy = intensity = 0.0;
 
     // G4cout << EnergyVector.size() << IntensityVector.size() << energyDataPoints << G4endl;
 
@@ -160,12 +161,7 @@ G4double PrimaryGenerator::InverseCumul()
 { 
     // Function to estimate counts --> cumulative function is second order polynomial
 
-    X_random = 0.0;
-    Y_random = 0.0;
-    Alfa = 0.0;
-    Beta = 0.0;
-    Gamma = 0.0;
-    Delta = 0.0;
+    X_random = Y_random = Alfa = Beta = Gamma = Delta = 0.0;
 
     Y_random = G4UniformRand() * Y_Cumulative[energyDataPoints-1]; 
  

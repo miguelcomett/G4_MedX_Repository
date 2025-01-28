@@ -663,7 +663,6 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Mean_Energy = da.sum(Energy * Frequency) / da.sum(Frequency)
         Mean_Energy = Mean_Energy.compute()
 
-
     try: print(f"-> Initial Photons in Simulation:  \033[1m{Number_of_Photons:,.2f} M   \033[0m")
     except: pass
     try: print(f"-> Mean Energy of Photons:         \033[1m{Mean_Energy:,.2f} keV       \033[0m")
@@ -676,7 +675,7 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     except: pass
     try: print(f"-> Dose of Radiation Received:     \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
     except: pass
-    
+
 
 def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree, spectra_branches, range_x, range_y, range_spectra):
 

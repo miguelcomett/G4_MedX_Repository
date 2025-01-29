@@ -1,8 +1,8 @@
 # Python modules: 
-import os, sys, time, subprocess, shutil, platform, threading, signal, numpy as np, pandas as pd, matplotlib.pyplot as plt
+import os, sys, time, subprocess, shutil, platform, threading, signal, numpy as np, pandas as pd, matplotlib.pyplot as plt, math
 from contextlib import redirect_stdout, redirect_stderr; from pathlib import Path
 
-# 0.1. ========================================================================================================================================================
+# 0.0. ========================================================================================================================================================
 
 def Install_Libraries():
 
@@ -47,7 +47,6 @@ def Install_Libraries():
 
     print("All libraries are installed and ready to use.")
 
-# 0.2. ========================================================================================================================================================
 
 def PlayAlarm():
 
@@ -68,10 +67,8 @@ def PlayAlarm():
     # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
 
-# 0.3. ========================================================================================================================================================
 
 interrupt_flag = False
-
 def handle_keyboard_interrupt(sig, frame):
     global interrupt_flag
     if interrupt_flag: print('Second keyboard interrupt received. Exiting...'); sys.exit(1)
@@ -80,6 +77,256 @@ def handle_keyboard_interrupt(sig, frame):
         interrupt_flag = True
 
 signal.signal(signal.SIGINT, handle_keyboard_interrupt)
+
+# 0.1 ========================================================================================================================================================
+
+def directories():
+
+    mac_filename = 'Bisection.mac'
+
+    if platform.system() == "Darwin":
+        directory = 'BUILD/'
+        executable_file = "Sim"
+        run_sim = f"./{executable_file} {mac_filename} . . ."
+
+    elif platform.system() == "Windows":
+        directory = f"build/Release"
+        executable_file = "Sim.exe"
+        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
+        print(run_sim)
+
+    elif platform.system() == "Linux":
+        directory = f"build/Release"
+        executable_file = "Sim.exe"
+        run_sim = fr"./{executable_file} {mac_filename} . . ."
+        print(run_sim)
+
+    else: raise EnvironmentError("Unsupported operating system")
+
+    return directory, mac_filename, run_sim
+
+
+def Create_MAC_Template(threads):
+
+    mac_template = []
+
+    if threads: mac_template.append(f"/run/numberOfThreads {'{Threads}'}")
+
+    mac_template.extend([
+        f"/run/numberOfThreads {'{Threads}'}",
+        f"/run/initialize",
+        f"/gun/energy {'{energy}'} eV",
+        f"/myDetector/ThicknessTarget {'{thickness}'}",
+        f"/run/reinitializeGeometry",
+        f"/run/beamOn {'{beam_count}'}"
+    ])
+
+    return mac_template
+
+# 2.1 ========================================================================================================================================================
+
+def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector):
+    
+    import tqdm as tqdm, uproot
+    
+    results = []
+    counter_3 = 0
+    
+    for energy in tqdm(energies_vector, desc = "Mappping Energies", unit = "Energies", leave = True): 
+
+        ratio = 0
+        counter_1 = 1
+        counter_2 = 0
+        counter_4 = 1
+        beam_count = 200
+
+        if counter_3 == 1:
+            if (energy / previous_energy) < 5: thickness_1 = thickness_1 * 5           
+            elif (energy / previous_energy) < 10: thickness_1 = thickness_1 * 10
+            else: counter_3 = 0
+        
+        previous_energy = energy
+
+        kev = energy / 1000
+        if counter_3 == 0:
+            if kev <= 0.1:                  thickness = 0.0001 * kev
+            if kev > 0.1 and kev <= 1:      thickness = 0.0005 * kev
+            if kev > 1   and kev <= 10:     thickness = 0.001 * kev
+            if kev > 10  and kev <= 100:    thickness = .01 * kev
+            if kev > 100:                   thickness = 0.01 * kev
+
+            thickness_0 = thickness / 100
+            thickness_1 = thickness * 100
+
+        while True: 
+            
+            if counter_4 == 1:
+                thickness = math.sqrt(thickness_0 * thickness_1)
+                counter_4 = 2 
+            
+            if counter_4 == 2:
+                thickness = (thickness_0 + thickness_1) / 2
+                counter_4 = 1 
+
+            mac_template = Create_MAC_Template(threads)
+
+            mac_filepath = os.path.join(directory, mac_filename)
+            mac_content = mac_template.format(energy = energy, thickness = thickness, beam_count = beam_count)
+            with open(mac_filepath, 'w') as f: f.write(mac_content)
+
+            try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
+
+            if not os.path.isfile(root_path): print("Error: El archivo ROOT no existe."); break          
+            
+            try:
+                
+                root_file = uproot.open(root_path)
+                tree = root_file[tree_name]
+                if branch_1 not in tree.keys(): print(f"Branch '{branch_1}' not found in tree '{tree_name}' in {root_path}"); continue
+
+                hits_count = tree[branch_1].array(library="np")[0]  # Assuming you want the first entry
+
+            except Exception as e: print(f"Error al procesar el archivo ROOT: {e}"); continue
+            
+            ratio = hits_count / beam_count * 100
+
+            if counter_3 == 1:
+                if ratio == 0:      thickness_0 = thickness_0 / 10
+                elif ratio < 10:    thickness_0 = thickness_0 / 5
+                elif ratio == 100:  thickness_1 = thickness_1 * 10
+                elif ratio > 90:    thickness_1 = thickness_1 * 5
+                
+                counter_3 = 0
+
+            if   ratio > (50 + tolerance / 2): thickness_0 = thickness
+            elif ratio < (50 - tolerance / 2): thickness_1 = thickness 
+            else:
+                
+                if counter_2 > 0:
+                    try:
+                        
+                        branch2_array = tree[branch_2].array(library="np")
+                        
+                        if len(branch2_array) > 0:
+                            coeficient = branch2_array[0]
+                            results.append({'Energy': energy / 1000, 'Optimal_Thickness': thickness, 'AtCoefficient': coeficient})
+                            counter_3 = 1
+                            break
+                        else: print(f"No data in branch '{branch_2}' in tree '{tree_name}' in root_path}"); break
+                    
+                    except Exception as e: print(f"Error al procesar el branch '{branch_2}': {e}"); break
+
+                if counter_2 == 0:
+                    beam_count = 100000
+                    counter_2 = 1
+
+            counter_1 += 1
+            if counter_1 == 30:
+                print("No se encontró una solución en el rango especificado.")
+                print('Thickness:', thickness, 'mm')
+                print('Ratio:', ratio, '%')
+                break
+
+        results_df = pd.DataFrame(results)
+        results_df.to_csv(output_file, index=False)
+
+
+def BisectionEnergiesNIST(threads, root_filename, outputcsv_name, root_structure, input_csv, tolerance):
+
+    directory, mac_filename, run_sim = directories()
+
+    tree_name = root_structure[0]
+    branch_1 = root_structure[1]
+    branch_2 = root_structure[2]
+    
+    root_path = os.path.join(directory + 'ROOT/' + root_filename)
+    output_file = os.path.join(directory + 'ROOT/' + outputcsv_name)
+    input_file  = os.path.join(directory + 'ROOT/' + input_csv)
+    energies_table = pd.read_csv(input_file)
+
+    energies_vector = energies_table['Energy']
+
+    Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
+    
+    print('Finished Bisection')
+
+
+def BisectionFixedEnergyStep(threads, root_filename, output_file, root_structure, energies, tolerance):
+    
+    directory, mac_filename, run_sim = directories()
+
+    root_path = os.path.join(directory + 'ROOT/' + root_filename)
+    output_file = os.path.join(directory + 'ROOT/' + output_file)
+
+    tree_name = root_structure[0]
+    branch_1 = root_structure[1]
+    branch_2 = root_structure[2]
+
+    initial_energy = energies[0]
+    final_energy = energies[1]
+    energy_step = energies[2]
+
+    energies_vector = np.arange(initial_energy, final_energy, energy_step)
+
+    Loop_for_Bisection(threads,root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
+
+    print('Finished Bisection')
+
+
+def Plot_Att_Coeff(directory, DATA, title, x_label, y_label, X_axis_log, Y_axis_log, Figure_Text, Font_Size_Normal, Font_Size_Large, save_as):
+
+    plt.figure(figsize = (14, 8))
+
+    plt.rc("font",  family = 'Century Expanded')  
+    plt.rc("font",  weight = "normal")  
+    plt.rc("axes",  titlesize = Font_Size_Large)  
+    plt.rc("axes",  labelsize = Font_Size_Large)  
+    plt.rc("font",  size      = Font_Size_Normal)  
+    plt.rc("xtick", labelsize = Font_Size_Normal)  
+    plt.rc("ytick", labelsize = Font_Size_Normal)  
+
+    for CSV_File in DATA:
+        
+        file_path = directory + CSV_File["CSV"]
+        DataFrame = pd.read_csv(file_path)
+        
+        plt.plot(DataFrame[CSV_File["X"]], DataFrame[CSV_File["Y"]], label = CSV_File["LABEL"], marker = CSV_File["MARKER"], 
+                 markersize = CSV_File["MARKERSIZE"], color = CSV_File["COLOR"], alpha = CSV_File["ALPHA"])
+
+    if X_axis_log == True: plt.xscale("log")
+    if Y_axis_log == True: plt.yscale("log")
+
+    plt.title(title, pad = 12); plt.xlabel(x_label, labelpad = 7); plt.ylabel(y_label, labelpad = 8)
+
+    plt.figtext(Figure_Text, fontsize = Font_Size_Normal, bbox = dict(facecolor = 'white', alpha = 0.5))
+
+    plt.legend(); plt.grid(True)
+    
+    if save_as != None: plt.savefig(f"{directory}/{save_as}", dpi = 600)
+    plt.show()
+
+
+def Merge_CSVs(directory, output_file):
+    
+    first_file = True
+    sorted_filenames = sorted(os.listdir(directory))
+    
+    with open(output_file, 'w') as outfile:
+        
+        for filename in sorted_filenames:
+            if filename.endswith('.csv') and filename != output_file:
+                
+                with open(os.path.join(directory, filename), 'r') as file:
+                    
+                    if first_file:
+                        outfile.write(file.read())
+                        first_file = False
+                    else:
+                        next(file)
+                        outfile.write(file.read()) 
+                    
+                    outfile.write('\n')
 
 # 1.1. ========================================================================================================================================================
 

@@ -213,7 +213,7 @@ def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, ma
                             results.append({'Energy': energy / 1000, 'Optimal_Thickness': thickness, 'AtCoefficient': coeficient})
                             counter_3 = 1
                             break
-                        else: print(f"No data in branch '{branch_2}' in tree '{tree_name}' in root_path}"); break
+                        else: print(f"No data in branch '{branch_2}' in tree '{tree_name}' in {root_path}"); break
                     
                     except Exception as e: print(f"Error al procesar el branch '{branch_2}': {e}"); break
 
@@ -859,7 +859,7 @@ def Manage_Files(directory, starts_with, output_name):
 
 def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, summary_branches, spectra_tree, spectra_branches):
 
-    import uproot, dask.array as da; from dask.diagnostics import ProgressBar
+    import uproot, dask.array as da
 
     directory = os.path.join(directory, '')
     if not root_file.endswith('.root'): root_file = root_file + '.root'
@@ -868,34 +868,39 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
 
     if hits_tree is not None:
         
-        hits_tree = opened_file[hits_tree]
+        hits_tree = uproot.dask(opened_file[hits_tree], library = 'np', step_size = '50 MB')
         
         for i in range(len(hits_branches)): 
             if hits_branches[i] not in hits_tree.keys(): 
-                raise ValueError(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
+                print(f"Branch: '{hits_branches[i]}', not found in tree: '{hits_tree}'.")
         
         Number_of_Hits = hits_tree[hits_branches[0]]
-        Number_of_Hits = np.array(Number_of_Hits)
         Number_of_Hits = len(Number_of_Hits)
         Number_of_Hits = round(Number_of_Hits/1_000_000, 2)
     
     if summary_tree is not None:
 
-        summary_tree = opened_file[summary_tree]
+        summary_tree = uproot.dask(opened_file[summary_tree], library = 'np', step_size = '50 MB')
         
         for i in range(len(summary_branches)): 
             if summary_branches[i] not in summary_tree.keys(): 
-                raise ValueError(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
+                print(f"Branch: '{summary_branches[i]}', not found in tree: '{summary_tree}'.")
         
-        Number_of_Photons = np.array(summary_tree[summary_branches[0]])
-        Sample_Mass       = np.array(summary_tree[summary_branches[1]])
-        Energy_Deposition = np.array(summary_tree[summary_branches[2]])
-        Radiation_Dose    = np.array(summary_tree[summary_branches[3]])
-        Number_of_Photons = Number_of_Photons.sum()
-        Number_of_Photons = round(Number_of_Photons/1_000_000, 2)
-        Sample_Mass       = Sample_Mass.mean()
-        Energy_Deposition = Energy_Deposition.sum()
-        Radiation_Dose    = Radiation_Dose.sum() 
+        Number_of_Photons = summary_tree[summary_branches[0]]
+        Sample_Mass       = summary_tree[summary_branches[1]]
+        Energy_Deposition = summary_tree[summary_branches[2]]
+        Radiation_Dose    = summary_tree[summary_branches[3]]
+
+        Number_of_Photons = da.sum(Number_of_Photons).compute()
+        Number_of_Photons = round(Number_of_Photons / 1_000_000, 2)
+        Sample_Mass       = da.mean(Sample_Mass).compute()
+        Energy_Deposition = da.sum(Energy_Deposition).compute()
+        Radiation_Dose    = da.sum(Radiation_Dose).compute()
+
+    if spectra_tree is None:
+
+        Mean_Energy = np.array(summary_tree['Initial_Energy_keV'])
+        Mean_Energy = Mean_Energy.mean()
     
     if spectra_tree is not None:
 
@@ -965,6 +970,16 @@ def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree
         plt.bar(range_y[:-1], hist_y, width = width_y, align = 'edge', color = 'green', alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
         plt.xlabel('Distance in Y (mm)'); plt.ylabel('Frequency'); plt.title('Hits in Y')
 
+    if spectra_tree is None:
+        
+        summary_tree = uproot.dask(opened_file['Run Summary'], library='np', step_size = '50 MB')
+        Energy = summary_tree['Initial_Energy_keV']
+
+        hist_z, range_z = dask_da.histogram(Energy, bins = range_spectra[2], range = (range_spectra[0], range_spectra[1])) 
+        
+        print('Computing Z-Dimension Histogram (3/3)...')
+        with ProgressBar(): hist_z = hist_z.compute()
+        
 
     if spectra_tree is not None:
 
@@ -979,14 +994,13 @@ def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree
         
         hist_z, range_z = dask_da.histogram(Energy, weights = Frequency, bins = range_spectra[2], range = (range_spectra[0], range_spectra[1])) 
 
-        with ProgressBar():
-            print('Computing Z-Dimension Histogram (3/3)...')
-            hist_z = hist_z.compute()
+        print('Computing Z-Dimension Histogram (3/3)...')
+        with ProgressBar(): hist_z = hist_z.compute()
 
-        plt.subplot(1, 3, 3)
-        width_z = (range_z[1] - range_z[0])
-        plt.bar(range_z[:-1], hist_z, width = width_z, align = 'edge', color = 'red',   alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
-        plt.xlabel('Energy (keV)'); plt.ylabel('Frequency'); plt.title('Energy Spectrum')
+    plt.subplot(1, 3, 3)
+    width_z = (range_z[1] - range_z[0])
+    plt.bar(range_z[:-1], hist_z, width = width_z, align = 'edge', color = 'red',   alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
+    plt.xlabel('Energy (keV)'); plt.ylabel('Frequency'); plt.title('Energy Spectrum')
     
 
 # 2.0. ========================================================================================================================================================

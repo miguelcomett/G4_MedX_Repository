@@ -72,7 +72,7 @@ class RunAction : public G4UserRunAction
 
         std::string currentPath, tempDirectory, rootDirectory, mergedFileName;
         G4String particleName, baseName, fileName, haddCommand;
-        G4int numberOfEvents, runID, index, totalNumberOfEvents, threadID, GunMode, frequency, fileIndex;
+        G4int numberOfEvents, runID, totalNumberOfEvents, threadID, GunMode, frequency, fileIndex;
         G4float primaryEnergy, energies;
         G4double energy, sampleMass, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose;
 

@@ -31,7 +31,7 @@ class SensitiveDetector:public G4VSensitiveDetector
         G4String particleName;
         G4int digits, defaultDecimals, copyNo, Event, Decimals, scaleFactor;
         G4float Xpos, Ypos;
-        G4double Wavelength, Energy, energyKeV;
+        G4double Wavelength, Energy, photonEnergy;
         
         G4ThreeVector posPhoton, momPhoton, posDetector;
 };

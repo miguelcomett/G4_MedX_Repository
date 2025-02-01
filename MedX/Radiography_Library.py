@@ -402,12 +402,17 @@ def Generate_MAC_Template(
 
     mac_template = []
 
-    if threads: mac_template.append(f"/run/numberOfThreads {'{Threads}'}")
-    mac_template.append("/run/initialize")
-
     mac_template.extend([
         f"/myDetector/nColumns {detector_parameters['nColumns']}",
-        f"/myDetector/nRows {detector_parameters['nRows']}"
+        f"/myDetector/nRows {detector_parameters['nRows']}",
+        f"/run/reinitializeGeometry",
+        f""
+    ])
+
+    if threads: mac_template.append(f"/run/numberOfThreads {'{Threads}'}")
+    mac_template.extend([
+        f"/run/initialize",
+        f""
     ])
 
     mac_template.extend([
@@ -415,7 +420,8 @@ def Generate_MAC_Template(
         f"/Pgun/Y {gun_parameters['Y']} mm",
         f"/Pgun/gaussX {gun_parameters['gaussX']}",
         f"/Pgun/SpanX {gun_parameters['SpanX']} mm",
-        f"/Pgun/SpanY {gun_parameters['SpanY']} mm"
+        f"/Pgun/SpanY {gun_parameters['SpanY']} mm",
+        f""
     ])
 
     if simulation_mode == 'single' or simulation_mode == 0:
@@ -1501,11 +1507,15 @@ def Generate_CT_MAC_Template(
         f"/myDetector/Rotation {'{angle}'}",
         f"/myDetector/nColumns {detector_parameters['nColumns']}",
         f"/myDetector/nRows {detector_parameters['nRows']}",
-        f"/run/reinitializeGeometry"
+        f"/run/reinitializeGeometry",
+        f""
     ])
 
     if threads: mac_template.append(f"/run/numberOfThreads {'{Threads}'}")
-    mac_template.append("/run/initialize")
+    mac_template.extend([
+        f"/run/initialize",
+        f""
+    ])
 
     mac_template.extend([
         f"/Pgun/X {gun_parameters['X']} mm",
@@ -1513,17 +1523,18 @@ def Generate_CT_MAC_Template(
         f"/Pgun/SpanX {gun_parameters['SpanX']} mm",
         f"/Pgun/Xcos true",
         f"/Pgun/Y {gun_parameters['Y']} mm",
-        f"/Pgun/SpanY {gun_parameters['SpanY']} mm"
+        f"/Pgun/SpanY {gun_parameters['SpanY']} mm",
+        f""
     ])
 
     if spectra_mode == 'mono' or spectra_mode == 0:
-        mac_template.append(f"/gun/energy {'{Energy}'} keV")
+        mac_template.append(f"/gun/energy {'{Energy}'} keV \n")
 
     if spectra_mode == '80kvp' or spectra_mode == 1:
-        mac_template.append(f"/Pgun/Mode 1")
+        mac_template.append(f"/Pgun/Mode 1 \n")
 
     if spectra_mode == '140kvp' or spectra_mode == 2:
-        mac_template.extend(f"/Pgun/Mode 2")
+        mac_template.extend(f"/Pgun/Mode 2 \n")
 
     mac_template.append(f"{'{beam_lines}'}")
 

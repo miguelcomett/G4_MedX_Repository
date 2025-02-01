@@ -41,19 +41,15 @@ void EventAction::EndOfEventAction(const G4Event * event)
         << std::put_time(nowTime3, "%H:%M:%S") << "\033[0m" << std::endl;
     }
 
-    G4AnalysisManager * analysisManager = G4AnalysisManager::Instance();
-
-    if (arguments == 1 || arguments == 2)
-    {
-        if (fEDep > 0.0) 
-        {
-            analysisManager -> FillNtupleDColumn(2, 0, fEDep);
-            analysisManager -> AddNtupleRow(2);
-        }
-    }
+    // if (arguments == 1 || arguments == 2)
+    // {
+    //     G4AnalysisManager * analysisManager = G4AnalysisManager::Instance();
+    //     if (fEDep > 0.0) 
+    //     {
+    //         analysisManager -> FillNtupleDColumn(4, 0, fEDep);
+    //         analysisManager -> AddNtupleRow(4);
+    //     }
+    // }
 
     fRunAction -> AddEdep(fEDep);
 }
-
-// G4int Event = G4RunManager::GetRunManager() -> GetCurrentEvent() -> GetEventID();
-// G4cout << "Energy deposition (keV): " << fEDep << "  |Event ID: " << Event << G4endl; 

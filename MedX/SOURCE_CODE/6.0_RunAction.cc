@@ -19,24 +19,33 @@ RunAction::RunAction()
 
     if (arguments == 1 || arguments == 2)
     {
-        analysisManager -> CreateNtuple("Photons", "Photons");
-        analysisManager -> CreateNtupleIColumn("Event_Count");
-        analysisManager -> CreateNtupleDColumn("X_axis");
-        analysisManager -> CreateNtupleDColumn("Y_axis");
-        analysisManager -> CreateNtupleDColumn("Z_axis");
-        analysisManager -> CreateNtupleDColumn("Photons'_Wavelengths_nm");
+        analysisManager -> CreateNtuple("Hits", "Hits");
+        analysisManager -> CreateNtupleDColumn("X");
+        analysisManager -> CreateNtupleDColumn("Y");
+        analysisManager -> CreateNtupleDColumn("X_det");
+        analysisManager -> CreateNtupleDColumn("Y_det");
         analysisManager -> FinishNtuple(0);
 
-        analysisManager -> CreateNtuple("Hits", "Hits");
-        analysisManager -> CreateNtupleIColumn("Event_Count");
-        analysisManager -> CreateNtupleDColumn("X_Detectors");
-        analysisManager -> CreateNtupleDColumn("Y_Detectors");
-        analysisManager -> CreateNtupleDColumn("Z_Detectors");
+        analysisManager -> CreateNtuple("Run Summary", "Run Summary");
+        analysisManager -> CreateNtupleDColumn("Number_of_Photons");
+        analysisManager -> CreateNtupleDColumn("Sample_Mass_kg");
+        analysisManager -> CreateNtupleDColumn("EDep_Value_TeV");
+        analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");
         analysisManager -> FinishNtuple(1);
-
-        analysisManager -> CreateNtuple("Energy", "Energy");
-        analysisManager -> CreateNtupleDColumn("Energy_Deposition_keV");
+        
+        analysisManager -> CreateNtuple("Energy Spectra keV", "Energy Spectra keV");
+        analysisManager -> CreateNtupleFColumn("Energies");
+        analysisManager -> CreateNtupleIColumn("Counts");
         analysisManager -> FinishNtuple(2);
+
+        analysisManager -> CreateNtuple("Detected Photons", "Detected Photons");
+        analysisManager -> CreateNtupleDColumn("Energies_keV");
+        analysisManager -> CreateNtupleDColumn("Wavelengths_nm");
+        analysisManager -> FinishNtuple(3);
+
+        // analysisManager -> CreateNtuple("Energy", "Energy");
+        // analysisManager -> CreateNtupleDColumn("Energy_Deposition_keV");
+        // analysisManager -> FinishNtuple(4);
     }
 
     if (arguments == 3)
@@ -157,14 +166,13 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
         {
             scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
-            totalMass = 0;
-            index = 1;
-
             for (G4LogicalVolume * volume : scoringVolumes) 
             { 
-                if (volume) {sampleMass = volume -> GetMass(); totalMass = totalMass + sampleMass;} 
-                // G4cout << "Mass " << index << ": " << G4BestUnit(sampleMass, "Mass") << G4endl;
-                index = index + 1;
+                if (volume)
+                {
+                    sampleMass = volume -> GetMass(); 
+                    totalMass = totalMass + sampleMass;
+                } 
             }
             
             particleName = currentRun -> GetPrimaryParticleName();
@@ -193,7 +201,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             G4cout << G4endl;
         }
         
-        if (arguments == 5)
+        if (arguments == 1 || arguments == 2 || arguments == 5)
         {   
             totalMass = totalMass / kg;
             TotalEnergyDeposit = TotalEnergyDeposit / TeV;

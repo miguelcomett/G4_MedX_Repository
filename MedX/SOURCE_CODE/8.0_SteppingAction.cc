@@ -1,49 +1,54 @@
 #include "8.0_SteppingAction.hh"
-#include "G4UserLimits.hh"
 
-SteppingAction::SteppingAction(EventAction * eventAction) {fEventAction = eventAction;}
+SteppingAction::SteppingAction(EventAction * EventAction) {eventAction = EventAction;}
 SteppingAction::~SteppingAction() {}
 
 void SteppingAction::UserSteppingAction(const G4Step * step)
 {
     track = step -> GetTrack();
     position = track -> GetPosition();
-    worldMaxX =  500.1 * mm; worldMinX = -500.1 * mm; worldMaxY =  500.1 * mm; worldMinY = -500.1 * mm; worldMaxZ =  500.1 * mm; worldMinZ = -500.1 * mm;
+    worldMaxX =  500.1*mm; worldMinX = -500.1*mm; worldMaxY = 500.1*mm; worldMinY = -500.1*mm; worldMaxZ = 500.1*mm; worldMinZ = -500.1*mm;
     if (position.x() < worldMinX || position.x() > worldMaxX || position.y() < worldMinY || position.y() > worldMaxY || position.z() < worldMinZ || position.z() > worldMaxZ)  
     {track -> SetTrackStatus(fStopAndKill); G4cout << " ERROR: Particle outside world bounds!!!" << G4endl;}
 
     Volume = step -> GetPreStepPoint() -> GetTouchableHandle() -> GetVolume() -> GetLogicalVolume();
     detectorConstruction = static_cast < const DetectorConstruction *> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
-    scoringVolume = detectorConstruction -> GetScoringVolume();
 
     if (arguments == 1 || arguments == 2)
     {   
-        std::vector<G4LogicalVolume*> scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
-        if (std::find(scoringVolumes.begin(), scoringVolumes.end(), Volume) == scoringVolumes.end()) {return;}
+        scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
+        std::set <G4LogicalVolume*> scoringSet(scoringVolumes.begin(), scoringVolumes.end());
+        
+        if (scoringSet.count(Volume) > 0)
         {
-            EDep = step -> GetTotalEnergyDeposit();
-            if (EDep > 0.0) {fEventAction -> AddEDep(EDep);}
-            fEventAction -> AddEDep(EDep);
-            // G4cout << "Energy deposition (keV): " << EDep << G4endl; 
+            volumeName = Volume -> GetName();
+            energyDeposition = step -> GetTotalEnergyDeposit();
+
+            if (energyDeposition > 0.0) 
+            {
+                eventAction -> AddEDepEvent(energyDeposition);
+                energyDepositionMap[volumeName] += energyDeposition;
+            }
         }
     }
 
     if (arguments == 3) 
     {
-        if(Volume != scoringVolume) { return; }
-        // G4cout << "particle touches target: " << scoringVolume << G4endl;
+        scoringVolume = detectorConstruction -> GetScoringVolume();
+
+        if(Volume != scoringVolume) {return;}
 
         endPoint = step -> GetPostStepPoint();
         processName = endPoint -> GetProcessDefinedStep() -> GetProcessName();
-        Run * run = static_cast <Run *> (G4RunManager::GetRunManager() -> GetNonConstCurrentRun()); 
+        run = static_cast <Run*> (G4RunManager::GetRunManager() -> GetNonConstCurrentRun()); 
         run -> CountProcesses(processName);
 
-        G4RunManager::GetRunManager() -> AbortEvent();  // kill event after first interaction
+        G4RunManager::GetRunManager() -> AbortEvent();
     }
 
     if (arguments == 5)
     {   
-        G4bool Stuck = true;
+        Stuck = true;
         
         if (Stuck == true) 
         {
@@ -71,12 +76,11 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
             else {stuckParticles[trackID] = {currentPosition, 0};} // Add new track to monitoring
         }
 
-        std::vector<G4LogicalVolume*> scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
-        if (std::find(scoringVolumes.begin(), scoringVolumes.end(), Volume) == scoringVolumes.end()) {return;}
+        scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
+        if ( std::find(scoringVolumes.begin(), scoringVolumes.end(), Volume) == scoringVolumes.end() )
         {       
-            EDep = step -> GetTotalEnergyDeposit();
-            if (EDep > 0.0) {fEventAction -> AddEDep(EDep);}
-            // G4cout << "Energy deposition (eV): " << G4BestUnit(EDep, "Energy") << G4endl; 
+            energyDeposition = step -> GetTotalEnergyDeposit();
+            if (energyDeposition > 0.0) {eventAction -> AddEDepEvent(energyDeposition);}
         }
     }
 }

@@ -25,6 +25,7 @@
 #include "3.0_DetectorConstruction.hh"
 #include "5.0_PrimaryGenerator.hh"
 #include "6.1_Run.hh"
+// #include "8.0_SteppingAction.hh"
 
 extern int arguments;
 
@@ -40,7 +41,7 @@ class RunAction : public G4UserRunAction
 
         G4Run * GenerateRun() override;
 
-        void AddEdep(G4double edep) {fEdep += edep;}
+        void AddEDep(G4double EDepEvent) {EDepSum += EDepEvent;}
         void MergeEnergySpectra();
         void MergeRootFiles(const std::string & fileName, const std::string & tempDirectory, const std::string & rootDirectory);
 
@@ -55,11 +56,14 @@ class RunAction : public G4UserRunAction
         const PrimaryGenerator * primaryGenerator = static_cast <const PrimaryGenerator*> 
         (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction());
         const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> 
-        (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());   
+        (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());  
+        // const SteppingAction * steppingAction = static_cast<const SteppingAction*>
+        // (G4RunManager::GetRunManager() -> GetUserSteppingAction()); 
 
-        G4Accumulable <G4double> fEdep = 0.0;
+        G4Accumulable <G4double> EDepSum = 0.0;
         std::vector <G4LogicalVolume*> scoringVolumes;
 
+        std::map<G4String, G4double> energyDepositionMap;
         std::map<G4float, G4int> energyHistogram;
 
         std::chrono::system_clock::time_point simulationStartTime, simulationEndTime;
@@ -71,10 +75,10 @@ class RunAction : public G4UserRunAction
         G4ParticleDefinition * particle;
 
         std::string currentPath, tempDirectory, rootDirectory, mergedFileName;
-        G4String particleName, baseName, fileName, haddCommand;
+        G4String particleName, baseName, fileName, haddCommand, tissueName;
         G4int numberOfEvents, runID, totalNumberOfEvents, threadID, GunMode, frequency, fileIndex;
         G4float primaryEnergy, energies;
-        G4double energy, sampleMass, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose;
+        G4double energy, sampleMass, totalMass, durationInSeconds, TotalEnergyDeposit, radiationDose, tissueEDep;
 
         const G4double milligray = 1.0e-3*gray;
         const G4double microgray = 1.0e-6*gray;

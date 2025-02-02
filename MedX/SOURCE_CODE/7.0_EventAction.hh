@@ -18,20 +18,20 @@ class EventAction : public G4UserEventAction
 {
     public:
         
-        EventAction(RunAction * runAction);
+        EventAction(RunAction * RunAction);
         ~EventAction();
 
         virtual void BeginOfEventAction(const G4Event *);
         virtual void EndOfEventAction  (const G4Event *);
 
-        void AddEDep(G4double EDep){fEDep = fEDep + EDep;};
+        void AddEDepEvent(G4double EDepStep){EDepEvent = EDepEvent + EDepStep;};
 
     private:
         
-        RunAction * fRunAction = nullptr;
+        RunAction * runAction = nullptr;
         
         G4int totalEvents, eventID;
-        G4double fEDep, EDep_keV;
+        G4double EDepEvent;
 
         std::chrono::system_clock::time_point nowTime1;
         std::time_t nowTime2;

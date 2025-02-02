@@ -29,7 +29,7 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
 {
     public:
 
-        PrimaryGenerator(DetectorConstruction * detector);
+        PrimaryGenerator(DetectorConstruction * DetectorConstruction);
         ~PrimaryGenerator();
 
         virtual void GeneratePrimaries(G4Event *);

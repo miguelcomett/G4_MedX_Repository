@@ -1,7 +1,11 @@
 #include "6.0_RunAction.hh"
+#include "8.0_SteppingAction.hh"
 
-G4Mutex mergeMutex = G4MUTEX_INITIALIZER;
+G4Mutex Mutex_Spectra = G4MUTEX_INITIALIZER;
 std::map<G4float, G4int> masterEnergySpectra;
+
+G4Mutex Mutex_EDep = G4MUTEX_INITIALIZER;
+std::map<G4String, G4double> masterEnergyDeposition;
 
 RunAction::RunAction()
 {
@@ -11,7 +15,7 @@ RunAction::RunAction()
     new G4UnitDefinition("picogray" , "picoGy"  , "Dose", picogray);
 
     accumulableManager = G4AccumulableManager::Instance();
-    accumulableManager -> RegisterAccumulable(fEdep);
+    accumulableManager -> RegisterAccumulable(EDepSum);
 
     analysisManager = G4AnalysisManager::Instance();
     analysisManager -> SetDefaultFileType("root");
@@ -43,9 +47,10 @@ RunAction::RunAction()
         analysisManager -> CreateNtupleDColumn("Wavelengths_nm");
         analysisManager -> FinishNtuple(3);
 
-        // analysisManager -> CreateNtuple("Energy", "Energy");
-        // analysisManager -> CreateNtupleDColumn("Energy_Deposition_keV");
-        // analysisManager -> FinishNtuple(4);
+        analysisManager -> CreateNtuple("Tissue Energy Dep", "Tissue Energy Dep");
+        analysisManager -> CreateNtupleSColumn("Tissue");
+        analysisManager -> CreateNtupleDColumn("EnergyDeposition_TeV");
+        analysisManager -> FinishNtuple(4);
     }
 
     if (arguments == 3)
@@ -167,7 +172,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
             for (G4LogicalVolume * volume : scoringVolumes) 
-            { 
+            {
                 if (volume)
                 {
                     sampleMass = volume -> GetMass(); 
@@ -179,7 +184,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             primaryEnergy = currentRun -> GetPrimaryEnergy();
             numberOfEvents = thisRun -> GetNumberOfEvent();
 
-            TotalEnergyDeposit = fEdep.GetValue();
+            TotalEnergyDeposit = EDepSum.GetValue();
             radiationDose = TotalEnergyDeposit / totalMass;
 
             simulationEndTime = std::chrono::system_clock::now();
@@ -216,17 +221,13 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             
             if (masterEnergySpectra.size() == 0) 
             {
-                frequency = 1;
                 analysisManager -> FillNtupleFColumn(2, 0, primaryEnergy);
-                analysisManager -> FillNtupleIColumn(2, 1, frequency);
+                analysisManager -> FillNtupleIColumn(2, 1, 1);
                 analysisManager -> AddNtupleRow(2);
             }
             
             if (masterEnergySpectra.size() > 0)
-            {
-                energies = 0.0;
-                frequency = 0;
-                
+            {                
                 for (const auto & entry : masterEnergySpectra) 
                 {
                     energies = entry.first;
@@ -235,6 +236,24 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     analysisManager -> FillNtupleFColumn(2, 0, energies);
                     analysisManager -> FillNtupleIColumn(2, 1, frequency);
                     analysisManager -> AddNtupleRow(2);
+                }
+            }
+
+            if (arguments == 2)
+            {
+                if (masterEnergyDeposition.size() > 0)
+                {   
+                    for (const auto & entry : masterEnergyDeposition) 
+                    {
+                        tissueName = entry.first;
+                        tissueEDep = entry.second;
+
+                        // G4cout << name << ": " << G4BestUnit(edep, "Energy") << G4endl;
+
+                        analysisManager -> FillNtupleSColumn(4, 0, tissueName.c_str());
+                        analysisManager -> FillNtupleDColumn(4, 1, tissueEDep);
+                        analysisManager -> AddNtupleRow(4);
+                    }
                 }
             }
         }
@@ -252,9 +271,16 @@ void RunAction::MergeEnergySpectra()
 {
     if (primaryGenerator) {energyHistogram = primaryGenerator -> GetEnergySpectra();}
     
-    G4MUTEXLOCK(&mergeMutex);
+    G4MUTEXLOCK(&Mutex_Spectra);
     for (const auto & entry : energyHistogram) {masterEnergySpectra[entry.first] += entry.second;}
-    G4MUTEXUNLOCK(&mergeMutex);
+    G4MUTEXUNLOCK(&Mutex_Spectra);
+
+    const SteppingAction * steppingAction = static_cast<const SteppingAction*> (G4RunManager::GetRunManager() -> GetUserSteppingAction()); 
+    if (steppingAction){energyDepositionMap = steppingAction -> GetEnergyDepositionMap();}
+    
+    G4MUTEXLOCK(&Mutex_EDep);
+    for (const auto & entry : energyDepositionMap) {masterEnergyDeposition[entry.first] += entry.second;}
+    G4MUTEXUNLOCK(&Mutex_EDep);
 }
 
 void RunAction::MergeRootFiles(const std::string & baseName, const std::string & tempDirectory, const std::string & rootDirectory) 

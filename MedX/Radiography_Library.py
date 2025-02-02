@@ -863,7 +863,8 @@ def Manage_Files(directory, starts_with, output_name):
 
 # 1.4. ========================================================================================================================================================
 
-def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, summary_branches, spectra_tree, spectra_branches):
+def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, summary_branches, 
+                 edep_tree, edep_branches, spectra_tree, spectra_branches):
 
     import uproot, dask.array as da
 
@@ -903,6 +904,17 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Energy_Deposition = da.sum(Energy_Deposition).compute()
         Radiation_Dose    = da.sum(Radiation_Dose).compute()
 
+    if edep_tree is not None:
+        
+        edep_tree = uproot.dask(opened_file[edep_tree], library = 'np', step_size = '50 MB')
+        
+        for i in range(len(edep_branches)): 
+            if edep_branches[i] not in edep_tree.keys(): 
+                print(f"Branch: '{edep_branches[i]}', not found in tree: '{edep_tree}'.")
+        
+        Tissue_Names = (edep_tree[edep_branches[0]]).compute()
+        Tissue_EDep  = (edep_tree[edep_branches[1]]).compute()
+
     if spectra_tree is None:
 
         Mean_Energy = np.array(summary_tree['Initial_Energy_keV'])
@@ -929,9 +941,12 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     except: pass
     try: print(f"-> Mass of Sample Scanned:         \033[1m{Sample_Mass:,.3f} kg        \033[0m")
     except: pass
-    try: print(f"-> Energy Deposited in Tissue:     \033[1m{Energy_Deposition:,.3f} TeV \033[0m")
+    try: print(f"-> Energy Deposited in Tissues:    \033[1m{Energy_Deposition:,.3f} TeV \033[0m \n")
     except: pass
-    try: print(f"-> Dose of Radiation Received:     \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
+    try: print(f"-> Total Dose of Radiation:        \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
+    except: pass
+    try: 
+        for i in range(len(Tissue_Names)): print(f"  • Energy Deposited in {Tissue_Names[i]:>9}: \033[1m{Tissue_EDep[i]:,.5f} TeV \033[0m")
     except: pass
 
 

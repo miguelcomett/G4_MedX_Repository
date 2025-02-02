@@ -37,19 +37,19 @@ RunAction::RunAction()
         analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");
         analysisManager -> FinishNtuple(1);
         
+        analysisManager -> CreateNtuple("Tissue Energy Dep", "Tissue Energy Dep");
+        analysisManager -> CreateNtupleSColumn("Tissue");
+        analysisManager -> CreateNtupleDColumn("EnergyDeposition_TeV");
+        analysisManager -> FinishNtuple(2);
+
         analysisManager -> CreateNtuple("Energy Spectra keV", "Energy Spectra keV");
         analysisManager -> CreateNtupleFColumn("Energies");
         analysisManager -> CreateNtupleIColumn("Counts");
-        analysisManager -> FinishNtuple(2);
+        analysisManager -> FinishNtuple(3);
 
         analysisManager -> CreateNtuple("Detected Photons", "Detected Photons");
         analysisManager -> CreateNtupleDColumn("Energies_keV");
         analysisManager -> CreateNtupleDColumn("Wavelengths_nm");
-        analysisManager -> FinishNtuple(3);
-
-        analysisManager -> CreateNtuple("Tissue Energy Dep", "Tissue Energy Dep");
-        analysisManager -> CreateNtupleSColumn("Tissue");
-        analysisManager -> CreateNtupleDColumn("EnergyDeposition_TeV");
         analysisManager -> FinishNtuple(4);
     }
 
@@ -83,10 +83,15 @@ RunAction::RunAction()
         analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");
         analysisManager -> FinishNtuple(1);
         
+        analysisManager -> CreateNtuple("Tissue Energy Dep", "Tissue Energy Dep");
+        analysisManager -> CreateNtupleSColumn("Tissue");
+        analysisManager -> CreateNtupleDColumn("EnergyDeposition_TeV");
+        analysisManager -> FinishNtuple(2);
+
         analysisManager -> CreateNtuple("Energy Spectra keV", "Energy Spectra keV");
         analysisManager -> CreateNtupleFColumn("Energies");
         analysisManager -> CreateNtupleIColumn("Counts");
-        analysisManager -> FinishNtuple(2);
+        analysisManager -> FinishNtuple(3);
     }
 }
 
@@ -219,13 +224,28 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             analysisManager -> FillNtupleDColumn(1, 3, radiationDose);
             analysisManager -> AddNtupleRow(1);
             
+            if (masterEnergyDeposition.size() > 0)
+            {   
+                for (const auto & entry : masterEnergyDeposition) 
+                {
+                    tissueName = entry.first;
+                    tissueEDep = entry.second;
+                    tissueEDep = tissueEDep / TeV;
+
+                    G4cout << tissueName << ": " << tissueEDep << " TeV" << G4endl;
+
+                    analysisManager -> FillNtupleSColumn(2, 0, tissueName.c_str());
+                    analysisManager -> FillNtupleDColumn(2, 1, tissueEDep);
+                    analysisManager -> AddNtupleRow(2);
+                }
+            }
+
             if (masterEnergySpectra.size() == 0) 
             {
-                analysisManager -> FillNtupleFColumn(2, 0, primaryEnergy);
-                analysisManager -> FillNtupleIColumn(2, 1, 1);
-                analysisManager -> AddNtupleRow(2);
+                analysisManager -> FillNtupleFColumn(3, 0, primaryEnergy);
+                analysisManager -> FillNtupleIColumn(3, 1, 1);
+                analysisManager -> AddNtupleRow(3);
             }
-            
             if (masterEnergySpectra.size() > 0)
             {                
                 for (const auto & entry : masterEnergySpectra) 
@@ -233,27 +253,9 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     energies = entry.first;
                     frequency = entry.second;
 
-                    analysisManager -> FillNtupleFColumn(2, 0, energies);
-                    analysisManager -> FillNtupleIColumn(2, 1, frequency);
-                    analysisManager -> AddNtupleRow(2);
-                }
-            }
-
-            if (arguments == 2)
-            {
-                if (masterEnergyDeposition.size() > 0)
-                {   
-                    for (const auto & entry : masterEnergyDeposition) 
-                    {
-                        tissueName = entry.first;
-                        tissueEDep = entry.second;
-
-                        // G4cout << name << ": " << G4BestUnit(edep, "Energy") << G4endl;
-
-                        analysisManager -> FillNtupleSColumn(4, 0, tissueName.c_str());
-                        analysisManager -> FillNtupleDColumn(4, 1, tissueEDep);
-                        analysisManager -> AddNtupleRow(4);
-                    }
+                    analysisManager -> FillNtupleFColumn(3, 0, energies);
+                    analysisManager -> FillNtupleIColumn(3, 1, frequency);
+                    analysisManager -> AddNtupleRow(3);
                 }
             }
         }

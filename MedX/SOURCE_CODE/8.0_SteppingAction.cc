@@ -14,7 +14,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
     Volume = step -> GetPreStepPoint() -> GetTouchableHandle() -> GetVolume() -> GetLogicalVolume();
     detectorConstruction = static_cast < const DetectorConstruction *> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
 
-    if (arguments == 1 || arguments == 2)
+    if (arguments == 1 || arguments == 2 || arguments == 5)
     {   
         scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
         std::set <G4LogicalVolume*> scoringSet(scoringVolumes.begin(), scoringVolumes.end());
@@ -30,24 +30,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
                 energyDepositionMap[volumeName] += energyDeposition;
             }
         }
-    }
 
-    if (arguments == 3) 
-    {
-        scoringVolume = detectorConstruction -> GetScoringVolume();
-
-        if(Volume != scoringVolume) {return;}
-
-        endPoint = step -> GetPostStepPoint();
-        processName = endPoint -> GetProcessDefinedStep() -> GetProcessName();
-        run = static_cast <Run*> (G4RunManager::GetRunManager() -> GetNonConstCurrentRun()); 
-        run -> CountProcesses(processName);
-
-        G4RunManager::GetRunManager() -> AbortEvent();
-    }
-
-    if (arguments == 5)
-    {   
         Stuck = true;
         
         if (Stuck == true) 
@@ -75,12 +58,19 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
             } 
             else {stuckParticles[trackID] = {currentPosition, 0};} // Add new track to monitoring
         }
+    }
 
-        scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
-        if ( std::find(scoringVolumes.begin(), scoringVolumes.end(), Volume) == scoringVolumes.end() )
-        {       
-            energyDeposition = step -> GetTotalEnergyDeposit();
-            if (energyDeposition > 0.0) {eventAction -> AddEDepEvent(energyDeposition);}
-        }
+    if (arguments == 3) 
+    {
+        scoringVolume = detectorConstruction -> GetScoringVolume();
+
+        if(Volume != scoringVolume) {return;}
+
+        endPoint = step -> GetPostStepPoint();
+        processName = endPoint -> GetProcessDefinedStep() -> GetProcessName();
+        run = static_cast <Run*> (G4RunManager::GetRunManager() -> GetNonConstCurrentRun()); 
+        run -> CountProcesses(processName);
+
+        G4RunManager::GetRunManager() -> AbortEvent();
     }
 }

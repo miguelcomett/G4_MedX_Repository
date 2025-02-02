@@ -34,9 +34,9 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
             analysisManager -> FillNtupleDColumn(0, 3, posDetector[1]);
             analysisManager -> AddNtupleRow(0);
             
-            analysisManager -> FillNtupleDColumn(3, 0, photonEnergy);
-            analysisManager -> FillNtupleDColumn(3, 1, Wavelength);
-            analysisManager -> AddNtupleRow(3);
+            analysisManager -> FillNtupleDColumn(4, 0, photonEnergy);
+            analysisManager -> FillNtupleDColumn(4, 1, Wavelength);
+            analysisManager -> AddNtupleRow(4);
         }
 
         if (arguments == 4)

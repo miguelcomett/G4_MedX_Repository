@@ -83,9 +83,9 @@ RunAction::RunAction()
         analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");
         analysisManager -> FinishNtuple(1);
         
-        analysisManager -> CreateNtuple("Tissue Energy Dep", "Tissue Energy Dep");
+        analysisManager -> CreateNtuple("Radiation Dose", "Radiation Dose");
         analysisManager -> CreateNtupleSColumn("Tissue");
-        analysisManager -> CreateNtupleDColumn("EnergyDeposition_TeV");
+        analysisManager -> CreateNtupleDColumn("Radiation_Dose_uSv");
         analysisManager -> FinishNtuple(2);
 
         analysisManager -> CreateNtuple("Energy Spectra keV", "Energy Spectra keV");
@@ -153,7 +153,6 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
 
     if (threadID == 0)
     {
-        std::cout << std::endl;
         std::cout << "\033[32m================= RUN " << runID + 1 << " ==================" << std::endl;
         std::cout << "    The run is: " << totalNumberOfEvents << " " << particleName << " of " ;
         
@@ -182,6 +181,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                 {
                     sampleMass = volume -> GetMass(); 
                     totalMass = totalMass + sampleMass;
+                    // G4cout << volume->GetName() << ": " << sampleMass/kg << G4endl;
                 } 
             }
             
@@ -201,9 +201,9 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
 
             G4cout << G4endl; 
             G4cout << "\033[32mRun Summary:" << G4endl;
-            G4cout << "--> Total mass of sample: " << G4BestUnit(totalMass, "Mass") << G4endl;
-            G4cout << "--> Total energy deposition: " << G4BestUnit(TotalEnergyDeposit, "Energy") << G4endl;
-            G4cout << "--> Radiation dose : " << G4BestUnit(radiationDose, "Dose") << G4endl;
+            G4cout << "--> Total Mass of Sample: " << G4BestUnit(totalMass, "Mass") << G4endl;
+            G4cout << "--> Energy Deposition: " << G4BestUnit(TotalEnergyDeposit, "Energy") << G4endl;
+            G4cout << "--> Radiation Dose : " << G4BestUnit(radiationDose, "Dose") << G4endl;
             G4cout << G4endl;
             G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
             G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
@@ -230,15 +230,37 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                 {
                     tissueName = entry.first;
                     tissueEDep = entry.second;
-                    tissueEDep = tissueEDep / TeV;
 
-                    G4cout << tissueName << ": " << tissueEDep << " TeV" << G4endl;
+                    scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
-                    analysisManager -> FillNtupleSColumn(2, 0, tissueName.c_str());
-                    analysisManager -> FillNtupleDColumn(2, 1, tissueEDep);
-                    analysisManager -> AddNtupleRow(2);
+                    for (auto & volume : scoringVolumes) 
+                    {
+                        if (volume -> GetName() == tissueName) 
+                        {
+                            sampleMass = volume -> GetMass();  
+                            break;
+                        }
+                    }
+
+                    radiationDose = tissueEDep / sampleMass;
+
+                    G4cout 
+                    << "  -> [" << std::setw(7) << std::left << tissueName << "] "
+                    << "Mass: \033[1m" 
+                    << std::setw(8) << std::left << std::setprecision(5) << sampleMass/kg << " kg\033[0m"
+                    << ", Energy Deposition: \033[1m" 
+                    << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(tissueEDep, "Energy") << "\033[0m"
+                    << " === Radiation Dose: \033[1m" 
+                    << std::setw(9) << std::left << std::setprecision(6) << G4BestUnit(radiationDose, "Dose") << "\033[0m" <<
+                    G4endl;
+
+                    // analysisManager -> FillNtupleSColumn(2, 0, tissueName.c_str());
+                    // analysisManager -> FillNtupleDColumn(2, 1, radiationDose);
+                    // analysisManager -> AddNtupleRow(2);
                 }
             }
+            
+            G4cout << G4endl;
 
             if (masterEnergySpectra.size() == 0) 
             {

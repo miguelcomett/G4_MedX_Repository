@@ -262,8 +262,8 @@ void DetectorConstruction::ConstructThorax()
     TumorReal = stl.Read(modelPath + "TUMOR.stl");
     if (TumorReal && isTumorReal)
     {
-        logicTumorReal = new G4LogicalVolume(TumorReal, Muscle_Sucrose, "TumorReal");
-        new G4PVPlacement(Model3DRotation, samplePosition, logicTumorReal, "TumorReal", logicWorld, false, 0, true);
+        logicTumorReal = new G4LogicalVolume(TumorReal, Muscle_Sucrose, "Tumor");
+        new G4PVPlacement(Model3DRotation, samplePosition, logicTumorReal, "Tumor", logicWorld, false, 0, true);
 
         scoringVolume_6 = logicTumorReal;
         scoringVolumes.push_back(scoringVolume_6);
@@ -471,8 +471,8 @@ void DetectorConstruction::ConstructTumor(int i)
     }
     
     tumorSphere = new G4Sphere("Tumor", 0, tumorRadius, 0*deg, 360*deg, 0*deg, 180*deg);
-    logicTumor = new G4LogicalVolume(tumorSphere, Muscle_Sucrose, "Tumor");
-    new G4PVPlacement(Model3DRotation, tumorPosition, logicTumor, "Tumor", logicWorld, false, 0, true);
+    logicTumor = new G4LogicalVolume(tumorSphere, Muscle_Sucrose, "TumorSphere");
+    new G4PVPlacement(Model3DRotation, tumorPosition, logicTumor, "TumorSphere", logicWorld, false, 0, true);
     
     if (isDebug) {G4cout << "Radio del tumor generado: " << tumorRadius / mm << " mm" << G4endl; G4cout << "Tumor generado en posición: " << tumorPosition << G4endl;}
 }

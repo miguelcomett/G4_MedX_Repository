@@ -18,7 +18,7 @@ class EventAction : public G4UserEventAction
 {
     public:
         
-        EventAction(RunAction * RunAction);
+        EventAction(RunAction * runAction);
         ~EventAction();
 
         virtual void BeginOfEventAction(const G4Event *);
@@ -28,7 +28,7 @@ class EventAction : public G4UserEventAction
 
     private:
         
-        RunAction * runAction = nullptr;
+        RunAction * myRunAction;
         
         G4int totalEvents, eventID;
         G4double EDepEvent;

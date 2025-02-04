@@ -1,6 +1,6 @@
 #include "8.0_SteppingAction.hh"
 
-SteppingAction::SteppingAction(EventAction * EventAction) {eventAction = EventAction;}
+SteppingAction::SteppingAction(EventAction * eventAction) {myEventAction = eventAction;}
 SteppingAction::~SteppingAction() {}
 
 void SteppingAction::UserSteppingAction(const G4Step * step)
@@ -26,7 +26,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
 
             if (energyDeposition > 0.0) 
             {
-                eventAction -> AddEDepEvent(energyDeposition);
+                myEventAction -> AddEDepEvent(energyDeposition);
                 energyDepositionMap[volumeName] += energyDeposition;
             }
         }

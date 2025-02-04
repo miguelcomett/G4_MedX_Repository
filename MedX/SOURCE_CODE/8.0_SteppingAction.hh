@@ -17,7 +17,7 @@ class SteppingAction : public G4UserSteppingAction
 {
     public:
 
-        SteppingAction(EventAction * EventAction);
+        SteppingAction(EventAction * eventAction);
         ~ SteppingAction();
 
         virtual void UserSteppingAction(const G4Step *);
@@ -45,7 +45,7 @@ class SteppingAction : public G4UserSteppingAction
         
         Run * run;
         G4Track * track;
-        EventAction * eventAction;
+        EventAction * myEventAction;
         const DetectorConstruction * detectorConstruction;
 };
 

@@ -153,14 +153,16 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
 
     if (threadID == 0)
     {
-        std::cout << "\033[32m================= RUN " << runID + 1 << " ==================" << std::endl;
-        std::cout << "    The run is: " << totalNumberOfEvents << " " << particleName << " of " ;
-        
-        if (GunMode == 0) {std::cout << G4BestUnit(primaryEnergy, "Energy") << std::endl;}
-        if (GunMode  > 0) {std::cout << primaryEnergy << " kVp" << std::endl;}
+        std::cout << "\033[32m" << "================= RUN " << runID + 1 << " ==================" << std::endl;
+        std::cout << "    The run is: " << "\033[1m" << totalNumberOfEvents << " " << particleName << "\033[22m" << " of ";
 
-        std::cout << "Start time: " << std::put_time(now_tm_0, "%H:%M:%S") << "    Date: " << std::put_time(now_tm_0, "%d-%m-%Y") << std::endl;
-        std::cout << "\033[0m" << std::endl;
+        std::cout << "\033[1m";
+        if (GunMode == 0) {std::cout << G4BestUnit(primaryEnergy, "Energy") << std::endl;}
+        if (GunMode  > 0) {std::cout << primaryEnergy << " kVp" << std::endl;};
+        std::cout << "\033[22m";
+
+        std::cout << "Start time: " << std::put_time(now_tm_0, "%H:%M:%S") << "    Date: " << std::put_time(now_tm_0, "%d-%m-%Y") << "\033[0m" << std::endl;
+        std::cout << std::endl;
     }
 }
 
@@ -171,8 +173,8 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
 
     if (isMaster) 
     { 
-        if (arguments != 3)
-        {
+        if (arguments == 1 || arguments == 2 || arguments == 5)
+        {   
             scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
             for (G4LogicalVolume * volume : scoringVolumes) 
@@ -181,7 +183,6 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                 {
                     sampleMass = volume -> GetMass(); 
                     totalMass = totalMass + sampleMass;
-                    // G4cout << volume->GetName() << ": " << sampleMass/kg << G4endl;
                 } 
             }
             
@@ -192,27 +193,13 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             TotalEnergyDeposit = EDepSum.GetValue();
             radiationDose = TotalEnergyDeposit / totalMass;
 
-            simulationEndTime = std::chrono::system_clock::now();
-            now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
-            now_tm_1 = std::localtime(&now_end);
-            
-            auto duration = std::chrono::duration_cast<std::chrono::seconds>(simulationEndTime - simulationStartTime);
-            durationInSeconds = duration.count() * second;
-
             G4cout << G4endl; 
-            G4cout << "\033[32mRun Summary:" << G4endl;
-            G4cout << "--> Total Mass of Sample: " << G4BestUnit(totalMass, "Mass") << G4endl;
-            G4cout << "--> Energy Deposition: " << G4BestUnit(TotalEnergyDeposit, "Energy") << G4endl;
-            G4cout << "--> Radiation Dose : " << G4BestUnit(radiationDose, "Dose") << G4endl;
+            G4cout << "\033[32m" << "Run Summary:" << G4endl;
+            G4cout << "--> Total Mass of Sample: " << "\033[1m" << G4BestUnit(totalMass, "Mass")            << "\033[22m" << G4endl;
+            G4cout << "--> Energy Deposition: "    << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << "\033[22m" << G4endl;
             G4cout << G4endl;
-            G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
-            G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
-            G4cout << "========================================== \033[0m" << G4endl;
-            G4cout << G4endl;
-        }
-        
-        if (arguments == 1 || arguments == 2 || arguments == 5)
-        {   
+            G4cout << "--> Radiation Dose: "       << "\033[1m" << G4BestUnit(radiationDose, "Dose")        << "\033[22m" << G4endl;
+
             totalMass = totalMass / kg;
             TotalEnergyDeposit = TotalEnergyDeposit / TeV;
             radiationDose = radiationDose / microgray;
@@ -231,36 +218,28 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     tissueName = entry.first;
                     tissueEDep = entry.second;
 
-                    scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
-
                     for (auto & volume : scoringVolumes) 
                     {
-                        if (volume -> GetName() == tissueName) 
-                        {
-                            sampleMass = volume -> GetMass();  
-                            break;
-                        }
+                        if (volume -> GetName() == tissueName) {sampleMass = volume -> GetMass(); break;}
                     }
 
                     radiationDose = tissueEDep / sampleMass;
 
                     G4cout 
-                    << "  -> [" << std::setw(7) << std::left << tissueName << "] "
-                    << "Mass: \033[1m" 
-                    << std::setw(8) << std::left << std::setprecision(5) << sampleMass/kg << " kg\033[0m"
-                    << ", Energy Deposition: \033[1m" 
-                    << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(tissueEDep, "Energy") << "\033[0m"
-                    << " === Radiation Dose: \033[1m" 
-                    << std::setw(9) << std::left << std::setprecision(6) << G4BestUnit(radiationDose, "Dose") << "\033[0m" <<
+                    << "  > [" << std::setw(7) << std::left << tissueName << "] "
+                    << "Mass: " 
+                    << "\033[1m" << std::setw(8) << std::left << std::setprecision(5) << sampleMass/kg << " kg\033[22m"
+                    << ", Energy Deposition: " 
+                    << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(tissueEDep, "Energy") << "\033[22m"
+                    << " === Radiation Dose: " 
+                    << "\033[1m" << std::setw(9) << std::left << std::setprecision(6) << G4BestUnit(radiationDose, "Dose") << "\033[22m" <<
                     G4endl;
 
-                    // analysisManager -> FillNtupleSColumn(2, 0, tissueName.c_str());
-                    // analysisManager -> FillNtupleDColumn(2, 1, radiationDose);
-                    // analysisManager -> AddNtupleRow(2);
+                    analysisManager -> FillNtupleSColumn(2, 0, tissueName.c_str());
+                    analysisManager -> FillNtupleDColumn(2, 1, radiationDose);
+                    analysisManager -> AddNtupleRow(2);
                 }
             }
-            
-            G4cout << G4endl;
 
             if (masterEnergySpectra.size() == 0) 
             {
@@ -280,6 +259,19 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     analysisManager -> AddNtupleRow(3);
                 }
             }
+
+            simulationEndTime = std::chrono::system_clock::now();
+            now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
+            now_tm_1 = std::localtime(&now_end);
+            
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(simulationEndTime - simulationStartTime);
+            durationInSeconds = duration.count() * second;
+
+            G4cout << G4endl;
+            G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
+            G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
+            G4cout << "========================================== \033[0m" << G4endl;
+            G4cout << G4endl;
         }
         
         customRun -> EndOfRun();

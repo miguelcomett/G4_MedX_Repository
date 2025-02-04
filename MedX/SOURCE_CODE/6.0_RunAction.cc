@@ -235,19 +235,19 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     << "\033[1m" << std::setw(9) << std::left << std::setprecision(6) << G4BestUnit(radiationDose, "Dose") << "\033[22m" <<
                     G4endl;
 
-                    analysisManager -> FillNtupleSColumn(2, 0, tissueName.c_str());
-                    analysisManager -> FillNtupleDColumn(2, 1, radiationDose);
+                    analysisManager -> FillNtupleSColumn(2, 0, tissueName); // tissueName.c_str()
+                    analysisManager -> FillNtupleDColumn(2, 1, radiationDose / microgray);
                     analysisManager -> AddNtupleRow(2);
                 }
             }
 
-            if (masterEnergySpectra.size() == 0) 
+            if (masterEnergySpectra.size() == 0) // mono
             {
                 analysisManager -> FillNtupleFColumn(3, 0, primaryEnergy);
                 analysisManager -> FillNtupleIColumn(3, 1, 1);
                 analysisManager -> AddNtupleRow(3);
             }
-            if (masterEnergySpectra.size() > 0)
+            if (masterEnergySpectra.size() > 0) // poly
             {                
                 for (const auto & entry : masterEnergySpectra) 
                 {

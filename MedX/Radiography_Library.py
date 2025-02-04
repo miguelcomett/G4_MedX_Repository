@@ -50,6 +50,7 @@ def Install_Libraries():
 def PlayAlarm():
 
     import pygame
+    os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
     alarm_path = 'Alarm.mp3'
 
@@ -902,6 +903,9 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Tissue_Names = (radiation_tree[radiation_branches[0]]).compute()
         Tissue_Dose  = (radiation_tree[radiation_branches[1]]).compute()
 
+        Unique_Tissues = np.unique(Tissue_Names)
+        Tissue_Dose = {organ: Tissue_Dose[Tissue_Names == organ].sum() for organ in Unique_Tissues}
+
     except Exception as error: print("\033[31m" + f"Error while processing Root file: \n \n {error}" + "\033[0m \n")
     
     try:
@@ -936,7 +940,7 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     try: print(f"-> Total Dose of Radiation:        \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
     except: pass
     try: 
-        for i in range(len(Tissue_Names)): print(f"  • Radiation Dose in {Tissue_Names[i]:>7}:     \033[1m{Tissue_Dose[i]:,.5f} µSv \033[0m")
+        for organ, dose in Tissue_Dose.items(): print(f"Radiation Dose in {organ}: {dose:.5f} µSv")
     except: pass
 
 

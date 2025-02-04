@@ -47,7 +47,6 @@ def Install_Libraries():
 
     print("All libraries are installed and ready to use.")
 
-
 def PlayAlarm():
 
     import pygame
@@ -66,7 +65,6 @@ def PlayAlarm():
     time.sleep(6)
     # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
-
 
 interrupt_flag = False
 def handle_keyboard_interrupt(sig, frame):
@@ -104,7 +102,6 @@ def directories():
     else: raise EnvironmentError("Unsupported operating system")
 
     return directory, mac_filename, run_sim
-
 
 def Create_MAC_Template(threads):
 
@@ -231,7 +228,6 @@ def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, ma
         results_df = pd.DataFrame(results)
         results_df.to_csv(output_file, index=False)
 
-
 def BisectionEnergiesNIST(threads, root_filename, outputcsv_name, root_structure, input_csv, tolerance):
 
     directory, mac_filename, run_sim = directories()
@@ -250,7 +246,6 @@ def BisectionEnergiesNIST(threads, root_filename, outputcsv_name, root_structure
     Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
     
     print('Finished Bisection')
-
 
 def BisectionFixedEnergyStep(threads, root_filename, output_file, root_structure, energies, tolerance):
     
@@ -272,7 +267,6 @@ def BisectionFixedEnergyStep(threads, root_filename, output_file, root_structure
     Loop_for_Bisection(threads,root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
 
     print('Finished Bisection')
-
 
 def Plot_Att_Coeff(directory, DATA, title, x_label, y_label, X_axis_log, Y_axis_log, Figure_Text, Font_Size_Normal, Font_Size_Large, save_as):
 
@@ -306,7 +300,6 @@ def Plot_Att_Coeff(directory, DATA, title, x_label, y_label, X_axis_log, Y_axis_
     if save_as != None: plt.savefig(f"{directory}/{save_as}", dpi = 600)
     plt.show()
 
-
 def Merge_CSVs(directory, output_file):
     
     first_file = True
@@ -336,7 +329,6 @@ def Trash_Folder(trash_folder):
                  
     try: send2trash(trash_folder)
     except Exception as e: print(f"Error deleting trash folder: {e}")
-
 
 def Simulation_Setup():
         
@@ -376,7 +368,6 @@ def Simulation_Setup():
 
     return directory, run_sim, root_folder, mac_filepath, rad_folder
 
-
 def Run_Calibration(directory, run_sim):
     
     start_time = time.perf_counter()
@@ -386,7 +377,6 @@ def Run_Calibration(directory, run_sim):
     calibration_time = end_time - start_time
 
     return calibration_time
-
 
 def Generate_MAC_Template(
     simulation_mode,              # Obligarory parameter: 'single (1)' or 'DEXA (2)'
@@ -465,7 +455,6 @@ def Generate_MAC_Template(
             ])
 
     return "\n".join(mac_template)  
-
 
 def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
@@ -668,7 +657,6 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
     if alarm == True or alarm == 1: PlayAlarm()
 
-
 def UI_RunDEXA():
 
     import ipywidgets as widgets; from IPython.display import display, HTML
@@ -781,7 +769,6 @@ def Merge_Roots_HADD(directory, starts_with, output_name, trim_coords):
         print("Using Merge_Roots_Dask Function")
         Merge_Roots_Dask(directory, starts_with, output_name, trim_coords)
 
-
 def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
 
     import uproot, dask.array as da
@@ -834,7 +821,6 @@ def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
     Trash_Folder(trash_folder)
     print(f"Merged data written to: {merged_file}")
 
-
 def Manage_Files(directory, starts_with, output_name):
 
     directory = os.path.join(directory, '')
@@ -873,8 +859,7 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     file_path = directory + root_file
     opened_file = uproot.open(file_path)
 
-    if hits_tree is not None:
-        
+    try:
         hits_tree = uproot.dask(opened_file[hits_tree], library = 'np', step_size = '50 MB')
         
         for i in range(len(hits_branches)): 
@@ -884,9 +869,10 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Number_of_Hits = hits_tree[hits_branches[0]]
         Number_of_Hits = len(Number_of_Hits)
         Number_of_Hits = round(Number_of_Hits/1_000_000, 2)
-    
-    if summary_tree is not None:
 
+    except Exception as error: print("\033[31m" + f"Error while processing Root file: \n \n {error}" + "\033[0m \n")
+    
+    try:
         summary_tree = uproot.dask(opened_file[summary_tree], library = 'np', step_size = '50 MB')
         
         for i in range(len(summary_branches)): 
@@ -904,8 +890,9 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Energy_Deposition = da.sum(Energy_Deposition).compute()
         Radiation_Dose    = da.sum(Radiation_Dose).compute()
 
-    if radiation_tree is not None:
+    except Exception as error: print("\033[31m" + f"Error while processing Root file: \n \n {error}" + "\033[0m \n")
         
+    try:
         radiation_tree = uproot.dask(opened_file[radiation_tree], library = 'np', step_size = '50 MB')
         
         for i in range(len(radiation_branches)): 
@@ -915,13 +902,9 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Tissue_Names = (radiation_tree[radiation_branches[0]]).compute()
         Tissue_Dose  = (radiation_tree[radiation_branches[1]]).compute()
 
-    if spectra_tree is None:
-
-        Mean_Energy = np.array(summary_tree['Initial_Energy_keV'])
-        Mean_Energy = Mean_Energy.mean()
+    except Exception as error: print("\033[31m" + f"Error while processing Root file: \n \n {error}" + "\033[0m \n")
     
-    if spectra_tree is not None:
-
+    try:
         spectra_tree = uproot.dask(opened_file[spectra_tree], library = 'np', step_size = '50 MB')
         
         for i in range(len(spectra_branches)): 
@@ -932,6 +915,13 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Frequency = spectra_tree[spectra_branches[1]]
         Mean_Energy = da.sum(Energy * Frequency) / da.sum(Frequency)
         Mean_Energy = Mean_Energy.compute()
+
+    except Exception as error: 
+        print("\033[31m" + f"Error while processing Root file: \n \n {error}" + "\033[0m \n")
+        print(f"Falling back to previous calculation of Mean Energy.")
+
+        Mean_Energy = np.array(summary_tree['Initial_Energy_keV'])
+        Mean_Energy = Mean_Energy.mean()
 
     try: print(f"-> Initial Photons in Simulation:  \033[1m{Number_of_Photons:,.2f} M   \033[0m")
     except: pass
@@ -946,7 +936,7 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     try: print(f"-> Total Dose of Radiation:        \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
     except: pass
     try: 
-        for i in range(len(Tissue_Names)): print(f"  • Radiation Dose in {Tissue_Names[i]:>9}: \033[1m{Tissue_Dose[i]:,.5f} TeV \033[0m")
+        for i in range(len(Tissue_Names)): print(f"  • Radiation Dose in {Tissue_Names[i]:>7}:     \033[1m{Tissue_Dose[i]:,.5f} µSv \033[0m")
     except: pass
 
 
@@ -1023,7 +1013,6 @@ def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree
     plt.bar(range_z[:-1], hist_z, width = width_z, align = 'edge', color = 'red',   alpha = 0.7, edgecolor = 'gray', linewidth = 0.0)
     plt.xlabel('Energy (keV)'); plt.ylabel('Frequency'); plt.title('Energy Spectrum')
     
-
 # 2.0. ========================================================================================================================================================
 
 def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size, progress_bar):
@@ -1164,7 +1153,7 @@ def IsolateTissues(low_energy_img, high_energy_img, sigma1, sigma2, wn, save_in,
 
 # 4.0. ========================================================================================================================================================
 
-def BMO(SLS_Bone, SLS_Tissue):
+def Bone_Mineral_Density(SLS_Bone, SLS_Tissue):
 
     U_b_l = 0.7519 # mu1
     U_b_h = 0.3012 # mu2
@@ -1331,31 +1320,24 @@ def Fixed_CNR(image_path, save_as, coords_signal, coords_bckgrnd):
 
 # 6.1 ========================================================================================================================================================
 
-def Denoise_EdgeDetection(path, isArray, sigma_color, sigma_spatial):
+def Denoising_Auto_Edge_Detection(path, isArray, sigma_color, sigma_spatial):
 
     from skimage.restoration import denoise_bilateral; from PIL import Image
     
-    if isArray == True:
-        original_image = np.array(path)
-    else:
-        original_image = Image.open(path)
-        
+    if isArray == True: original_image = np.array(path)
+    else: original_image = Image.open(path)
     denoised_image = denoise_bilateral(original_image, sigma_color = sigma_color, sigma_spatial = sigma_spatial, channel_axis = None)
 
     save_as = ''
 
     plt.figure(figsize = (10, 5))
 
-    plt.subplot(1, 2, 1)
-    plt.imshow(denoised_image, cmap = 'gray')
-    plt.title('Denoised Image')
-    plt.axis('off')
+    plt.subplot(1, 2, 1); plt.imshow(denoised_image, cmap = 'gray')
+    plt.title('Denoised Image'); plt.axis('off')
     if save_as != '': plt.savefig('RESULTS/' + save_as + '.png', bbox_inches = 'tight', dpi = 900)
 
-    plt.subplot(1, 2, 2)
-    plt.imshow(original_image, cmap = 'gray')
-    plt.title('Original Image')
-    plt.axis('off')
+    plt.subplot(1, 2, 2); plt.imshow(original_image, cmap = 'gray')
+    plt.title('Original Image'); plt.axis('off')
 
     plt.show()
 
@@ -1363,7 +1345,7 @@ def Denoise_EdgeDetection(path, isArray, sigma_color, sigma_spatial):
 
 # 6.2 ========================================================================================================================================================
 
-def Denoise(array, isHann, alpha, save_as, isCrossSection):
+def Denoising_Window(array, isHann, alpha, save_as, isCrossSection):
     
     from scipy import signal; from scipy.fft import fft2, fftshift, ifft2
 
@@ -1450,7 +1432,6 @@ def Plotly_Heatmap_1(array, xlim, ylim, title, x_label, y_label, width, height, 
     if save_as != '': pio.write_image(fig, save_as + '.png', width = width, height = height, scale = 5)
     fig.show()
 
-
 def Plotly_Heatmap_2(array, xlim, ylim, title, x_label, y_label, sqr_1_coords, sqr_2_coords, annotation, width, height, save_as):
 
     import plotly.graph_objects as go, plotly.io as pio
@@ -1504,7 +1485,6 @@ def ClearFolder(directory):
             try: send2trash(file_path)
             except Exception as e: print(f"Error deleting file {file_path}: {e}")
 
-
 def Generate_CT_MAC_Template(
     threads              = None,  # Optional parameter
     spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
@@ -1554,7 +1534,6 @@ def Generate_CT_MAC_Template(
     mac_template.append(f"{'{beam_lines}'}")
 
     return "\n".join(mac_template)  
-
 
 def CT_Loop(threads, starts_with, angles, slices, alarm):
 
@@ -1634,7 +1613,6 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     print("Finished Simulating CT")
     if alarm == True: PlayAlarm()
 
-
 def CT_Summary_Data(directory, summary_tree_name, summary_branches, spectra_tree_name, spectra_branches):
 
     import uproot, dask.array as da
@@ -1685,7 +1663,6 @@ def CT_Summary_Data(directory, summary_tree_name, summary_branches, spectra_tree
     if spectra_tree_name is not None: print(f"-> Mean Energy of Photons:     \033[1m {Mean_Energy:,.2f} keV      \033[0m")
     print(f"-> Energy Deposited in Tissue: \033[1m{EnergyDeposition:,.3f} TeV \033[0m")
     print(f"-> Dose of Radiation Received: \033[1m{RadiationDose:,.5f} uSv    \033[0m")
-
 
 def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, csv_folder):
     
@@ -1827,7 +1804,6 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
     return heatmap_matrix, sinogram_matrix, slices_matrix
 
-    
 def Plotly_CT(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
 
     import plotly.graph_objects as go; from plotly.subplots import make_subplots
@@ -1858,7 +1834,6 @@ def MatPlotLib_CT(heatmap_matrix, sinogram_matrix, slices_matrix, step):
         plt.text(-250, 300, f"Slice Number: {slice}", ha = 'center', fontsize = 11, color ='gray')
         plt.show()
 
-
 def CoefficientstoHU(csv_slices, mu_water, air_parameter):
 
     import plotly.graph_objects as go
@@ -1878,7 +1853,6 @@ def CoefficientstoHU(csv_slices, mu_water, air_parameter):
     fig.show()
 
     return HU_images
-
 
 def Export_to_Dicom(HU_images, size_y, directory, compressed):
 

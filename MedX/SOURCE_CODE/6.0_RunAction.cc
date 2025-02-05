@@ -229,11 +229,11 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     G4cout 
                     << "  > [" << std::setw(7) << std::left << tissueName << "] "
                     << "Mass: " 
-                    << "\033[1m" << std::setw(8) << std::left << std::setprecision(5) << sampleMass/kg << " kg\033[22m"
+                    << "\033[1m" << std::setw(9) << std::left << std::setprecision(4) << sampleMass/kg << " kg\033[22m"
                     << ", Energy Deposition: " 
                     << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(tissueEDep, "Energy") << "\033[22m"
                     << " === Radiation Dose: " 
-                    << "\033[1m" << std::setw(9) << std::left << std::setprecision(6) << G4BestUnit(radiationDose, "Dose") << "\033[22m" <<
+                    << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(radiationDose, "Dose") << "\033[22m" <<
                     G4endl;
 
                     analysisManager -> FillNtupleSColumn(2, 0, tissueName); // tissueName.c_str()
@@ -265,7 +265,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
             now_tm_1 = std::localtime(&now_end);
             
-            auto duration = std::chrono::duration_cast<std::chrono::seconds>(simulationEndTime - simulationStartTime);
+            auto duration = std::chrono::duration_cast <std::chrono::seconds> (simulationEndTime - simulationStartTime);
             durationInSeconds = duration.count() * second;
 
             G4cout << G4endl;
@@ -288,18 +288,18 @@ void RunAction::MergeDataToMaster()
 {
     if (primaryGenerator) {energyHistogram = primaryGenerator -> GetEnergySpectra();}
     
-    G4MUTEXLOCK(&Mutex_Spectra);
+    G4MUTEXLOCK(& Mutex_Spectra);
     for (const auto & entry : energyHistogram) {masterEnergySpectra[entry.first] += entry.second;}
-    G4MUTEXUNLOCK(&Mutex_Spectra);
+    G4MUTEXUNLOCK(& Mutex_Spectra);
 
     const G4UserSteppingAction * userSteppingAction = G4RunManager::GetRunManager() -> GetUserSteppingAction();
     const SteppingAction * steppingAction = dynamic_cast<const SteppingAction*> (userSteppingAction); 
     
     if (steppingAction){energyDepositionMap = steppingAction -> GetEnergyDepositionMap();}
     
-    G4MUTEXLOCK(&Mutex_EDep);
+    G4MUTEXLOCK(& Mutex_EDep);
     for (const auto & entry : energyDepositionMap) {masterEnergyDeposition[entry.first] += entry.second;}
-    G4MUTEXUNLOCK(&Mutex_EDep);
+    G4MUTEXUNLOCK(& Mutex_EDep);
 }
 
 void RunAction::MergeRootFiles(const std::string & baseName, const std::string & tempDirectory, const std::string & rootDirectory) 

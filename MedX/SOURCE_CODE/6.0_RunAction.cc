@@ -170,7 +170,7 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
 void RunAction::EndOfRunAction(const G4Run * thisRun)
 {  
     accumulableManager -> Merge();
-    MergeEnergySpectra();
+    MergeDataToMaster();
 
     if (isMaster) 
     { 
@@ -284,7 +284,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     if (isMaster && arguments > 1) {MergeRootFiles(baseName, tempDirectory, rootDirectory);}
 }
 
-void RunAction::MergeEnergySpectra()
+void RunAction::MergeDataToMaster()
 {
     if (primaryGenerator) {energyHistogram = primaryGenerator -> GetEnergySpectra();}
     
@@ -294,6 +294,7 @@ void RunAction::MergeEnergySpectra()
 
     const G4UserSteppingAction * userSteppingAction = G4RunManager::GetRunManager() -> GetUserSteppingAction();
     const SteppingAction * steppingAction = dynamic_cast<const SteppingAction*> (userSteppingAction); 
+    
     if (steppingAction){energyDepositionMap = steppingAction -> GetEnergyDepositionMap();}
     
     G4MUTEXLOCK(&Mutex_EDep);

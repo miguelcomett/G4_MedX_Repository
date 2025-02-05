@@ -39,7 +39,7 @@ class RunAction : public G4UserRunAction
         G4Run * GenerateRun() override;
 
         void AddEDep(G4double EDepStepping) {EDepSum += EDepStepping;}
-        void MergeEnergySpectra();
+        void MergeDataToMaster();
         void MergeRootFiles(const std::string & fileName, const std::string & tempDirectory, const std::string & rootDirectory);
 
     private:

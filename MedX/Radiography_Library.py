@@ -47,10 +47,10 @@ def Install_Libraries():
 
     print("All libraries are installed and ready to use.")
 
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 def PlayAlarm():
 
     import pygame
-    os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
     alarm_path = 'Alarm.mp3'
 

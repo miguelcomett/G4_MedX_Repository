@@ -3,15 +3,17 @@
 
 #include <algorithm>
 
-#include "G4UserSteppingAction.hh"
 #include "G4Step.hh"
 #include "G4RunManager.hh"
 
+#include "G4UserSteppingAction.hh"
 #include "3.0_DetectorConstruction.hh"
 #include "6.1_Run.hh"
 #include "7.0_EventAction.hh"
 
 extern int arguments;
+
+class EventAction;
 
 class SteppingAction : public G4UserSteppingAction
 {
@@ -43,8 +45,8 @@ class SteppingAction : public G4UserSteppingAction
         G4LogicalVolume * scoringVolume, * Volume, * currentLogicVolume;
         G4StepPoint * endPoint;
         
-        Run * run;
         G4Track * track;
+        Run * run;
         EventAction * myEventAction;
         const DetectorConstruction * detectorConstruction;
 };

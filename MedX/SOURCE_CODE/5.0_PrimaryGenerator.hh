@@ -5,12 +5,10 @@
 #include <vector>
 #include <fstream>
 #include <ctime>
-
 #include <map>
 #include <cmath>
 
 #include "Randomize.hh"
-#include "G4VUserPrimaryGeneratorAction.hh"
 #include "G4ParticleGun.hh"
 #include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
@@ -18,12 +16,13 @@
 #include "G4PhysicalConstants.hh"
 #include "G4RunManager.hh"
 
+#include "G4VUserPrimaryGeneratorAction.hh"
 #include "3.0_DetectorConstruction.hh"
 #include "6.1_Run.hh"
 #include "5.1_GeneratorMessenger.hh"
 
-class PrimaryGeneratorMessenger;
 class DetectorConstruction;
+class PrimaryGeneratorMessenger;
 
 class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
 {

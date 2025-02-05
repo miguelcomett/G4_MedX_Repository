@@ -17,17 +17,19 @@
 #include <G4RunManager.hh>
 #include <G4AccumulableManager.hh>
 #include "G4UIManager.hh"
-#include "G4UserRunAction.hh"
 #include "G4AnalysisManager.hh"
 #include "G4Run.hh"
 #include "G4Threading.hh"
 
+#include "G4UserRunAction.hh"
 #include "3.0_DetectorConstruction.hh"
 #include "5.0_PrimaryGenerator.hh"
 #include "6.1_Run.hh"
-// #include "8.0_SteppingAction.hh"
 
 extern int arguments;
+
+class EventAction;
+class SteppingAction;
 
 class RunAction : public G4UserRunAction
 {
@@ -50,15 +52,10 @@ class RunAction : public G4UserRunAction
         G4AnalysisManager * analysisManager;
         G4AccumulableManager * accumulableManager;
 
-        Run * customRun = nullptr;
+        Run * customRun;
         const Run * currentRun;
-
-        const PrimaryGenerator * primaryGenerator = static_cast <const PrimaryGenerator*> 
-        (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction());
-        const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> 
-        (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());  
-        // const SteppingAction * steppingAction = static_cast<const SteppingAction*>
-        // (G4RunManager::GetRunManager() -> GetUserSteppingAction()); 
+        const PrimaryGenerator * primaryGenerator = static_cast <const PrimaryGenerator*> (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction());
+        const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());  
 
         G4Accumulable <G4double> EDepSum = 0.0;
         std::vector <G4LogicalVolume*> scoringVolumes;

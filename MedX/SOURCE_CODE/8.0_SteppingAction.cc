@@ -1,6 +1,6 @@
 #include "8.0_SteppingAction.hh"
 
-SteppingAction::SteppingAction(EventAction * eventAction) {myEventAction = eventAction;}
+SteppingAction::SteppingAction() {}
 SteppingAction::~SteppingAction() {}
 
 void SteppingAction::UserSteppingAction(const G4Step * step)
@@ -12,7 +12,6 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
     {track -> SetTrackStatus(fStopAndKill); G4cout << " ERROR: Particle outside world bounds!!!" << G4endl;}
 
     Volume = step -> GetPreStepPoint() -> GetTouchableHandle() -> GetVolume() -> GetLogicalVolume();
-    detectorConstruction = static_cast < const DetectorConstruction *> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
 
     if (arguments == 1 || arguments == 2 || arguments == 5)
     {   
@@ -26,7 +25,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
 
             if (energyDeposition > 0.0) 
             {
-                myEventAction -> AddEDepEvent(energyDeposition);
+                if (runAction) {runAction -> AddEDep(energyDeposition);}
                 energyDepositionMap[volumeName] += energyDeposition;
             }
         }

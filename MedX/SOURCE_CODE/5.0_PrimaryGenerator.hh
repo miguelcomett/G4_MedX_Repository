@@ -21,14 +21,13 @@
 #include "6.1_Run.hh"
 #include "5.1_GeneratorMessenger.hh"
 
-class DetectorConstruction;
 class PrimaryGeneratorMessenger;
 
-class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
+class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
 {
     public:
 
-        PrimaryGenerator(DetectorConstruction * DetectorConstruction);
+        PrimaryGenerator();
         ~PrimaryGenerator();
 
         virtual void GeneratePrimaries(G4Event *);
@@ -56,7 +55,9 @@ class PrimaryGenerator:public G4VUserPrimaryGeneratorAction
 
         G4ParticleGun * particleGun;        
         PrimaryGeneratorMessenger * GeneratorMessenger;
-        DetectorConstruction * detectorConstruction;
+
+        const G4VUserDetectorConstruction * userDetectorConstruction = G4RunManager::GetRunManager() -> GetUserDetectorConstruction();
+        const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> (userDetectorConstruction);
 
         G4ParticleTable * particleTable;
         G4ParticleDefinition * particleName;

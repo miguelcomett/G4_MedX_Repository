@@ -34,13 +34,12 @@ int main(int argc, char** argv)
     long seed = std::time(nullptr);
     CLHEP::HepRandom::setTheSeed(seed);
 
+    PhysicsList          * myPhysicsList          = new PhysicsList();
     DetectorConstruction * myDetectorConstruction = new DetectorConstruction();
-    runManager -> SetUserInitialization(myDetectorConstruction);
+    ActionInitialization * myActionInitilization  = new ActionInitialization();
 
-    PhysicsList * myPhysicsList = new PhysicsList();
     runManager -> SetUserInitialization(myPhysicsList);
-
-    ActionInitialization * myActionInitilization = new ActionInitialization(myDetectorConstruction);
+    runManager -> SetUserInitialization(myDetectorConstruction);
     runManager -> SetUserInitialization(myActionInitilization);
 
     G4UImanager * UImanager = G4UImanager::GetUIpointer();

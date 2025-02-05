@@ -13,13 +13,11 @@
 
 extern int arguments;
 
-class EventAction;
-
 class SteppingAction : public G4UserSteppingAction
 {
     public:
 
-        SteppingAction(EventAction * eventAction);
+        SteppingAction();
         ~ SteppingAction();
 
         virtual void UserSteppingAction(const G4Step *);
@@ -47,8 +45,13 @@ class SteppingAction : public G4UserSteppingAction
         
         G4Track * track;
         Run * run;
-        EventAction * myEventAction;
-        const DetectorConstruction * detectorConstruction;
+
+        const G4VUserDetectorConstruction * userDetectorConstruction = G4RunManager::GetRunManager() -> GetUserDetectorConstruction();
+        const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> (userDetectorConstruction);
+
+        const G4UserRunAction * userRunAction = G4RunManager::GetRunManager() -> GetUserRunAction();
+        const RunAction * constRunAction = dynamic_cast <const RunAction*> (userRunAction);
+        RunAction * runAction = const_cast <RunAction*> (constRunAction);
 };
 
 #endif

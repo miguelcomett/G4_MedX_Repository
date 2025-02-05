@@ -1,9 +1,7 @@
 #include "5.0_PrimaryGenerator.hh"
 
-PrimaryGenerator::PrimaryGenerator(DetectorConstruction * DetectorConstruction)
+PrimaryGenerator::PrimaryGenerator()
 {
-    detectorConstruction = DetectorConstruction;
-
     particleGun = new G4ParticleGun(1);
     particleTable = G4ParticleTable::GetParticleTable();
     particleName = particleTable -> FindParticle("gamma");

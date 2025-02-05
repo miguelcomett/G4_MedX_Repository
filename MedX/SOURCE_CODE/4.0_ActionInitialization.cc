@@ -1,13 +1,9 @@
 #include "4.0_ActionInitialization.hh"
 
-ActionInitialization::ActionInitialization(DetectorConstruction * detector)
-{
-    myDetector = detector;
-}
-
+ActionInitialization::ActionInitialization(){}
 ActionInitialization::~ActionInitialization()
 {
-    delete myGenerator;
+    delete myPrimaryGenerator;
     delete myRunAction;
     delete myEventAction;
     delete mySteppingAction;
@@ -21,15 +17,15 @@ void ActionInitialization::BuildForMaster() const
 
 void ActionInitialization::Build() const
 {
-    PrimaryGenerator * myGenerator = new PrimaryGenerator(myDetector);
-    SetUserAction(myGenerator);
+    PrimaryGenerator * myPrimaryGenerator = new PrimaryGenerator();
+    SetUserAction(myPrimaryGenerator);
     
     RunAction * myRunAction = new RunAction();
     SetUserAction(myRunAction);
-
-    EventAction * myEventAction = new EventAction(myRunAction);
+    
+    EventAction * myEventAction = new EventAction();
     SetUserAction(myEventAction);
-
-    SteppingAction * mySteppingAction = new SteppingAction(myEventAction);
+    
+    SteppingAction * mySteppingAction = new SteppingAction();
     SetUserAction(mySteppingAction);
 }

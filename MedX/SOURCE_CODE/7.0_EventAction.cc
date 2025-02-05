@@ -1,6 +1,6 @@
 #include "7.0_EventAction.hh"
 
-EventAction::EventAction(RunAction * runAction){myRunAction = runAction;}
+EventAction::EventAction(){}
 EventAction::~EventAction(){}
 
 void EventAction::BeginOfEventAction(const G4Event * event) {EDepEvent = 0.0;}
@@ -35,6 +35,4 @@ void EventAction::EndOfEventAction(const G4Event * event)
         std::cout << "\033[32;1m===== Progress: 75% ====== Time: "
         << std::put_time(nowTime3, "%H:%M:%S") << "\033[0m" << std::endl;
     }
-
-    myRunAction -> AddEDep(EDepEvent);
 }

@@ -10,27 +10,20 @@
 
 #include "G4UserEventAction.hh"
 #include "6.0_RunAction.hh"
-#include "6.1_Run.hh"
 
 extern int arguments;
-
-class RunAction;
 
 class EventAction : public G4UserEventAction
 {
     public:
         
-        EventAction(RunAction * runAction);
+        EventAction();
         ~EventAction();
 
         virtual void BeginOfEventAction(const G4Event *);
         virtual void EndOfEventAction  (const G4Event *);
 
-        void AddEDepEvent(G4double EDepStep){EDepEvent = EDepEvent + EDepStep;};
-
     private:
-        
-        RunAction * myRunAction;
         
         G4int totalEvents, eventID;
         G4double EDepEvent;

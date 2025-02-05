@@ -11,8 +11,6 @@
 #include <regex>
 #include <thread>
 
-#include <TFile.h>
-#include <TTree.h>
 #include "Randomize.hh"
 #include <G4RunManager.hh>
 #include <G4AccumulableManager.hh>
@@ -28,9 +26,6 @@
 
 extern int arguments;
 
-class EventAction;
-class SteppingAction;
-
 class RunAction : public G4UserRunAction
 {
     public:
@@ -43,7 +38,7 @@ class RunAction : public G4UserRunAction
 
         G4Run * GenerateRun() override;
 
-        void AddEDep(G4double EDepEvent) {EDepSum += EDepEvent;}
+        void AddEDep(G4double EDepStepping) {EDepSum += EDepStepping;}
         void MergeEnergySpectra();
         void MergeRootFiles(const std::string & fileName, const std::string & tempDirectory, const std::string & rootDirectory);
 
@@ -54,8 +49,12 @@ class RunAction : public G4UserRunAction
 
         Run * customRun;
         const Run * currentRun;
-        const PrimaryGenerator * primaryGenerator = static_cast <const PrimaryGenerator*> (G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction());
-        const DetectorConstruction * detectorConstruction = static_cast <const DetectorConstruction*> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());  
+
+        const G4VUserPrimaryGeneratorAction * userPrimaryGeneratorAction = G4RunManager::GetRunManager() -> GetUserPrimaryGeneratorAction();
+        const PrimaryGenerator * primaryGenerator = dynamic_cast <const PrimaryGenerator*> (userPrimaryGeneratorAction);
+        
+        const G4VUserDetectorConstruction * userDetectorConstruction = G4RunManager::GetRunManager() -> GetUserDetectorConstruction();
+        const DetectorConstruction * detectorConstruction = dynamic_cast <const DetectorConstruction*> (userDetectorConstruction);  
 
         G4Accumulable <G4double> EDepSum = 0.0;
         std::vector <G4LogicalVolume*> scoringVolumes;

@@ -136,12 +136,13 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
         customRun -> SetPrimary(particle, energy);
     }
 
-    currentRun = static_cast<const Run *>(thisRun);
+    currentRun = static_cast <const Run *> (thisRun);
     particleName = currentRun -> GetPrimaryParticleName();
     totalNumberOfEvents = currentRun -> GetNumberOfEventToBeProcessed();
     primaryEnergy = currentRun -> GetPrimaryEnergy();   
     
     if (primaryGenerator) {GunMode = primaryGenerator -> GetGunMode();} 
+    
     if (GunMode == 1) {primaryEnergy = 80;}
     if (GunMode == 2) {primaryEnergy = 140;}
 
@@ -291,7 +292,8 @@ void RunAction::MergeEnergySpectra()
     for (const auto & entry : energyHistogram) {masterEnergySpectra[entry.first] += entry.second;}
     G4MUTEXUNLOCK(&Mutex_Spectra);
 
-    const SteppingAction * steppingAction = static_cast<const SteppingAction*> (G4RunManager::GetRunManager() -> GetUserSteppingAction()); 
+    const G4UserSteppingAction * userSteppingAction = G4RunManager::GetRunManager() -> GetUserSteppingAction();
+    const SteppingAction * steppingAction = dynamic_cast<const SteppingAction*> (userSteppingAction); 
     if (steppingAction){energyDepositionMap = steppingAction -> GetEnergyDepositionMap();}
     
     G4MUTEXLOCK(&Mutex_EDep);

@@ -927,20 +927,20 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
         Mean_Energy = np.array(summary_tree['Initial_Energy_keV'])
         Mean_Energy = Mean_Energy.mean()
 
-    try: print(f"-> Initial Photons in Simulation:  \033[1m{Number_of_Photons:,.2f} M   \033[0m")
+    try: print(f"-> Initial Photons Generated:   \033[1m{Number_of_Photons:,.2f} M   \033[0m")
     except: pass
-    try: print(f"-> Mean Energy of Photons:         \033[1m{Mean_Energy:,.2f} keV       \033[0m")
+    try: print(f"-> Mean Energy of Photons:      \033[1m{Mean_Energy:,.2f} keV       \033[0m")
     except: pass
-    try: print(f"-> Photon's Hit Count in Detector: \033[1m{Number_of_Hits:,.2f} M      \033[0m")
+    try: print(f"-> Photon's Hits in Detector:   \033[1m{Number_of_Hits:,.2f} M      \033[0m")
     except: pass
-    try: print(f"-> Mass of Sample Scanned:         \033[1m{Sample_Mass:,.3f} kg        \033[0m")
+    try: print(f"-> Mass of Sample Scanned:      \033[1m{Sample_Mass:,.3f} kg        \033[0m")
     except: pass
-    try: print(f"-> Energy Deposited in Tissues:    \033[1m{Energy_Deposition:,.3f} TeV \033[0m \n")
+    try: print(f"-> Energy Deposited in Tissues: \033[1m{Energy_Deposition:,.3f} TeV \033[0m \n")
     except: pass
-    try: print(f"-> Total Dose of Radiation:        \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
+    try: print(f"-> Total Dose of Radiation:     \033[1m{Radiation_Dose:,.5f} µSv    \033[0m")
     except: pass
     try: 
-        for organ, dose in Tissue_Dose.items(): print(f"Radiation Dose in {organ}: {dose:.5f} µSv")
+        for organ, dose in Tissue_Dose.items(): print(f"  > Radiation Dose in {organ:>7}:  \033[1m{dose:.5f} µSv \033[0m")
     except: pass
 
 

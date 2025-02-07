@@ -369,16 +369,6 @@ def Simulation_Setup():
 
     return directory, run_sim, root_folder, mac_filepath, rad_folder
 
-def Run_Calibration(directory, run_sim):
-    
-    start_time = time.perf_counter()
-    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-    except Exception as e: print(f"Error running simulation: {e}")
-    end_time = time.perf_counter()
-    calibration_time = end_time - start_time
-
-    return calibration_time
-
 def Generate_MAC_Template(
     simulation_mode,              # Obligarory parameter: 'single (1)' or 'DEXA (2)'
     threads              = None,  # Optional parameter
@@ -457,6 +447,17 @@ def Generate_MAC_Template(
 
     return "\n".join(mac_template)  
 
+def Run_Calibration(directory, run_sim):
+    
+    start_time = time.perf_counter()
+    try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+    
+    end_time = time.perf_counter()
+    calibration_time = end_time - start_time
+
+    return calibration_time
+
 def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
     from tqdm.notebook import tqdm
@@ -496,8 +497,10 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     new_root_name = root_folder/f"{new_base_name}{'_0.root'}"
 
     try: os.rename(old_root_name, new_root_name)
-    except FileNotFoundError: print("The file does not exist.")
-    shutil.move(new_root_name, rad_folder)
+    except FileNotFoundError as error: print("The file does not exist. {error}"); raise
+    
+    try: shutil.move(new_root_name, rad_folder)
+    except OSError as error: print(f"Error moving the file: {error}"); raise
 
     iterations = int(sim_time / iteration_time)
     
@@ -512,12 +515,15 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         if interrupt_flag: print('Exiting'); break
 
         try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
         
         new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
+        
         try: os.rename(old_root_name, new_root_name)
-        except FileNotFoundError: print("The file does not exist.")
-        shutil.move(new_root_name, rad_folder)
+        except FileNotFoundError as error: print("The file does not exist: {error}"); raise
+        
+        try: shutil.move(new_root_name, rad_folder)
+        except OSError as error: print(f"Error moving the file: {error}"); raise
 
     total_beams = int(np.ceil(Beams * iterations / 1000000))
     merged_name = f"{new_base_name}{'_'}{energy_name}{'_'}{str(total_beams)}{'M'}"
@@ -529,10 +535,10 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     merged_name = f"{merged_name}{'.root'}"
 
     with open(os.devnull, "w") as fnull: 
-        with redirect_stdout(fnull), redirect_stderr(fnull):
-            Merge_Roots_HADD(rad_folder, new_base_name, merged_name, trim_coords = None)
+        with redirect_stdout(fnull): Merge_Roots_HADD(rad_folder, new_base_name, merged_name, trim_coords = None)
 
-    shutil.move(rad_folder/merged_name, root_folder)
+    try: shutil.move(rad_folder/merged_name, root_folder)
+    except OSError as error: print(f"Error moving the file: {error}"); raise
     Trash_Folder(rad_folder)
 
     print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
@@ -546,6 +552,7 @@ def Rename_and_Move(root_folder, rad_folder, iteration, spectra_mode):
     if spectra_mode == 'mono' or spectra_mode == 0:
         base_name_40 = 'Rad_40kev'
         base_name_80 = 'Rad_80kev'
+    
     if spectra_mode == 'poly' or spectra_mode == 1:
         base_name_40 = 'Poly_80kvp'
         base_name_80 = 'Poly_140kvp'
@@ -558,27 +565,20 @@ def Rename_and_Move(root_folder, rad_folder, iteration, spectra_mode):
     new_name_80 = root_folder / f"{base_name_80}{'_'}{str(iteration)}{'.root'}"
 
     try: os.rename(file_40, new_name_40)
-    except FileNotFoundError: 
-        print("The file does not exist.")
-        sys.exit()
-    except PermissionError: 
-        print("You do not have permission to rename this file.")
-        sys.exit()
+    except FileNotFoundError as error: print(f"Error: {file_40} does not exist. {error}"); raise
+    except PermissionError as error: print(f"Error: No permission to rename {file_40}. {error}"); raise
 
     try: os.rename(file_80, new_name_80)
-    except FileNotFoundError: 
-        print("The file does not exist.")
-        sys.exit()
-    except PermissionError: 
-        print("You do not have permission to rename this file.")
-        sys.exit()
-
-    if os.path.exists(new_name_40): shutil.move(new_name_40, rad_folder)
-    if os.path.exists(new_name_80): shutil.move(new_name_80, rad_folder)
+    except FileNotFoundError as error: print(f"Error: {file_80} does not exist. {error}"); raise
+    except PermissionError as error: print(f"Error: No permission to rename {file_80}. {error}"); raise
+        
+    try: shutil.move(new_name_40, rad_folder)
+    except OSError as error: print(f"Error moving the file: {error}"); raise
+    try: shutil.move(new_name_80, rad_folder)
+    except OSError as error: print(f"Error moving the file: {error}"); raise
 
     return base_name_40, base_name_80
     
-
 def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
     from tqdm.notebook import tqdm
@@ -623,7 +623,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
         if interrupt_flag: print('Exiting'); break
 
         try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as e: print(f"Error al ejecutar la simulación: {e}")
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
 
         Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
 
@@ -646,8 +646,8 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     merged_80 = f"{merged_80}{'.root'}"
 
     fnull = open(os.devnull, "w")
-    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, base_name_40, merged_40, trim_coords = None)
-    with redirect_stdout(fnull), redirect_stderr(fnull): Merge_Roots_HADD(rad_folder, base_name_80, merged_80, trim_coords = None)
+    with redirect_stdout(fnull): Merge_Roots_HADD(rad_folder, base_name_40, merged_40, trim_coords = None)
+    with redirect_stdout(fnull): Merge_Roots_HADD(rad_folder, base_name_80, merged_80, trim_coords = None)
     fnull.close()
 
     shutil.move(rad_folder/merged_40, root_folder)
@@ -1598,7 +1598,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
         with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
         
         try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as e: print(f"Error during simulation: {e}"); continue  # Skip to the next angle
+        except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
 
         output_name = f"Aang_{angle}"
         if os.path.exists(ct_folder / f"{output_name}.root"):
@@ -1607,12 +1607,12 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
             output_name = root_folder / f"{output_name}_{counter}"
 
         with open(os.devnull, "w") as fnull: 
-            with redirect_stdout(fnull), redirect_stderr(fnull):
-                Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
+            with redirect_stdout(fnull): Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
 
         merged_file_path = root_folder / f"{output_name}.root"
 
-        if os.path.exists(merged_file_path): shutil.move(merged_file_path, ct_folder)
+        try: shutil.move(merged_file_path, ct_folder)
+        except OSError as error: print(f"Error moving file: {error}"); raise
     
     print("Finished Simulating CT")
     if alarm == True: PlayAlarm()

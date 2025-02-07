@@ -14,7 +14,6 @@ if(APPLE)
     configure_file(${_script} ${PROJECT_BINARY_DIR}/${_script_name} COPYONLY)
   endforeach()
 
-
 elseif(WIN32)
  
   if(POLICY CMP0141) # Enable Hot Reload for MSVC compilers if supported
@@ -23,7 +22,6 @@ elseif(WIN32)
         "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
   endif()
   
-
   # Set startup project for Visual Studio
   set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT IFI.03.Radiography)
 
@@ -43,7 +41,6 @@ elseif(WIN32)
   find_package(ROOT REQUIRED)
   include(${ROOT_USE_FILE})
 
-
 else() # General Unix-based system settings if needed (Linux, etc.)
   
   # Copy each script file to the binary directory (for general Unix-like systems)
@@ -52,6 +49,8 @@ else() # General Unix-based system settings if needed (Linux, etc.)
     configure_file(${_script} ${PROJECT_BINARY_DIR}/${_script_name} COPYONLY)
   endforeach()
 endif()
+
+==================================================================================================================================================
 
 # Option to build with Geant4 UI and Visualization
 option(WITH_GEANT4_UIVIS "Build example with Geant4 UI and Vis drivers" ON)
@@ -105,10 +104,8 @@ set(ROOT "${PROJECT_BINARY_DIR}/ROOT_temp")
 add_definitions(-DROOT_OUTPUT_DIR="${ROOT}")
 file(MAKE_DIRECTORY ${ROOT})
 
-
 #find_package(Qt5 REQUIRED Widgets)
 #target_link_libraries(your_target_name Qt5::Widgets)
-
 
 # Custom target for building the main executable
 add_custom_target(IFI.03.Radiography DEPENDS Sim)

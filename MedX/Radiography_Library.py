@@ -331,43 +331,95 @@ def Trash_Folder(trash_folder):
     try: send2trash(trash_folder)
     except Exception as e: print(f"Error deleting trash folder: {e}")
 
-def Simulation_Setup():
+def Compile_Geant4():
+
+    if platform.system() == "Darwin":
+        
+        directory = Path('BUILD')
+        if not os.path.exists(directory): os.makedirs(directory)
+
+        cmake = "cmake .."
+        make = "make -j8"
+
+        print("Building Geant4... ", end="", flush = True)
+        
+        if not os.listdir(directory):
+            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        print("Built successfully.")
+
+    elif platform.system() == "Windows":
+        
+        directory = Path('build') / 'Release'
+        if not os.path.exists(directory): os.makedirs(directory)
+
+        cmake = "cmake .."
+        make = "cmake --build . --config Release"
+
+        print("Building Geant4... ", end = "", flush = True)
+
+        if not os.listdir(directory):
+            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        print("Built successfully.")
+
+    elif platform.system() == "Linux":
+        
+        directory = Path('build') / 'Release'
+        if not os.path.exists(directory): os.makedirs(directory)
+
+        cmake = "cmake .."
+        make = "make -j8"
+
+        print("Building Geant4... ", end = "", flush = True)
+        
+        if not os.listdir(directory):
+            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        print("Built successfully.")
+
+    else: raise EnvironmentError("Unsupported operating system")
+
+def Simulation_Setup(executable_file, mac_filename, temp_folder):
         
     from send2trash import send2trash
     
-    mac_filename = 'radiography.mac'
-    
     if platform.system() == "Darwin":
         directory = Path('BUILD')
-        #  directory = 'BUILD/'
-        executable_file = "Sim"
         run_sim = f"./{executable_file} {mac_filename} . . ."
 
     elif platform.system() == "Windows":
         directory = Path('build') / 'Release'
-        # directory = 'build\\Release\\'
-        executable_file = "Sim.exe"
+        executable_file = f"{executable_file}.exe"
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
-        print(run_sim)
 
     elif platform.system() == "Linux":
-        directory = Path('build') / 'Release'
-        # directory = 'build\\Release\\'
-        executable_file = "Sim.exe"
-        run_sim = fr"./{executable_file} {mac_filename} . . ."
-        print(run_sim)
+        directory = Path('build')
+        run_sim = f"./{executable_file} {mac_filename} . . ."
 
     else: raise EnvironmentError("Unsupported operating system")
 
     root_folder  = directory / "ROOT/"
     mac_filepath = directory / mac_filename
     
-    rad_folder = directory / "ROOT/" / "Rad_temp/"
-    try: send2trash(rad_folder)
+    temp_folder = directory / "ROOT/" / temp_folder
+    try: send2trash(temp_folder)
     except: pass
-    os.makedirs(rad_folder, exist_ok = True)
+    os.makedirs(temp_folder, exist_ok = True)
 
-    return directory, run_sim, root_folder, mac_filepath, rad_folder
+    return directory, run_sim, root_folder, mac_filepath, temp_folder
 
 def Generate_MAC_Template(
     simulation_mode,              # Obligarory parameter: 'single (1)' or 'DEXA (2)'
@@ -467,9 +519,13 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     sim_time = sim_time * 60 # s
     iteration_time = iteration_time * 60 # s 
 
-    energy_name = f"{str(energy)}{'kev'}"
+    Compile_Geant4()
 
-    directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
+    executable_file = 'Sim'
+    mac_filename = 'radiography.mac'
+    temp_folder = 'Rad_temp'
+
+    directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
 
     simulation_mode = 'single'
     mac_template = Generate_MAC_Template(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
@@ -481,25 +537,26 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     
     calibration_time = Run_Calibration(directory, run_sim)
 
-    root_base_name= 'CT'
-
     if spectra_mode == 'mono' or spectra_mode == 0: 
         new_base_name = 'Rad'
+        energy_name = f"{str(energy)}{'kev'}"
 
     if spectra_mode == '80kvp' or spectra_mode == 1: 
         new_base_name = 'Poly'
         energy_name = spectra_mode
+
     if spectra_mode == '140kvp' or spectra_mode == 2: 
         new_base_name = 'Poly'
         energy_name = spectra_mode
 
+    root_base_name = 'CT'
     old_root_name = root_folder/f"{root_base_name}{'_00.root'}"
     new_root_name = root_folder/f"{new_base_name}{'_0.root'}"
 
     try: os.rename(old_root_name, new_root_name)
     except OSError as error: print(f"Error renaming {old_root_name}. {error}"); raise
     
-    try: shutil.move(new_root_name, rad_folder)
+    try: shutil.move(new_root_name, temp_folder)
     except OSError as error: print(f"Error moving {new_root_name}. {error}"); raise
 
     iterations = int(sim_time / iteration_time)
@@ -522,7 +579,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         try: os.rename(old_root_name, new_root_name)
         except OSError as error: print(f"Error renaming {old_root_name}. {error}"); raise
         
-        try: shutil.move(new_root_name, rad_folder)
+        try: shutil.move(new_root_name, temp_folder)
         except OSError as error: print(f"Error moving the file: {error}"); raise
 
     total_beams = int(np.ceil(Beams * iterations / 1000000))
@@ -535,11 +592,11 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     merged_name = f"{merged_name}{'.root'}"
 
     with open(os.devnull, "w") as fnull: 
-        with redirect_stdout(fnull): Merge_Roots_HADD(rad_folder, new_base_name, merged_name, trim_coords = None)
+        with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, new_base_name, merged_name, trim_coords = None)
 
-    try: shutil.move(rad_folder/merged_name, root_folder)
+    try: shutil.move(temp_folder/merged_name, root_folder)
     except OSError as error: print(f"Error moving the file: {error}"); raise
-    Trash_Folder(rad_folder)
+    Trash_Folder(temp_folder)
 
     print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
 
@@ -547,7 +604,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
 # 1.2. ========================================================================================================================================================
 
-def Rename_and_Move(root_folder, rad_folder, iteration, spectra_mode):
+def Rename_and_Move(root_folder, temp_folder, iteration, spectra_mode):
 
     if spectra_mode == 'mono' or spectra_mode == 0:
         base_name_40 = 'Rad_40kev'
@@ -570,9 +627,10 @@ def Rename_and_Move(root_folder, rad_folder, iteration, spectra_mode):
     try: os.rename(file_80, new_name_80)
     except OSError as error: print(f"Error renaming {file_80}. {error}"); raise
         
-    try: shutil.move(new_name_40, rad_folder)
+    try: shutil.move(new_name_40, temp_folder)
     except OSError as error: print(f"Error moving the file: {error}"); raise
-    try: shutil.move(new_name_80, rad_folder)
+
+    try: shutil.move(new_name_80, temp_folder)
     except OSError as error: print(f"Error moving the file: {error}"); raise
 
     return base_name_40, base_name_80
@@ -586,7 +644,13 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     sim_time = sim_time * 60 # s
     iteration_time = iteration_time * 60 # s 
 
-    directory, run_sim, root_folder, mac_filepath, rad_folder = Simulation_Setup()
+    Compile_Geant4()
+
+    executable_file = 'Sim'
+    mac_filename = 'DEXA.mac'
+    temp_folder = 'DEXA_temp'
+
+    directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
 
     simulation_mode = 'DEXA'
     mac_template = Generate_MAC_Template(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
@@ -603,7 +667,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
     calibration_time = Run_Calibration(directory, run_sim)
-    base_name_40, base_name_80  = Rename_and_Move(root_folder, rad_folder, 0, spectra_mode)
+    base_name_40, base_name_80  = Rename_and_Move(root_folder, temp_folder, 0, spectra_mode)
     iterations = int(sim_time / iteration_time)
 
     Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
@@ -623,7 +687,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
         try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
 
-        Rename_and_Move(root_folder, rad_folder, iteration + 1, spectra_mode)
+        Rename_and_Move(root_folder, temp_folder, iteration + 1, spectra_mode)
 
     total_beams_40 = int(np.ceil(Beams40 * iterations / 1_000_000))
     total_beams_80 = int(np.ceil(Beams80 * iterations / 1_000_000))
@@ -644,14 +708,14 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     merged_80 = f"{merged_80}{'.root'}"
 
     fnull = open(os.devnull, "w")
-    with redirect_stdout(fnull): Merge_Roots_HADD(rad_folder, base_name_40, merged_40, trim_coords = None)
-    with redirect_stdout(fnull): Merge_Roots_HADD(rad_folder, base_name_80, merged_80, trim_coords = None)
+    with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, base_name_40, merged_40, trim_coords = None)
+    with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, base_name_80, merged_80, trim_coords = None)
     fnull.close()
 
-    shutil.move(rad_folder/merged_40, root_folder)
-    shutil.move(rad_folder/merged_80, root_folder)
+    shutil.move(temp_folder/merged_40, root_folder)
+    shutil.move(temp_folder/merged_80, root_folder)
 
-    Trash_Folder(rad_folder)
+    Trash_Folder(temp_folder)
 
     print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
     if alarm == True or alarm == 1: PlayAlarm()
@@ -1474,19 +1538,6 @@ def Plotly_Heatmap_2(array, xlim, ylim, title, x_label, y_label, sqr_1_coords, s
 
 # 8.0 ========================================================================================================================================================
 
-def ClearFolder(directory):
-
-    from send2trash import send2trash
-        
-    for file_name in os.listdir(directory):
-
-        if file_name.startswith('CT_') and file_name.endswith('.root'):
-
-            file_path = os.path.join(directory, file_name)
-            # if os.path.isfile(file_path):
-            try: send2trash(file_path)
-            except Exception as e: print(f"Error deleting file {file_path}: {e}")
-
 def Generate_CT_MAC_Template(
     threads              = None,  # Optional parameter
     spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
@@ -1539,33 +1590,15 @@ def Generate_CT_MAC_Template(
 
 def CT_Loop(threads, starts_with, angles, slices, alarm):
 
-    from tqdm.notebook import tqdm
+    from tqdm.notebook import tqdm; from send2trash import send2trash
 
+    Compile_Geant4()
+
+    executable_file = 'Sim'
     mac_filename = 'CT.mac'
-    
-    if platform.system() == "Darwin":
-        directory = Path('BUILD')
-        executable_file = "Sim"
-        run_sim = f"./{executable_file} {mac_filename} . . ."
+    temp_folder = 'Tomography'
 
-    elif platform.system() == "Windows":
-        directory = Path('build') / 'Release'
-        executable_file = "Sim.exe"
-        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
-        print(run_sim)
-
-    elif platform.system() == "Linux":
-        directory = Path('build') / 'Release'
-        executable_file = "Sim.exe"
-        run_sim = fr"./{executable_file} {mac_filename} . . ."
-        print(run_sim)
-
-    else: raise EnvironmentError("Unsupported operating system")
-
-    root_folder = directory / "ROOT/"
-    mac_filepath = directory / mac_filename
-    ct_folder = directory / f"ROOT/CT/"
-    os.makedirs(ct_folder, exist_ok = True)
+    directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
 
     y_start = slices[0]
     y_end = slices[1]
@@ -1578,8 +1611,12 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
 
         if interrupt_flag: print('Exiting'); break
-        
-        ClearFolder(root_folder) # deletes residual files but doesn't delete subfolders
+
+        for file_name in os.listdir(directory):
+            if file_name.startswith('CT_') and file_name.endswith('.root'):
+                file_path = os.path.join(directory, file_name)
+                try: send2trash(file_path)
+                except Exception as error: print(f"Error deleting file {file_path}: {error}")
 
         mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
         
@@ -1599,9 +1636,9 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
         except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
 
         output_name = f"Aang_{angle}"
-        if os.path.exists(ct_folder / f"{output_name}.root"):
+        if os.path.exists(temp_folder / f"{output_name}.root"):
             counter = 0
-            while os.path.exists(ct_folder / f"{output_name}_{counter}.root"): counter = counter + 1
+            while os.path.exists(temp_folder / f"{output_name}_{counter}.root"): counter = counter + 1
             output_name = root_folder / f"{output_name}_{counter}"
 
         with open(os.devnull, "w") as fnull: 
@@ -1609,7 +1646,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
         merged_file_path = root_folder / f"{output_name}.root"
 
-        try: shutil.move(merged_file_path, ct_folder)
+        try: shutil.move(merged_file_path, temp_folder)
         except OSError as error: print(f"Error moving file: {error}"); raise
     
     print("Finished Simulating CT")

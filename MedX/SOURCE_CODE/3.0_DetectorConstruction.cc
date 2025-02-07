@@ -214,15 +214,11 @@ void DetectorConstruction::ConstructThorax()
     G4STL stl; 
     
     #ifdef __APPLE__
-        std::string currentPath = std::filesystem::current_path().string();
-        std::string modelPath = std::filesystem::path(currentPath).parent_path().string() + "/3D_Models/";
+        currentPath = std::filesystem::current_path().string();
+        modelPath = std::filesystem::path(currentPath).parent_path().string() + "/3D_Models/";
     #else
-        // Obtener el directorio actual (donde está el ejecutable, probablemente en "build/Release")
-        std::string currentPath = std::filesystem::current_path().string();
-
-        // Navegar al directorio superior y luego a "ROOT"
-        std::string modelPath = std::filesystem::path(currentPath).parent_path().parent_path().string() + "\\3D_Models\\";
-        //std::string modelPath = "C:\\Users\\conej\\Documents\\Universidad\\Geant4\\Projects\\Models2\\"; // Define el directorio de los modelos 3D
+        currentPath = std::filesystem::current_path().string();
+        modelPath = std::filesystem::path(currentPath).parent_path().parent_path().string() + "\\3D_Models\\";
     #endif
 
     originMatrix = new G4RotationMatrix(0, 0, 0);

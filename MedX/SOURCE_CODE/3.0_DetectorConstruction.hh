@@ -79,6 +79,8 @@ class DetectorConstruction:public G4VUserDetectorConstruction
 
         G4GenericMessenger * DetectorMessenger;
 
+        std::string currentPath, modelPath;
+
         G4int DetectorColumnsCount, DetectorRowsCount, numPores, numTumores;
         
         G4double innerBoneRadius, outerBoneRadius, boneHeight, poreRadius, xWorld, yWorld, zWorld, 

@@ -79,32 +79,99 @@ signal.signal(signal.SIGINT, handle_keyboard_interrupt)
 
 # 0.1 ========================================================================================================================================================
 
-def directories():
-
-    mac_filename = 'Bisection.mac'
+def Compile_Geant4(directory):
 
     if platform.system() == "Darwin":
-        directory = 'BUILD/'
-        executable_file = "Sim"
-        run_sim = f"./{executable_file} {mac_filename} . . ."
+        
+        if not os.path.exists(directory): os.makedirs(directory)
+
+        cmake = "cmake .."
+        make = "make -j8"
+
+        print("Building Geant4... ", end="", flush = True)
+        
+        if not os.listdir(directory):
+            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        print("Built successfully.")
 
     elif platform.system() == "Windows":
-        directory = f"build/Release"
-        executable_file = "Sim.exe"
-        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
-        print(run_sim)
+        
+        if not os.path.exists(directory): os.makedirs(directory)
+
+        cmake = "cmake .."
+        make = "cmake --build . --config Release"
+
+        print("Building Geant4... ", end = "", flush = True)
+
+        if not os.listdir(directory):
+            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        print("Built successfully.")
 
     elif platform.system() == "Linux":
-        directory = f"build/Release"
-        executable_file = "Sim.exe"
-        run_sim = fr"./{executable_file} {mac_filename} . . ."
-        print(run_sim)
+        
+        if not os.path.exists(directory): os.makedirs(directory)
+
+        cmake = "cmake .."
+        make = "make -j8"
+
+        print("Building Geant4... ", end = "", flush = True)
+        
+        if not os.listdir(directory):
+            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        
+        print("Built successfully.")
 
     else: raise EnvironmentError("Unsupported operating system")
 
-    return directory, mac_filename, run_sim
+def Simulation_Setup(executable_file, mac_filename, temp_folder):
+        
+    from send2trash import send2trash
+    
+    if platform.system() == "Darwin":
+        directory = Path('BUILD')
+        run_sim = f"./{executable_file} {mac_filename} . . ."
 
-def Create_MAC_Template(threads):
+    elif platform.system() == "Windows":
+        directory = Path('build') / 'Release'
+        executable_file = f"{executable_file}.exe"
+        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
+
+    elif platform.system() == "Linux":
+        directory = Path('build')
+        run_sim = f"./{executable_file} {mac_filename} . . ."
+
+    else: raise EnvironmentError("Unsupported operating system")
+
+    root_folder  = directory / "ROOT/"
+    mac_filepath = directory / mac_filename
+
+    if temp_folder:
+        temp_folder = directory / "ROOT/" / temp_folder
+        try: send2trash(temp_folder)
+        except: pass
+        os.makedirs(temp_folder, exist_ok = True)
+
+    Compile_Geant4(directory)
+
+    return directory, run_sim, root_folder, mac_filepath, temp_folder
+
+# 0.2 ========================================================================================================================================================
+
+def MAC_Template_AttCoeff(threads):
 
     mac_template = []
 
@@ -121,9 +188,7 @@ def Create_MAC_Template(threads):
 
     return mac_template
 
-# 2.1 ========================================================================================================================================================
-
-def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector):
+def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, mac_filepath, run_sim, tree_name, branch_1, branch_2, energies_vector):
     
     import tqdm as tqdm, uproot
     
@@ -166,9 +231,8 @@ def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, ma
                 thickness = (thickness_0 + thickness_1) / 2
                 counter_4 = 1 
 
-            mac_template = Create_MAC_Template(threads)
+            mac_template = MAC_Template_AttCoeff(threads)
 
-            mac_filepath = os.path.join(directory, mac_filename)
             mac_content = mac_template.format(energy = energy, thickness = thickness, beam_count = beam_count)
             with open(mac_filepath, 'w') as f: f.write(mac_content)
 
@@ -229,31 +293,41 @@ def Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, ma
         results_df = pd.DataFrame(results)
         results_df.to_csv(output_file, index=False)
 
-def BisectionEnergiesNIST(threads, root_filename, outputcsv_name, root_structure, input_csv, tolerance):
+def BisectionEnergiesNIST(threads, outputcsv_name, root_structure, input_csv, tolerance):
 
-    directory, mac_filename, run_sim = directories()
+    executable_file = 'Sim'
+    root_base_name = 'AttCoeff.root'
+    mac_filename = 'Bisection.mac'
+    temp_folder = None
+
+    directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
 
     tree_name = root_structure[0]
     branch_1 = root_structure[1]
     branch_2 = root_structure[2]
     
-    root_path = os.path.join(directory + 'ROOT/' + root_filename)
-    output_file = os.path.join(directory + 'ROOT/' + outputcsv_name)
+    root_path = os.path.join(directory + 'ROOT/' + root_base_name)
+    output_csv = os.path.join(directory + 'ROOT/' + outputcsv_name)
     input_file  = os.path.join(directory + 'ROOT/' + input_csv)
     energies_table = pd.read_csv(input_file)
 
     energies_vector = energies_table['Energy']
 
-    Loop_for_Bisection(threads, root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
+    Loop_for_Bisection(threads, root_path, output_csv, tolerance, directory, mac_filepath, run_sim, tree_name, branch_1, branch_2, energies_vector)
     
     print('Finished Bisection')
 
-def BisectionFixedEnergyStep(threads, root_filename, output_file, root_structure, energies, tolerance):
-    
-    directory, mac_filename, run_sim = directories()
+def BisectionFixedEnergyStep(threads, output_csv, root_structure, energies, tolerance):
 
-    root_path = os.path.join(directory + 'ROOT/' + root_filename)
-    output_file = os.path.join(directory + 'ROOT/' + output_file)
+    executable_file = 'Sim'
+    root_base_name = 'AttCoeff.root'
+    mac_filename = 'Bisection.mac'
+    temp_folder = None
+
+    directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
+
+    root_path = os.path.join(directory + 'ROOT/' + root_base_name)
+    output_csv = os.path.join(directory + 'ROOT/' + output_csv)
 
     tree_name = root_structure[0]
     branch_1 = root_structure[1]
@@ -265,7 +339,7 @@ def BisectionFixedEnergyStep(threads, root_filename, output_file, root_structure
 
     energies_vector = np.arange(initial_energy, final_energy, energy_step)
 
-    Loop_for_Bisection(threads,root_path, output_file, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
+    Loop_for_Bisection(threads,root_path, output_csv, tolerance, directory, mac_filename, run_sim, tree_name, branch_1, branch_2, energies_vector)
 
     print('Finished Bisection')
 
@@ -331,97 +405,7 @@ def Trash_Folder(trash_folder):
     try: send2trash(trash_folder)
     except Exception as e: print(f"Error deleting trash folder: {e}")
 
-def Compile_Geant4():
-
-    if platform.system() == "Darwin":
-        
-        directory = Path('BUILD')
-        if not os.path.exists(directory): os.makedirs(directory)
-
-        cmake = "cmake .."
-        make = "make -j8"
-
-        print("Building Geant4... ", end="", flush = True)
-        
-        if not os.listdir(directory):
-            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        print("Built successfully.")
-
-    elif platform.system() == "Windows":
-        
-        directory = Path('build') / 'Release'
-        if not os.path.exists(directory): os.makedirs(directory)
-
-        cmake = "cmake .."
-        make = "cmake --build . --config Release"
-
-        print("Building Geant4... ", end = "", flush = True)
-
-        if not os.listdir(directory):
-            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        print("Built successfully.")
-
-    elif platform.system() == "Linux":
-        
-        directory = Path('build') / 'Release'
-        if not os.path.exists(directory): os.makedirs(directory)
-
-        cmake = "cmake .."
-        make = "make -j8"
-
-        print("Building Geant4... ", end = "", flush = True)
-        
-        if not os.listdir(directory):
-            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        print("Built successfully.")
-
-    else: raise EnvironmentError("Unsupported operating system")
-
-def Simulation_Setup(executable_file, mac_filename, temp_folder):
-        
-    from send2trash import send2trash
-    
-    if platform.system() == "Darwin":
-        directory = Path('BUILD')
-        run_sim = f"./{executable_file} {mac_filename} . . ."
-
-    elif platform.system() == "Windows":
-        directory = Path('build') / 'Release'
-        executable_file = f"{executable_file}.exe"
-        run_sim = fr".\{executable_file} .\{mac_filename} . . ."
-
-    elif platform.system() == "Linux":
-        directory = Path('build')
-        run_sim = f"./{executable_file} {mac_filename} . . ."
-
-    else: raise EnvironmentError("Unsupported operating system")
-
-    root_folder  = directory / "ROOT/"
-    mac_filepath = directory / mac_filename
-    
-    temp_folder = directory / "ROOT/" / temp_folder
-    try: send2trash(temp_folder)
-    except: pass
-    os.makedirs(temp_folder, exist_ok = True)
-
-    return directory, run_sim, root_folder, mac_filepath, temp_folder
-
-def Generate_MAC_Template(
+def MAC_Template_Radiography(
     simulation_mode,              # Obligarory parameter: 'single (1)' or 'DEXA (2)'
     threads              = None,  # Optional parameter
     spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
@@ -519,16 +503,15 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     sim_time = sim_time * 60 # s
     iteration_time = iteration_time * 60 # s 
 
-    Compile_Geant4()
-
     executable_file = 'Sim'
+    root_base_name = 'CT'
     mac_filename = 'radiography.mac'
     temp_folder = 'Rad_temp'
 
     directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
 
     simulation_mode = 'single'
-    mac_template = Generate_MAC_Template(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
+    mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
     
     Beams_calibration = 2500000
 
@@ -549,7 +532,6 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         new_base_name = 'Poly'
         energy_name = spectra_mode
 
-    root_base_name = 'CT'
     old_root_name = root_folder/f"{root_base_name}{'_00.root'}"
     new_root_name = root_folder/f"{new_base_name}{'_0.root'}"
 
@@ -644,8 +626,6 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     sim_time = sim_time * 60 # s
     iteration_time = iteration_time * 60 # s 
 
-    Compile_Geant4()
-
     executable_file = 'Sim'
     mac_filename = 'DEXA.mac'
     temp_folder = 'DEXA_temp'
@@ -653,7 +633,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, temp_folder)
 
     simulation_mode = 'DEXA'
-    mac_template = Generate_MAC_Template(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
+    mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
 
     if spectra_mode == 'mono' or spectra_mode == 0:
         Beams40_calibration = 2000000
@@ -1538,7 +1518,7 @@ def Plotly_Heatmap_2(array, xlim, ylim, title, x_label, y_label, sqr_1_coords, s
 
 # 8.0 ========================================================================================================================================================
 
-def Generate_CT_MAC_Template(
+def MAC_Template_CT(
     threads              = None,  # Optional parameter
     spectra_mode         = None,  # Optional parameter:   'mono (1)'   or 'poly (2)'
     detector_parameters  = None,  # Optional parameter
@@ -1592,8 +1572,6 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     from tqdm.notebook import tqdm; from send2trash import send2trash
 
-    Compile_Geant4()
-
     executable_file = 'Sim'
     mac_filename = 'CT.mac'
     temp_folder = 'Tomography'
@@ -1618,7 +1596,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
                 try: send2trash(file_path)
                 except Exception as error: print(f"Error deleting file {file_path}: {error}")
 
-        mac_template = Generate_CT_MAC_Template(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
+        mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
         
         beam_lines = ""
         for y in range(y_start, y_end + 1, step): 

@@ -497,10 +497,10 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     new_root_name = root_folder/f"{new_base_name}{'_0.root'}"
 
     try: os.rename(old_root_name, new_root_name)
-    except FileNotFoundError as error: print("The file does not exist. {error}"); raise
+    except OSError as error: print(f"Error renaming {old_root_name}. {error}"); raise
     
     try: shutil.move(new_root_name, rad_folder)
-    except OSError as error: print(f"Error moving the file: {error}"); raise
+    except OSError as error: print(f"Error moving {new_root_name}. {error}"); raise
 
     iterations = int(sim_time / iteration_time)
     
@@ -520,7 +520,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
         
         try: os.rename(old_root_name, new_root_name)
-        except FileNotFoundError as error: print("The file does not exist: {error}"); raise
+        except OSError as error: print(f"Error renaming {old_root_name}. {error}"); raise
         
         try: shutil.move(new_root_name, rad_folder)
         except OSError as error: print(f"Error moving the file: {error}"); raise
@@ -565,12 +565,10 @@ def Rename_and_Move(root_folder, rad_folder, iteration, spectra_mode):
     new_name_80 = root_folder / f"{base_name_80}{'_'}{str(iteration)}{'.root'}"
 
     try: os.rename(file_40, new_name_40)
-    except FileNotFoundError as error: print(f"Error: {file_40} does not exist. {error}"); raise
-    except PermissionError as error: print(f"Error: No permission to rename {file_40}. {error}"); raise
+    except OSError as error: print(f"Error renaming {file_40}. {error}"); raise
 
     try: os.rename(file_80, new_name_80)
-    except FileNotFoundError as error: print(f"Error: {file_80} does not exist. {error}"); raise
-    except PermissionError as error: print(f"Error: No permission to rename {file_80}. {error}"); raise
+    except OSError as error: print(f"Error renaming {file_80}. {error}"); raise
         
     try: shutil.move(new_name_40, rad_folder)
     except OSError as error: print(f"Error moving the file: {error}"); raise

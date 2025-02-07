@@ -50,7 +50,7 @@ else() # General Unix-based system settings if needed (Linux, etc.)
   endforeach()
 endif()
 
-==================================================================================================================================================
+# ==================================================================================================================================================
 
 # Option to build with Geant4 UI and Visualization
 option(WITH_GEANT4_UIVIS "Build example with Geant4 UI and Vis drivers" ON)

@@ -67,13 +67,10 @@ def PlayAlarm():
     # input("Press Enter to stop the alarm...")
     pygame.mixer.music.stop()
 
-interrupt_flag = False
+global interrupt_flag
 def handle_keyboard_interrupt(sig, frame):
-    global interrupt_flag
-    if interrupt_flag: print('Second keyboard interrupt received. Exiting...'); sys.exit(1)
-    if not interrupt_flag: 
-        print("\nKeyboard Interrupt caught! Finishing current iteration...\n")
-        interrupt_flag = True
+    if interrupt_flag:     print('Second keyboard interrupt received. Exiting...'); sys.exit(1)
+    if not interrupt_flag: print("\nKeyboard Interrupt caught! Finishing current iteration...\n"); interrupt_flag = True
 
 signal.signal(signal.SIGINT, handle_keyboard_interrupt)
 
@@ -88,17 +85,13 @@ def Compile_Geant4(directory):
         cmake = "cmake .."
         make = "make -j8"
 
-        print("Building Geant4... ", end="", flush = True)
+    elif platform.system() == "Linux":
         
-        if not os.listdir(directory):
-            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        print("Built successfully.")
+        if not os.path.exists(directory): os.makedirs(directory)
 
+        cmake = "cmake .."
+        make = "make -j8"
+    
     elif platform.system() == "Windows":
         
         if not os.path.exists(directory): os.makedirs(directory)
@@ -106,36 +99,18 @@ def Compile_Geant4(directory):
         cmake = "cmake .."
         make = "cmake --build . --config Release"
 
-        print("Building Geant4... ", end = "", flush = True)
-
-        if not os.listdir(directory):
-            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        print("Built successfully.")
-
-    elif platform.system() == "Linux":
-        
-        if not os.path.exists(directory): os.makedirs(directory)
-
-        cmake = "cmake .."
-        make = "make -j8"
-
-        print("Building Geant4... ", end = "", flush = True)
-        
-        if not os.listdir(directory):
-            try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        print("Built successfully.")
-
     else: raise EnvironmentError("Unsupported operating system")
+    
+    print("Building Geant4... ", end = "", flush = True)
+    
+    if not os.listdir(directory):
+        try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+    
+    try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+    except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+    
+    print("Built successfully.")
 
 def Simulation_Setup(executable_file, mac_filename, temp_folder):
         
@@ -145,14 +120,14 @@ def Simulation_Setup(executable_file, mac_filename, temp_folder):
         directory = Path('BUILD')
         run_sim = f"./{executable_file} {mac_filename} . . ."
 
+    elif platform.system() == "Linux":
+        directory = Path('build')
+        run_sim = f"./{executable_file} {mac_filename} . . ."
+
     elif platform.system() == "Windows":
         directory = Path('build') / 'Release'
         executable_file = f"{executable_file}.exe"
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
-
-    elif platform.system() == "Linux":
-        directory = Path('build')
-        run_sim = f"./{executable_file} {mac_filename} . . ."
 
     else: raise EnvironmentError("Unsupported operating system")
 
@@ -1996,132 +1971,3 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
     print(f"Written DICOMS to {directory}")
 
 # end ========================================================================================================================================================
-
-
-
-
-
-# Deprecated ========================================================================================================================================================
-
-def ModifyRoot(directory, root_name, tree_name, branch_names, output_name, new_tree_name, new_branch_names):
-
-    import uproot; import uproot.writing; import os
-
-    input_file = directory + root_name + '.root'
-    with uproot.open(input_file) as file:       
-        tree = file[tree_name]
-        branches = tree.arrays(branch_names, library="np")
-        
-    output_file = directory + output_name
-    counter = 1
-    while True:
-        if not os.path.exists(f"{output_file}{counter}.root"):
-            output_file = f"{output_file}{counter}.root"
-            break
-        counter = counter + 1
-
-    with uproot.recreate(output_file) as new_file:
-        new_file[new_tree_name] = {new_branch_names[0]: branches[branch_names[0]],
-                                   new_branch_names[1]: branches[branch_names[1]]}
-
-def LogaritmicTransformation(radiographs, pixel_size, sigma):
-    
-    import matplotlib.pyplot as plt; from scipy import ndimage; from tqdm import tqdm
-
-    htmps = np.zeros(len(radiographs), dtype = 'object')
-
-    for i, radiograph in tqdm(enumerate(radiographs), desc = 'Computing logarithmic transformation', unit = ' Heatmaps', leave = True):
-        radiograph = ndimage.gaussian_filter(radiograph, sigma)
-        maxi = np.max(radiograph)
-        htmps[i][htmps[i] == 0] = np.nan
-        htmps[i] = np.log(maxi/radiograph) / (pixel_size * 0.1)
-
-    plt.imshow(htmps[-1]); plt.colorbar(); plt.show()
-
-    return htmps
-
-def MergeRoots(directory, starts_with, output_name):
-
-    import uproot; from tqdm import tqdm
-
-    trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
-
-    with uproot.recreate(merged_file) as f_out:
-        
-        for file in tqdm(file_list, desc="Merging ROOT files", unit="file"):
-            
-            with uproot.open(file) as root_in:
-                
-                for key in root_in.keys():
-                    
-                    base_key = key.split(';')[0]  # Obtener el nombre base sin número de ciclo
-                    obj = root_in[key]
-
-                    if isinstance(obj, uproot.TTree):
-
-                        for new_data in obj.iterate(library="np", step_size="10 MB"):
-
-                            if base_key in f_out: f_out[base_key].extend(new_data)
-                            else: f_out[base_key] = new_data
-
-    print("Archivo final creado en:", merged_file)
-
-def MergeRootsParallel(directory, starts_with, output_name, trim_coords):
-    
-    import uproot; from tqdm import tqdm; from concurrent.futures import ThreadPoolExecutor; import threading
-
-    max_workers = 100
-    
-    trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
-
-    lock = threading.Lock() # Crear un lock para el acceso a f_out
-
-    with uproot.recreate(merged_file) as f_out:
-        
-        with ThreadPoolExecutor(max_workers = max_workers) as executor:
-            
-            futures = [executor.submit(ProcessMerging, file, f_out, lock, trim_coords = trim_coords) for file in file_list]
-            for future in tqdm(futures, desc = "Merging ROOT files", unit = "file"): future.result()
-
-    Trash_Folder(trash_folder)
-    print("Archivo final creado en:", merged_file)
-
-def ProcessMerging(file, root_out, lock, trim_coords):
-
-    import uproot
-
-    step_size = "50 MB"
-    
-    with uproot.open(file) as root_in:
-        
-        for key in root_in.keys():
-            base_key = key.split(';')[0]
-            obj = root_in[key]
-
-            if base_key == "Hits" and isinstance(obj, uproot.TTree):
-                
-                for new_data in obj.iterate(["x_ax", "y_ax"], library="np", step_size=step_size):
-                    
-                    if trim_coords:
-                        x_min, x_max, y_min, y_max = trim_coords
-                        mask = ((new_data['x_ax'] >= x_min) & (new_data['x_ax'] <= x_max) & (new_data['y_ax'] >= y_min) & (new_data['y_ax'] <= y_max))
-                        if mask.sum() == 0: print("No data after filtering. Skipping chunk."); continue
-                        new_data = {key: value[mask] for key, value in new_data.items()}
-                    
-                    with lock: # Lock para asegurar que la escritura en f_out sea thread-safe
-                        
-                        if base_key in root_out: root_out[base_key].extend(new_data)
-                        else: root_out[base_key] = new_data
-
-            elif base_key == "Run Summary" and isinstance(obj, uproot.TTree):
-                
-                for summary_data in obj.iterate(library="np", step_size=step_size):
-                    
-                    with lock:
-                        
-                        if base_key in root_out: root_out[base_key].extend(summary_data)
-                        else: root_out[base_key] = summary_data
-            
-            else: print(f"Skipping unrecognized tree or object: {base_key}")
-
-# ===========================================================================================================================================================================

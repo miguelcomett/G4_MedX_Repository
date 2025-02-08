@@ -59,20 +59,9 @@ def PlayAlarm():
 
     pygame.mixer.init()
     pygame.mixer.music.load(alarm_path)
-
-    # print("Script completed. Playing alarm...")
     pygame.mixer.music.play(loops = -1) 
-
-    time.sleep(6)
-    # input("Press Enter to stop the alarm...")
+    time.sleep(5)
     pygame.mixer.music.stop()
-
-global interrupt_flag
-def handle_keyboard_interrupt(sig, frame):
-    if interrupt_flag:     print('Second keyboard interrupt received. Exiting...'); sys.exit(1)
-    if not interrupt_flag: print("\nKeyboard Interrupt caught! Finishing current iteration...\n"); interrupt_flag = True
-
-signal.signal(signal.SIGINT, handle_keyboard_interrupt)
 
 # 0.1 ========================================================================================================================================================
 
@@ -101,7 +90,7 @@ def Compile_Geant4(directory):
 
     else: raise EnvironmentError("Unsupported operating system")
     
-    print("Building Geant4... ", end = "", flush = True)
+    print("-> Building Geant4... ", end = "", flush = True)
     
     if not os.listdir(directory):
         try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
@@ -460,14 +449,43 @@ def MAC_Template_Radiography(
 
 def Run_Calibration(directory, run_sim):
     
+    print("-> Running Calibration... ", end = "", flush = True)
     start_time = time.perf_counter()
     try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
     
     end_time = time.perf_counter()
     calibration_time = end_time - start_time
+    print(f"Finished. ", end = '', flush = True)
 
     return calibration_time
+
+def button_text():
+   
+    import ipywidgets as widgets
+    from IPython.display import display
+    import time
+    import threading
+
+    global pause_flag
+    pause_flag = threading.Event()
+    pause_flag.set()  
+
+    def toggle_pause(change):
+        print("Paused.")
+        # if pause_flag.is_set():
+        #     pause_flag.clear()
+        # else:
+        #     pause_flag.set()
+        #     print("Resuming execution...")
+
+    pause_button = widgets.Button(description="Pause/Resume")
+    pause_button.on_click(toggle_pause)
+    display(pause_button)
+
+    for i in range(100):
+        time.sleep(1)
+        print(i)
 
 def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
@@ -488,7 +506,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     simulation_mode = 'single'
     mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
     
-    Beams_calibration = 2500000
+    Beams_calibration = 250
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -519,14 +537,12 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     iterations = int(sim_time / iteration_time)
     
     Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
-    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M.")
+    print(f"Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M.")
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
-        
-        if interrupt_flag: print('Exiting'); break
 
         try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
@@ -630,14 +646,12 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     Beams40_str = f"{round(Beams40 * iterations / 1_000_000, 2)}M"
     Beams80_str = f"{round(Beams80 * iterations / 1_000_000, 2)}M"
-    print(f"-> Calibration Run Completed. Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
+    print(f"Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
     
     for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
-
-        if interrupt_flag: print('Exiting'); break
 
         try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
@@ -1562,8 +1576,6 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     print(f"Calculating Projections {angle_step_str}.")
     
     for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
-
-        if interrupt_flag: print('Exiting'); break
 
         for file_name in os.listdir(directory):
             if file_name.startswith('CT_') and file_name.endswith('.root'):

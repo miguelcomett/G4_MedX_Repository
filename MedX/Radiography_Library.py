@@ -460,33 +460,6 @@ def Run_Calibration(directory, run_sim):
 
     return calibration_time
 
-def button_text():
-   
-    import ipywidgets as widgets
-    from IPython.display import display
-    import time
-    import threading
-
-    global pause_flag
-    pause_flag = threading.Event()
-    pause_flag.set()  
-
-    def toggle_pause(change):
-        print("Paused.")
-        # if pause_flag.is_set():
-        #     pause_flag.clear()
-        # else:
-        #     pause_flag.set()
-        #     print("Resuming execution...")
-
-    pause_button = widgets.Button(description="Pause/Resume")
-    pause_button.on_click(toggle_pause)
-    display(pause_button)
-
-    for i in range(100):
-        time.sleep(1)
-        print(i)
-
 def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
     from tqdm.notebook import tqdm
@@ -506,7 +479,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     simulation_mode = 'single'
     mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
     
-    Beams_calibration = 250
+    Beams_calibration = 2_500_000
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -542,38 +515,41 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+    try: 
+        
+        for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
 
-        try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-        
-        new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
-        
-        try: os.rename(old_root_name, new_root_name)
-        except OSError as error: print(f"Error renaming {old_root_name}. {error}"); raise
-        
-        try: shutil.move(new_root_name, temp_folder)
+            try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+            
+            new_root_name = root_folder / f"{new_base_name}{'_'}{str(iteration + 1)}{'.root'}"
+            
+            try: os.rename(old_root_name, new_root_name)
+            except OSError as error: print(f"Error renaming {old_root_name}. {error}"); raise
+            
+            try: shutil.move(new_root_name, temp_folder)
+            except OSError as error: print(f"Error moving the file: {error}"); raise
+
+    finally:
+
+        total_beams = int(np.ceil(Beams * iterations / 1000000))
+        merged_name = f"{new_base_name}{'_'}{energy_name}{'_'}{str(total_beams)}{'M'}"
+
+        if os.path.exists(root_folder / f"{merged_name}{'.root'}"):
+            counter = 1
+            while os.path.exists(root_folder / f"{merged_name}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
+            merged_name = f"{merged_name}{'_'}{str(counter)}"
+        merged_name = f"{merged_name}{'.root'}"
+
+        with open(os.devnull, "w") as fnull: 
+            with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, new_base_name, merged_name, trim_coords = None)
+
+        try: shutil.move(temp_folder/merged_name, root_folder)
         except OSError as error: print(f"Error moving the file: {error}"); raise
+        Trash_Folder(temp_folder)
 
-    total_beams = int(np.ceil(Beams * iterations / 1000000))
-    merged_name = f"{new_base_name}{'_'}{energy_name}{'_'}{str(total_beams)}{'M'}"
-
-    if os.path.exists(root_folder / f"{merged_name}{'.root'}"):
-        counter = 1
-        while os.path.exists(root_folder / f"{merged_name}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
-        merged_name = f"{merged_name}{'_'}{str(counter)}"
-    merged_name = f"{merged_name}{'.root'}"
-
-    with open(os.devnull, "w") as fnull: 
-        with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, new_base_name, merged_name, trim_coords = None)
-
-    try: shutil.move(temp_folder/merged_name, root_folder)
-    except OSError as error: print(f"Error moving the file: {error}"); raise
-    Trash_Folder(temp_folder)
-
-    print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
-
-    if alarm == True or alarm == 1: PlayAlarm()
+        print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
+        if alarm == True or alarm == 1: PlayAlarm()
 
 # 1.2. ========================================================================================================================================================
 
@@ -651,43 +627,47 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
     
-    for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+    try:
 
-        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
 
-        Rename_and_Move(root_folder, temp_folder, iteration + 1, spectra_mode)
+            try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
 
-    total_beams_40 = int(np.ceil(Beams40 * iterations / 1_000_000))
-    total_beams_80 = int(np.ceil(Beams80 * iterations / 1_000_000))
+            Rename_and_Move(root_folder, temp_folder, iteration + 1, spectra_mode)
 
-    merged_40 = f"{base_name_40}{'_'}{str(total_beams_40)}{'M'}"
-    merged_80 = f"{base_name_80}{'_'}{str(total_beams_80)}{'M'}"
+    finally:
 
-    if os.path.exists(root_folder / f"{merged_40}{'.root'}"):
-        counter = 1
-        while os.path.exists(root_folder / f"{merged_40}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
-        merged_40 = f"{merged_40}{'_'}{str(counter)}"
-    merged_40 = f"{merged_40}{'.root'}"
+        total_beams_40 = int(np.ceil(Beams40 * iterations / 1_000_000))
+        total_beams_80 = int(np.ceil(Beams80 * iterations / 1_000_000))
 
-    if os.path.exists(root_folder / f"{merged_80}{'.root'}"):
-        counter = 1
-        while os.path.exists(root_folder / f"{merged_80}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
-        merged_80 = f"{merged_80}{'_'}{str(counter)}"
-    merged_80 = f"{merged_80}{'.root'}"
+        merged_40 = f"{base_name_40}{'_'}{str(total_beams_40)}{'M'}"
+        merged_80 = f"{base_name_80}{'_'}{str(total_beams_80)}{'M'}"
 
-    fnull = open(os.devnull, "w")
-    with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, base_name_40, merged_40, trim_coords = None)
-    with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, base_name_80, merged_80, trim_coords = None)
-    fnull.close()
+        if os.path.exists(root_folder / f"{merged_40}{'.root'}"):
+            counter = 1
+            while os.path.exists(root_folder / f"{merged_40}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
+            merged_40 = f"{merged_40}{'_'}{str(counter)}"
+        merged_40 = f"{merged_40}{'.root'}"
 
-    shutil.move(temp_folder/merged_40, root_folder)
-    shutil.move(temp_folder/merged_80, root_folder)
+        if os.path.exists(root_folder / f"{merged_80}{'.root'}"):
+            counter = 1
+            while os.path.exists(root_folder / f"{merged_80}{'_'}{str(counter)}{'.root'}"): counter = counter + 1
+            merged_80 = f"{merged_80}{'_'}{str(counter)}"
+        merged_80 = f"{merged_80}{'.root'}"
 
-    Trash_Folder(temp_folder)
+        fnull = open(os.devnull, "w")
+        with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, base_name_40, merged_40, trim_coords = None)
+        with redirect_stdout(fnull): Merge_Roots_HADD(temp_folder, base_name_80, merged_80, trim_coords = None)
+        fnull.close()
 
-    print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
-    if alarm == True or alarm == 1: PlayAlarm()
+        shutil.move(temp_folder/merged_40, root_folder)
+        shutil.move(temp_folder/merged_80, root_folder)
+
+        Trash_Folder(temp_folder)
+
+        print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
+        if alarm == True or alarm == 1: PlayAlarm()
 
 def UI_RunDEXA():
 
@@ -1559,7 +1539,7 @@ def MAC_Template_CT(
 
 def CT_Loop(threads, starts_with, angles, slices, alarm):
 
-    from tqdm.notebook import tqdm; from send2trash import send2trash
+    from tqdm.notebook import tqdm
 
     executable_file = 'Sim'
     mac_filename = 'CT.mac'
@@ -1580,8 +1560,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
         for file_name in os.listdir(directory):
             if file_name.startswith('CT_') and file_name.endswith('.root'):
                 file_path = os.path.join(directory, file_name)
-                try: send2trash(file_path)
-                except Exception as error: print(f"Error deleting file {file_path}: {error}")
+                Trash_Folder(file_path)
 
         mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
         
@@ -1983,3 +1962,77 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
     print(f"Written DICOMS to {directory}")
 
 # end ========================================================================================================================================================
+
+
+
+
+
+
+import ipywidgets as widgets
+from IPython.display import display
+import time
+import threading
+from tqdm import tqdm
+
+pause_flag = threading.Event()
+pause_flag.set()  # Initially set to "running" state
+
+stop_flag = threading.Event()  # Used to stop execution completely
+
+output_message = widgets.Output()  # For "Paused"/"Resumed"/"Stopped" messages
+output_time = widgets.Output()  # For elapsed time display
+
+def toggle_pause(change):
+    
+    with output_message: 
+        output_message.clear_output(wait=True)
+        if pause_flag.is_set(): print("Paused."); pause_flag.clear()
+        else: print("Resumed."); pause_flag.set()
+
+def stop_execution(change):
+    
+    with output_message:
+        output_message.clear_output(wait=True)
+        print("Stopping execution...")
+    stop_flag.set()  # Signal the loop to stop
+
+def button_action():
+    
+    pause_button = widgets.Button(description="Pause/Resume")
+    pause_button.on_click(toggle_pause)
+
+    stop_button = widgets.Button(description="Stop Execution", button_style="danger")
+    stop_button.on_click(stop_execution)
+
+    display(pause_button, stop_button, output_message, output_time)
+
+    stop_flag.clear()
+
+
+def run_loop():
+    try:
+        for i in tqdm(range(100)):
+            if stop_flag.is_set():  # If stop button is pressed, exit loop
+                break
+
+            # Instead of pause_flag.wait(), use a loop to check both flags
+            while not pause_flag.is_set():
+                if stop_flag.is_set():  # Check if stopping is requested
+                    return
+                time.sleep(0.1)  # Avoid CPU overuse
+
+            time.sleep(1)  # Simulate work
+            
+    finally:
+        with output_message:
+            print("Clean up")  # Ensure cleanup message is printed
+
+
+def simulation():
+
+    button_action()
+    thread = threading.Thread(target=run_loop(pause_button, stop_button), daemon=True)
+    thread.start()
+
+
+

@@ -1,8 +1,7 @@
-# Python modules: 
-import os, sys, time, subprocess, shutil, platform, threading, signal, numpy as np, pandas as pd, matplotlib.pyplot as plt, math
-from contextlib import redirect_stdout, redirect_stderr; from pathlib import Path
-
 # 0.0. ========================================================================================================================================================
+
+import os, sys, time, subprocess, shutil, platform, threading, signal, numpy as np, pandas as pd, matplotlib.pyplot as plt, math
+from contextlib import redirect_stdout; from pathlib import Path
 
 def Install_Libraries():
 
@@ -47,9 +46,9 @@ def Install_Libraries():
 
     print("All libraries are installed and ready to use.")
 
-os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 def PlayAlarm():
 
+    os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
     import pygame
 
     alarm_path = 'Alarm.mp3'
@@ -132,6 +131,52 @@ def Simulation_Setup(executable_file, mac_filename, temp_folder):
     Compile_Geant4(directory)
 
     return directory, run_sim, root_folder, mac_filepath, temp_folder
+
+def Button_Main():
+
+    global Button_Action
+
+    def Toggle_Pause(change):
+        
+        with output_message: 
+            output_message.clear_output(wait = True)
+            
+            if pause_flag.is_set(): 
+                print("Paused.")
+                pause_flag.clear()
+            else: 
+                print("Resumed.")
+                pause_flag.set()
+
+    def Stop_Execution(change):
+        
+        with output_message:
+            output_message.clear_output(wait = True)
+            print("Stopping execution...")
+        
+        stop_flag.set()
+
+    def Button_Action():
+
+        from IPython.display import display
+        import ipywidgets as widgets
+
+        global pause_flag, stop_flag, output_message
+
+        pause_flag = threading.Event()
+        pause_flag.set() 
+        stop_flag = threading.Event()  
+        output_message = widgets.Output()
+        
+        pause_button = widgets.Button(description = "Pause/Resume")
+        pause_button.on_click(Toggle_Pause)
+
+        stop_button = widgets.Button(description = "Stop Execution", button_style = "danger")
+        stop_button.on_click(Stop_Execution)
+
+        display(pause_button, stop_button, output_message)
+
+        stop_flag.clear()
 
 # 0.2 ========================================================================================================================================================
 
@@ -515,9 +560,19 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    try: 
+    Button_Main(); Button_Action()
+
+    Simulation_Thread = threading.Thread(target = Radiography_Loop, daemon = True)
+    Simulation_Thread.start()
+
+    def Radiography_Loop():
         
         for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+
+            if stop_flag.is_set(): break
+            while not pause_flag.is_set():
+                if stop_flag.is_set(): return
+                time.sleep(0.1) 
 
             try: subprocess.run(run_sim, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
             except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
@@ -530,7 +585,11 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
             try: shutil.move(new_root_name, temp_folder)
             except OSError as error: print(f"Error moving the file: {error}"); raise
 
-    finally:
+    threading.Thread(target = Finally, daemon = True).start()
+
+    def Finally():
+
+        Simulation_Thread.join()
 
         total_beams = int(np.ceil(Beams * iterations / 1000000))
         merged_name = f"{new_base_name}{'_'}{energy_name}{'_'}{str(total_beams)}{'M'}"
@@ -953,7 +1012,6 @@ def Summary_Data(directory, root_file, hits_tree, hits_branches, summary_tree, s
     try: 
         for organ, dose in Tissue_Dose.items(): print(f"  > Radiation Dose in {organ:>7}:  \033[1m{dose:.5f} µSv \033[0m")
     except: pass
-
 
 def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree, spectra_branches, range_x, range_y, range_spectra):
 
@@ -1962,77 +2020,3 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
     print(f"Written DICOMS to {directory}")
 
 # end ========================================================================================================================================================
-
-
-
-
-
-
-import ipywidgets as widgets
-from IPython.display import display
-import time
-import threading
-from tqdm import tqdm
-
-pause_flag = threading.Event()
-pause_flag.set()  # Initially set to "running" state
-
-stop_flag = threading.Event()  # Used to stop execution completely
-
-output_message = widgets.Output()  # For "Paused"/"Resumed"/"Stopped" messages
-output_time = widgets.Output()  # For elapsed time display
-
-def toggle_pause(change):
-    
-    with output_message: 
-        output_message.clear_output(wait=True)
-        if pause_flag.is_set(): print("Paused."); pause_flag.clear()
-        else: print("Resumed."); pause_flag.set()
-
-def stop_execution(change):
-    
-    with output_message:
-        output_message.clear_output(wait=True)
-        print("Stopping execution...")
-    stop_flag.set()  # Signal the loop to stop
-
-def button_action():
-    
-    pause_button = widgets.Button(description="Pause/Resume")
-    pause_button.on_click(toggle_pause)
-
-    stop_button = widgets.Button(description="Stop Execution", button_style="danger")
-    stop_button.on_click(stop_execution)
-
-    display(pause_button, stop_button, output_message, output_time)
-
-    stop_flag.clear()
-
-
-def run_loop():
-    try:
-        for i in tqdm(range(100)):
-            if stop_flag.is_set():  # If stop button is pressed, exit loop
-                break
-
-            # Instead of pause_flag.wait(), use a loop to check both flags
-            while not pause_flag.is_set():
-                if stop_flag.is_set():  # Check if stopping is requested
-                    return
-                time.sleep(0.1)  # Avoid CPU overuse
-
-            time.sleep(1)  # Simulate work
-            
-    finally:
-        with output_message:
-            print("Clean up")  # Ensure cleanup message is printed
-
-
-def simulation():
-
-    button_action()
-    thread = threading.Thread(target=run_loop(pause_button, stop_button), daemon=True)
-    thread.start()
-
-
-

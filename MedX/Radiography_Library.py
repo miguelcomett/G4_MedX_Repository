@@ -139,16 +139,17 @@ def Button_Main():
     def Toggle_Pause(change):
         
         with output_message: 
-            output_message.clear_output(wait = True)
             
             if pause_flag.is_set(): 
                 print("Paused.")
                 pause_flag.clear()
             else: 
-                print("Resumed.")
+                with output_message: output_message.clear_output(wait = True)
                 pause_flag.set()
 
     def Stop_Execution(change):
+
+        global start_time
         
         with output_message:
             output_message.clear_output(wait = True)
@@ -156,25 +157,47 @@ def Button_Main():
         
         stop_flag.set()
 
+    def update_elapsed_time():
+
+        global start_time
+
+        start_time = time.time()
+
+        while not stop_flag.is_set():
+            if pause_flag.is_set():  
+                elapsed_time = int(time.time() - start_time)
+                elapsed_time_label.value = f"Time Elapsed: {elapsed_time}s"
+            time.sleep(1)
+
     def Button_Action():
 
-        from IPython.display import display
+        from IPython.display import display, HTML
         import ipywidgets as widgets
 
-        global pause_flag, stop_flag, output_message
+        global pause_flag, stop_flag, output_message, elapsed_time_label
 
         pause_flag = threading.Event()
         pause_flag.set() 
         stop_flag = threading.Event()  
         output_message = widgets.Output()
+        elapsed_time_label = widgets.Label(value="Time Elapsed: 0s")
+
+        button_layout = widgets.Layout(width='150px', height='50px')
+        button_style = {'font_weight': 'bold'}
         
-        pause_button = widgets.Button(description = "Pause/Resume")
+        pause_button = widgets.Button(description = "Pause/Resume", button_style = 'info', layout=button_layout, style=button_style)
         pause_button.on_click(Toggle_Pause)
 
-        stop_button = widgets.Button(description = "Stop Execution", button_style = "danger")
+        stop_button = widgets.Button(description = "Stop Execution", button_style = "danger", layout=button_layout, style=button_style)
         stop_button.on_click(Stop_Execution)
 
-        display(pause_button, stop_button, output_message)
+        button_box = widgets.HBox([pause_button, stop_button])
+        gui_container = widgets.VBox([button_box, output_message])
+
+        display(gui_container, elapsed_time_label)
+
+        timer_thread = threading.Thread(target=update_elapsed_time, daemon=True)
+        timer_thread.start()
 
         stop_flag.clear()
 
@@ -507,7 +530,7 @@ def Run_Calibration(directory, run_sim):
 
 def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
-    from tqdm.notebook import tqdm
+    from tqdm import tqdm
 
     if iteration_time == 0 or iteration_time > sim_time: iteration_time = sim_time
 
@@ -562,12 +585,9 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
     Button_Main(); Button_Action()
 
-    Simulation_Thread = threading.Thread(target = Radiography_Loop, daemon = True)
-    Simulation_Thread.start()
-
     def Radiography_Loop():
         
-        for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+        for iteration in tqdm(range(iterations), desc = "Running Radiography", unit = " Iterations", leave = True):
 
             if stop_flag.is_set(): break
             while not pause_flag.is_set():
@@ -584,8 +604,6 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
             
             try: shutil.move(new_root_name, temp_folder)
             except OSError as error: print(f"Error moving the file: {error}"); raise
-
-    threading.Thread(target = Finally, daemon = True).start()
 
     def Finally():
 
@@ -607,8 +625,13 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         except OSError as error: print(f"Error moving the file: {error}"); raise
         Trash_Folder(temp_folder)
 
-        print(f"\n -> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
+        print(f"\n-> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
         if alarm == True or alarm == 1: PlayAlarm()
+
+    Simulation_Thread = threading.Thread(target = Radiography_Loop, daemon = True)
+    Simulation_Thread.start()
+
+    threading.Thread(target = Finally, daemon = True).start()
 
 # 1.2. ========================================================================================================================================================
 
@@ -688,7 +711,7 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     
     try:
 
-        for iteration in tqdm(range(iterations), desc = "Running Simulations", unit = " Iterations", leave = True):
+        for iteration in tqdm(range(iterations), desc = "Running DEXA", unit = " Iterations", leave = True):
 
             try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
             except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
@@ -1797,7 +1820,6 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     def compute_sinogram(y, heatmap_matrix):
         
         sinogram = []
-        # print(y)
         for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
         sinogram = np.array(sinogram).T
 
@@ -1864,6 +1886,16 @@ def Plotly_CT(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
     )
     fig.show()
 
+def Plotly(directory, filename):
+
+    import plotly.graph_objects as go
+
+    projection = np.genfromtxt(f"{directory}/{filename}", delimiter=',')
+
+    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
+    fig.update_layout(width = 800, height = 800, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.show()
+
 def MatPlotLib_CT(heatmap_matrix, sinogram_matrix, slices_matrix, step):
 
     plotis = np.arange(0, 60, step)
@@ -1887,6 +1919,7 @@ def CoefficientstoHU(csv_slices, mu_water, air_parameter):
         slice = np.genfromtxt(f"{csv_slices}{slices[i]}", delimiter=',')
         
         HU_images[i] = np.round(1000 * ((slice - mu_water) / mu_water)).astype(int)
+        # HU_images[i] = 1000*((slice - mu_water) / mu_water) + 1000
         HU_images[i][HU_images[i] < air_parameter] = -1000
 
     fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))

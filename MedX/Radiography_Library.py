@@ -62,6 +62,17 @@ def PlayAlarm():
     time.sleep(5)
     pygame.mixer.music.stop()
 
+def Formatted_Time(elapsed_time):
+
+    minutes, seconds = divmod(elapsed_time, 60)
+    hours, minutes = divmod(minutes, 60)
+
+    if hours > 0:     formatted_time = f"{int(hours)}h {int(minutes)}m {seconds:.1f}s"
+    elif minutes > 0: formatted_time = f"{int(minutes)}m {seconds:.1f}s"
+    else:             formatted_time = f"{seconds:.1f}s"
+
+    return formatted_time
+
 # 0.1 ========================================================================================================================================================
 
 def Compile_Geant4(directory):
@@ -90,13 +101,14 @@ def Compile_Geant4(directory):
     else: raise EnvironmentError("Unsupported operating system")
     
     print("-> Building Geant4... ", end = "", flush = True)
-    
+
     if not os.listdir(directory):
-        try: subprocess.run(cmake, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
-    
-    try: subprocess.run(make, cwd = directory,check = True, shell = True, stdout = subprocess.DEVNULL)
-    except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
+        print("Empty directory. Running Cmake... ", end = "", flush = True)
+        try: subprocess.run(cmake, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+        except subprocess.CalledProcessError as error: print(f"Error Running Cmake: {error}"); raise
+
+    try: subprocess.run(make, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    except subprocess.CalledProcessError as error: print(f"Error During Compilation: {error}"); raise
     
     print("Built successfully.")
 
@@ -118,6 +130,8 @@ def Simulation_Setup(executable_file, mac_filename, temp_folder):
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
 
     else: raise EnvironmentError("Unsupported operating system")
+    
+    Compile_Geant4(directory)
 
     root_folder  = directory / "ROOT/"
     mac_filepath = directory / mac_filename
@@ -127,8 +141,6 @@ def Simulation_Setup(executable_file, mac_filename, temp_folder):
         try: send2trash(temp_folder)
         except: pass
         os.makedirs(temp_folder, exist_ok = True)
-
-    Compile_Geant4(directory)
 
     return directory, run_sim, root_folder, mac_filepath, temp_folder
 
@@ -548,12 +560,12 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     simulation_mode = 'single'
     mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
     
-    Beams_calibration = 2_5#00_000
+    Beams_calibration = 2_500_000
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
     
-    calibration_time = Run_Calibration(directory, run_sim)
+    calibration_geant4_time = Run_Calibration(directory, run_sim)
 
     if spectra_mode == 'mono' or spectra_mode == 0: 
         new_base_name = 'Rad'
@@ -578,18 +590,18 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
     iterations = int(sim_time / iteration_time)
     
-    Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
+    Beams = int((sim_time * Beams_calibration) / (calibration_geant4_time * iterations))
     
     end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
-    print(f"({elapsed_time:.1f} seconds). ", end = '', flush = True)
-    
-    print(f"Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M.")
+    calibration_python_time = end_time - start_time
+    formatted_time = Formatted_Time(calibration_python_time)
+
+    print(f"({formatted_time}). Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M.")
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    Button_Main(); Button_Action()
+    Button_Main(); Button_Action(); start_time = time.perf_counter()
 
     def Radiography_Loop():
 
@@ -637,7 +649,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         except OSError as error: print(f"Error moving the file: {error}"); raise
         Trash_Folder(temp_folder)
 
-        print(f"\n-> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
+        print(f"\n-> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m.")
         if alarm == True or alarm == 1: PlayAlarm()
 
         finished_flag = True
@@ -645,7 +657,15 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     Simulation_Thread = threading.Thread(target = Radiography_Loop, daemon = True)
     Simulation_Thread.start()
 
-    threading.Thread(target = Finally, daemon = True).start()
+    finally_thread = threading.Thread(target = Finally, daemon = True)
+    finally_thread.start()
+    finally_thread.join()
+
+    end_time = time.perf_counter()
+    loop_time = end_time - start_time
+
+    formatted_time = Formatted_Time(calibration_python_time + loop_time)
+    print(f"   Total Time: {formatted_time}")
 
 # 1.2. ========================================================================================================================================================
 
@@ -714,26 +734,26 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    calibration_time = Run_Calibration(directory, run_sim)
+    calibration_geant4_time = Run_Calibration(directory, run_sim)
     base_name_40, base_name_80  = Rename_and_Move(root_folder, temp_folder, 0, spectra_mode)
     iterations = int(sim_time / iteration_time)
 
-    Beams40 = int((sim_time * Beams40_calibration) / (calibration_time * iterations))
-    Beams80 = int((sim_time * Beams80_calibration) / (calibration_time * iterations))
+    Beams40 = int((sim_time * Beams40_calibration) / (calibration_geant4_time * iterations))
+    Beams80 = int((sim_time * Beams80_calibration) / (calibration_geant4_time * iterations))
 
     Beams40_str = f"{round(Beams40 * iterations / 1_000_000, 2)}M"
     Beams80_str = f"{round(Beams80 * iterations / 1_000_000, 2)}M"
 
     end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
-    print(f"({elapsed_time:.1f} seconds). ", end = '', flush = True)
+    calibration_python_time = end_time - start_time
+    formatted_time = Formatted_Time(calibration_python_time)
     
-    print(f"Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
+    print(f"{formatted_time}) Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    Button_Main(); Button_Action()
+    Button_Main(); Button_Action(); start_time = time.perf_counter()
     
     def DEXA_Loop():
 
@@ -787,14 +807,22 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
         Trash_Folder(temp_folder)
 
-        print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
+        print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m.")
         if alarm == True or alarm == 1: PlayAlarm()
         finished_flag = True
 
     Simulation_Thread = threading.Thread(target = DEXA_Loop, daemon = True)
     Simulation_Thread.start()
 
-    threading.Thread(target = Finally, daemon = True).start()
+    finally_thread = threading.Thread(target = Finally, daemon = True)
+    finally_thread.start()
+    finally_thread.join()
+
+    end_time = time.perf_counter()
+    loop_time = end_time - start_time
+
+    formatted_time = Formatted_Time(calibration_python_time + loop_time)
+    print(f"   Total Time: {formatted_time}")
 
 def UI_RunDEXA():
 

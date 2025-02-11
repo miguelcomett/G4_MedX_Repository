@@ -1695,6 +1695,8 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     from tqdm.notebook import tqdm
 
+    start_time = time.perf_counter()
+
     global finished_flag
     finished_flag = False
 
@@ -1765,8 +1767,12 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     Simulation_Thread = threading.Thread(target = CT_Loop, daemon = True)
     Simulation_Thread.start()
+    Simulation_Thread.join()
     
-    print("Finished Simulating CT")
+    end_time = time.perf_counter()
+    formatted_Time = Formatted_Time(end_time - start_time)
+    print("Finished Simulating from {angles[0]} to {angle} angles. Time Elapsed: {formatted_Time}")
+
     if alarm == True: PlayAlarm()
     finished_flag = True
 

@@ -139,39 +139,35 @@ def Button_Main():
     def Toggle_Pause(change):
         
         with output_message: 
-            
+            output_message.clear_output(wait = False)
             if pause_flag.is_set(): 
-                print("Paused.")
+                print("Simulation Paused on Next Iteration.")
                 pause_flag.clear()
             else: 
-                with output_message: output_message.clear_output(wait = True)
                 pause_flag.set()
 
     def Stop_Execution(change):
-
-        global start_time
         
         with output_message:
-            output_message.clear_output(wait = True)
-            print("Stopping execution...")
+            output_message.clear_output(wait = False)
+            print("Stopping Execution on Next Iteration...")
         
         stop_flag.set()
 
-    def update_elapsed_time():
+    def Elapsed_Time():
 
-        global start_time
+        elapsed_time = 0
 
-        start_time = time.time()
-
-        while not stop_flag.is_set():
+        while True:
+            if finished_flag: break
             if pause_flag.is_set():  
-                elapsed_time = int(time.time() - start_time)
+                elapsed_time += 1
                 elapsed_time_label.value = f"Time Elapsed: {elapsed_time}s"
             time.sleep(1)
 
     def Button_Action():
 
-        from IPython.display import display, HTML
+        from IPython.display import display
         import ipywidgets as widgets
 
         global pause_flag, stop_flag, output_message, elapsed_time_label
@@ -182,21 +178,21 @@ def Button_Main():
         output_message = widgets.Output()
         elapsed_time_label = widgets.Label(value="Time Elapsed: 0s")
 
-        button_layout = widgets.Layout(width='150px', height='50px')
+        button_layout = widgets.Layout(width='170px', height='40px')
         button_style = {'font_weight': 'bold'}
         
-        pause_button = widgets.Button(description = "Pause/Resume", button_style = 'info', layout=button_layout, style=button_style)
+        pause_button = widgets.Button(description = "Pause / Resume", button_style = 'info', layout=button_layout, style=button_style)
         pause_button.on_click(Toggle_Pause)
 
         stop_button = widgets.Button(description = "Stop Execution", button_style = "danger", layout=button_layout, style=button_style)
         stop_button.on_click(Stop_Execution)
 
         button_box = widgets.HBox([pause_button, stop_button])
-        gui_container = widgets.VBox([button_box, output_message])
+        gui_container = widgets.VBox([button_box, output_message], layout=widgets.Layout(margin='10px 0px 0px 0px'))
 
         display(gui_container, elapsed_time_label)
 
-        timer_thread = threading.Thread(target=update_elapsed_time, daemon=True)
+        timer_thread = threading.Thread(target=Elapsed_Time, daemon=True)
         timer_thread.start()
 
         stop_flag.clear()
@@ -524,13 +520,18 @@ def Run_Calibration(directory, run_sim):
     
     end_time = time.perf_counter()
     calibration_time = end_time - start_time
-    print(f"Finished. ", end = '', flush = True)
+    print(f"Finished ", end = '', flush = True)
 
     return calibration_time
 
 def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
     from tqdm import tqdm
+
+    global finished_flag
+    finished_flag = False
+
+    start_time = time.perf_counter()
 
     if iteration_time == 0 or iteration_time > sim_time: iteration_time = sim_time
 
@@ -547,7 +548,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     simulation_mode = 'single'
     mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
     
-    Beams_calibration = 2_500_000
+    Beams_calibration = 2_5#00_000
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams_calibration)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
@@ -578,6 +579,11 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     iterations = int(sim_time / iteration_time)
     
     Beams = int((sim_time * Beams_calibration) / (calibration_time * iterations))
+    
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"({elapsed_time:.1f} seconds). ", end = '', flush = True)
+    
     print(f"Beams to simulate: \033[1m{round(Beams * iterations / 1000000, 2)}M.")
 
     filled_template = mac_template.format(Threads = threads, Energy = energy, Beams = Beams)
@@ -586,10 +592,14 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
     Button_Main(); Button_Action()
 
     def Radiography_Loop():
+
+        global finished_flag
         
         for iteration in tqdm(range(iterations), desc = "Running Radiography", unit = " Iterations", leave = True):
 
-            if stop_flag.is_set(): break
+            if stop_flag.is_set(): 
+                finished_flag = True
+                break
             while not pause_flag.is_set():
                 if stop_flag.is_set(): return
                 time.sleep(0.1) 
@@ -606,6 +616,8 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
             except OSError as error: print(f"Error moving the file: {error}"); raise
 
     def Finally():
+
+        global finished_flag
 
         Simulation_Thread.join()
 
@@ -627,6 +639,8 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
         print(f"\n-> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m. \n")
         if alarm == True or alarm == 1: PlayAlarm()
+
+        finished_flag = True
 
     Simulation_Thread = threading.Thread(target = Radiography_Loop, daemon = True)
     Simulation_Thread.start()
@@ -670,6 +684,11 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     from tqdm.notebook import tqdm
 
+    global finished_flag
+    finished_flag = False
+    
+    start_time = time.perf_counter()
+
     if iteration_time == 0 or iteration_time > sim_time: iteration_time = sim_time
 
     sim_time = sim_time * 60 # s
@@ -685,11 +704,11 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     mac_template = MAC_Template_Radiography(simulation_mode, threads, spectra_mode, detector_parameters, gun_parameters)
 
     if spectra_mode == 'mono' or spectra_mode == 0:
-        Beams40_calibration = 2000000
+        Beams40_calibration = 2_000_000
         Beams80_calibration = int(Beams40_calibration / 1.61)
 
     if spectra_mode == 'poly' or spectra_mode == 1:
-        Beams40_calibration = 2000000
+        Beams40_calibration = 2_000_000
         Beams80_calibration = round(Beams40_calibration / 1.30)
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40_calibration, Beams80 = Beams80_calibration)
@@ -704,21 +723,41 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     Beams40_str = f"{round(Beams40 * iterations / 1_000_000, 2)}M"
     Beams80_str = f"{round(Beams80 * iterations / 1_000_000, 2)}M"
+
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"({elapsed_time:.1f} seconds). ", end = '', flush = True)
+    
     print(f"Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
+
+    Button_Main(); Button_Action()
     
-    try:
+    def DEXA_Loop():
+
+        global finished_flag
 
         for iteration in tqdm(range(iterations), desc = "Running DEXA", unit = " Iterations", leave = True):
+
+            if stop_flag.is_set(): 
+                finished_flag = True
+                break
+            while not pause_flag.is_set():
+                if stop_flag.is_set(): return
+                time.sleep(0.1) 
 
             try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
             except subprocess.CalledProcessError as error: print(f"Error running the simulation: {error}"); raise
 
             Rename_and_Move(root_folder, temp_folder, iteration + 1, spectra_mode)
 
-    finally:
+    def Finally():
+
+        global finished_flag
+
+        Simulation_Thread.join()
 
         total_beams_40 = int(np.ceil(Beams40 * iterations / 1_000_000))
         total_beams_80 = int(np.ceil(Beams80 * iterations / 1_000_000))
@@ -750,6 +789,12 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
         print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m. \n")
         if alarm == True or alarm == 1: PlayAlarm()
+        finished_flag = True
+
+    Simulation_Thread = threading.Thread(target = DEXA_Loop, daemon = True)
+    Simulation_Thread.start()
+
+    threading.Thread(target = Finally, daemon = True).start()
 
 def UI_RunDEXA():
 
@@ -1622,6 +1667,9 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     from tqdm.notebook import tqdm
 
+    global finished_flag
+    finished_flag = False
+
     executable_file = 'Sim'
     mac_filename = 'CT.mac'
     temp_folder = 'Tomography'
@@ -1635,47 +1683,64 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
     if step == 0: angle_step_str = f"at Every Angle"
     if step >  1: angle_step_str = f"Every {step} Angles"
     print(f"Calculating Projections {angle_step_str}.")
+
+    Button_Main(); Button_Action()
+
+    def CT_Loop():
+
+        global finished_flag
     
-    for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
+        for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
 
-        for file_name in os.listdir(directory):
-            if file_name.startswith('CT_') and file_name.endswith('.root'):
-                file_path = os.path.join(directory, file_name)
-                Trash_Folder(file_path)
+            if stop_flag.is_set(): 
+                global finished_flag
+                break
+            while not pause_flag.is_set():
+                if stop_flag.is_set(): return
+                time.sleep(0.1) 
 
-        mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
-        
-        beam_lines = ""
-        for y in range(y_start, y_end + 1, step): 
-            beam_lines += f"""
-            /Pgun/Y {y} mm
-            /run/beamOn 150000
-            """
+            for file_name in os.listdir(directory):
+                if file_name.startswith('CT_') and file_name.endswith('.root'):
+                    file_path = os.path.join(directory, file_name)
+                    Trash_Folder(file_path)
 
-        energy = 80
+            mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
+            
+            beam_lines = ""
+            for y in range(y_start, y_end + 1, step): 
+                beam_lines += f"""
+                /Pgun/Y {y} mm
+                /run/beamOn 150000
+                """
 
-        filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
-        with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
-        
-        try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-        except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
+            energy = 80
 
-        output_name = f"Aang_{angle}"
-        if os.path.exists(temp_folder / f"{output_name}.root"):
-            counter = 0
-            while os.path.exists(temp_folder / f"{output_name}_{counter}.root"): counter = counter + 1
-            output_name = root_folder / f"{output_name}_{counter}"
+            filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
+            with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
+            
+            try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+            except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
 
-        with open(os.devnull, "w") as fnull: 
-            with redirect_stdout(fnull): Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
+            output_name = f"Aang_{angle}"
+            if os.path.exists(temp_folder / f"{output_name}.root"):
+                counter = 0
+                while os.path.exists(temp_folder / f"{output_name}_{counter}.root"): counter = counter + 1
+                output_name = root_folder / f"{output_name}_{counter}"
 
-        merged_file_path = root_folder / f"{output_name}.root"
+            with open(os.devnull, "w") as fnull: 
+                with redirect_stdout(fnull): Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)
 
-        try: shutil.move(merged_file_path, temp_folder)
-        except OSError as error: print(f"Error moving file: {error}"); raise
+            merged_file_path = root_folder / f"{output_name}.root"
+
+            try: shutil.move(merged_file_path, temp_folder)
+            except OSError as error: print(f"Error moving file: {error}"); raise
+
+    Simulation_Thread = threading.Thread(target = CT_Loop, daemon = True)
+    Simulation_Thread.start()
     
     print("Finished Simulating CT")
     if alarm == True: PlayAlarm()
+    finished_flag = True
 
 def CT_Summary_Data(directory, summary_tree_name, summary_branches, spectra_tree_name, spectra_branches):
 

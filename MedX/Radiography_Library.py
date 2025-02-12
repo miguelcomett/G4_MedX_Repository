@@ -110,7 +110,7 @@ def Compile_Geant4(directory):
     try: subprocess.run(make, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
     except subprocess.CalledProcessError as error: print(f"Error During Compilation: {error}"); raise
     
-    print("Built successfully.")
+    print("Built Successfully.")
 
 def Simulation_Setup(executable_file, mac_filename, temp_folder):
         
@@ -174,7 +174,8 @@ def Button_Main():
             if finished_flag: break
             if pause_flag.is_set():  
                 elapsed_time += 1
-                elapsed_time_label.value = f"Time Elapsed: {elapsed_time}s"
+                formatted_Time = Formatted_Time(elapsed_time)
+                elapsed_time_label.value = f"Time Elapsed: {formatted_Time}"
             time.sleep(1)
 
     def Button_Action():
@@ -540,7 +541,7 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
     from tqdm import tqdm
 
-    global finished_flag
+    global finished_flag, start_time
     finished_flag = False
 
     start_time = time.perf_counter()
@@ -649,8 +650,14 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
         except OSError as error: print(f"Error moving the file: {error}"); raise
         Trash_Folder(temp_folder)
 
-        print(f"\n-> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m.")
-        if alarm == True or alarm == 1: PlayAlarm()
+        end_time = time.perf_counter()
+        loop_time = end_time - start_time
+
+        formatted_time = Formatted_Time(calibration_python_time + loop_time)
+
+        print(f"-> Simulation Completed. Files: \033[1m{merged_name}\033[0m written in \033[1m{root_folder}\033[0m.")
+        print(f"   Total Time: {formatted_time}")
+        if alarm == True: PlayAlarm()
 
         finished_flag = True
 
@@ -659,13 +666,6 @@ def RunRadiography(threads, energy, sim_time, iteration_time, spectra_mode, dete
 
     finally_thread = threading.Thread(target = Finally, daemon = True)
     finally_thread.start()
-    finally_thread.join()
-
-    end_time = time.perf_counter()
-    loop_time = end_time - start_time
-
-    formatted_time = Formatted_Time(calibration_python_time + loop_time)
-    print(f"   Total Time: {formatted_time}")
 
 # 1.2. ========================================================================================================================================================
 
@@ -702,9 +702,9 @@ def Rename_and_Move(root_folder, temp_folder, iteration, spectra_mode):
     
 def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters, gun_parameters, alarm):
 
-    from tqdm.notebook import tqdm
+    from tqdm import tqdm
 
-    global finished_flag
+    global finished_flag, start_time
     finished_flag = False
     
     start_time = time.perf_counter()
@@ -748,12 +748,13 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
     calibration_python_time = end_time - start_time
     formatted_time = Formatted_Time(calibration_python_time)
     
-    print(f"{formatted_time}) Beams to simulate: \033[1m{Beams40_str}, {Beams80_str}.")
+    print(f"({formatted_time}) Beams to Simulate: \033[1m{Beams40_str}, {Beams80_str}.")
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
 
-    Button_Main(); Button_Action(); start_time = time.perf_counter()
+    Button_Main(); Button_Action(); 
+    start_time = time.perf_counter()
     
     def DEXA_Loop():
 
@@ -807,22 +808,21 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
         Trash_Folder(temp_folder)
 
-        print(f"\n -> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m.")
-        if alarm == True or alarm == 1: PlayAlarm()
         finished_flag = True
+
+        end_time = time.perf_counter()
+        loop_time = end_time - start_time
+        formatted_time = Formatted_Time(calibration_python_time + loop_time)
+
+        print(f"-> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m.")
+        print(f"   Total Time: {formatted_time}")
+        if alarm == True: PlayAlarm()
 
     Simulation_Thread = threading.Thread(target = DEXA_Loop, daemon = True)
     Simulation_Thread.start()
 
     finally_thread = threading.Thread(target = Finally, daemon = True)
     finally_thread.start()
-    finally_thread.join()
-
-    end_time = time.perf_counter()
-    loop_time = end_time - start_time
-
-    formatted_time = Formatted_Time(calibration_python_time + loop_time)
-    print(f"   Total Time: {formatted_time}")
 
 def UI_RunDEXA():
 
@@ -1693,12 +1693,12 @@ def MAC_Template_CT(
 
 def CT_Loop(threads, starts_with, angles, slices, alarm):
 
-    from tqdm.notebook import tqdm
+    from tqdm import tqdm
+
+    global finished_flag, start_time
+    finished_flag = False
 
     start_time = time.perf_counter()
-
-    global finished_flag
-    finished_flag = False
 
     executable_file = 'Sim'
     mac_filename = 'CT.mac'
@@ -1712,7 +1712,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     if step == 0: angle_step_str = f"at Every Angle"
     if step >  1: angle_step_str = f"Every {step} Angles"
-    print(f"Calculating Projections {angle_step_str}.")
+    print(f"-> Calculating Projections {angle_step_str}.")
 
     Button_Main(); Button_Action()
 
@@ -1767,14 +1767,22 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
     Simulation_Thread = threading.Thread(target = CT_Loop, daemon = True)
     Simulation_Thread.start()
-    Simulation_Thread.join()
     
-    end_time = time.perf_counter()
-    formatted_Time = Formatted_Time(end_time - start_time)
-    print("Finished Simulating from {angles[0]} to {angle} angles. Time Elapsed: {formatted_Time}")
+    def Finally():
 
-    if alarm == True: PlayAlarm()
-    finished_flag = True
+        global finished_flag
+
+        Simulation_Thread.join()
+        
+        end_time = time.perf_counter()
+        formatted_Time = Formatted_Time(end_time - start_time)
+        print("Finished Simulating from {angles[0]} to {angle} angles. Time Elapsed: {formatted_Time}")
+
+        if alarm == True: PlayAlarm()
+        finished_flag = True
+
+    finally_thread = threading.Thread(target = Finally, daemon = True)
+    finally_thread.start()
 
 def CT_Summary_Data(directory, summary_tree_name, summary_branches, spectra_tree_name, spectra_branches):
 

@@ -1,12 +1,22 @@
 # 0.0. ========================================================================================================================================================
 
-import os, sys, time, subprocess, shutil, platform, threading, signal, numpy as np, pandas as pd, matplotlib.pyplot as plt, math
+import os, sys, time, subprocess, shutil, platform, threading, signal, math
 from contextlib import redirect_stdout; from pathlib import Path
+
+try: import numpy as np
+except ImportError: print("NumPy is not installed.")
+
+try: import pandas as pd
+except ImportError: print("Pandas is not installed.")
+
+try: import matplotlib.pyplot as plt
+except ImportError: print("Matplotlib is not installed.")
 
 def Install_Libraries():
 
     libraries = {
         "numpy"           : None,
+        "pandas"          : None,
         "matplotlib"      : None,
         "dask"            : "2024.10.0",  
         "tqdm"            : None,
@@ -14,7 +24,6 @@ def Install_Libraries():
         "pygame"          : None,
         "ipywidgets"      : None,
         "uproot"          : None,
-        "tqdm"            : None,
         "plotly"          : None,
         "scipy"           : None,
         "pydicom"         : None,
@@ -752,9 +761,6 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
 
     filled_template = mac_template.format(Threads = threads, Beams40 = Beams40, Beams80 = Beams80)
     with open(mac_filepath, 'w') as template_file: template_file.write(filled_template)
-
-    Button_Main(); Button_Action(); 
-    start_time = time.perf_counter()
     
     def DEXA_Loop():
 
@@ -817,6 +823,9 @@ def RunDEXA(threads, sim_time, iteration_time, spectra_mode, detector_parameters
         print(f"-> Simulation Completed. Files: \033[1m{merged_40}\033[0m and \033[1m{merged_80}\033[0m written in \033[1m{root_folder}\033[0m.")
         print(f"   Total Time: {formatted_time}")
         if alarm == True: PlayAlarm()
+
+    Button_Main(); Button_Action(); 
+    start_time = time.perf_counter()
 
     Simulation_Thread = threading.Thread(target = DEXA_Loop, daemon = True)
     Simulation_Thread.start()
@@ -1895,7 +1904,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     step = slices_in[2]
 
     slices_num = len(np.arange(y0, yf, step))
-    proportion = int(rows/slices_num)
+    proportion = int(rows / slices_num)
 
     slice_0 = slices_out[0]
     slice_f = slices_out[1]
@@ -1908,16 +1917,19 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     slices_vector = (np.arange(slice_0, slice_f, slice_step))
     slices_vector = np.round(slices_vector).astype(int)
 
-    heatmap_matrix = np.zeros(len(projections), dtype = object)
+    heatmap_matrix  = np.zeros(len(projections), dtype = object)
     sinogram_matrix = np.zeros(len(slices_vector), dtype = object)
-    slices_matrix = np.zeros(len(slices_vector), dtype = object)
+    slices_matrix   = np.zeros(len(slices_vector), dtype = object)
 
     @delayed
     def process_heatmap(i, csv_read, sigma):
         
         read_name = f"{csv_read}{'CT_raw_'}{i}.csv"
-        raw_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
-        raw_heatmap = raw_heatmap.to_numpy()        
+        
+        # raw_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
+        # raw_heatmap = raw_heatmap.to_numpy()        
+        raw_heatmap = np.genfromtxt(read_name, delimiter=',')
+        
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
 
@@ -1936,7 +1948,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     def reconstruct_slice(i, sinogram_matrix, projections):
         
         sinogram = sinogram_matrix[i]
-        reconstructed_slice = iradon(sinogram, theta=projections)
+        reconstructed_slice = iradon(sinogram, theta=projections, circle=True, preserve_range=True, filter_name='hamming')
         
         return reconstructed_slice
     
@@ -1966,6 +1978,8 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         
         slice = slices_matrix[i]
         slice[np.isnan(slice)] = 0
+        
+        slice[slice < 0] = 0
 
         write_name = f"{csv_write}{'CT_slice_'}{i}.csv"
         np.savetxt(write_name, slice, delimiter=',', fmt='%.8f') # .8f
@@ -1974,64 +1988,41 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
     return heatmap_matrix, sinogram_matrix, slices_matrix
 
-def Plotly_CT(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
+def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
 
-    import plotly.graph_objects as go; from plotly.subplots import make_subplots
-
-    fig = make_subplots(rows = 1, cols = 3, shared_xaxes = False, shared_yaxes = False, horizontal_spacing = 0.05 )
-    fig.add_trace(go.Heatmap(z = heatmap_matrix[0],  colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 1)
-    fig.add_trace(go.Heatmap(z = sinogram_matrix[slice], colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 2)
-    fig.add_trace(go.Heatmap(z = slices_matrix[slice],   colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 3)
-    fig.update_layout(
-        height = 400, width = 1150, margin = dict(l = 40, r = 40, t = 60, b = 60),
-        yaxis1 = dict(autorange = 'reversed'), yaxis2 = dict(autorange = 'reversed'), yaxis3 = dict(autorange = 'reversed'),
-        annotations = [
-        dict(text = "Radiograph Projection",    x = 0.075, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
-        dict(text = "Sinogram Slice",           x = 0.500, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
-        dict(text = "Reconstructed Slice",      x = 0.915, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
-        dict(text = f"Slice Number: {slice+1}", x = 0.500, y =-0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=14))]
-    )
-    fig.show()
-
-def Plotly(directory, filename):
-
-    import plotly.graph_objects as go
-
-    projection = np.genfromtxt(f"{directory}/{filename}", delimiter=',')
-
-    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = 800, height = 800, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
-    fig.show()
-
-def MatPlotLib_CT(heatmap_matrix, sinogram_matrix, slices_matrix, step):
-
-    plotis = np.arange(0, 60, step)
-    for slice in plotis:
-        plt.figure(figsize = (10.5, 3)); 
-        plt.subplot(1,3,1); plt.imshow(heatmap_matrix[slice*6], cmap="gray"); plt.colorbar(); plt.title("Radiograph Projection", fontsize=11, pad=15)
-        plt.subplot(1,3,2); plt.imshow(sinogram_matrix[slice],  cmap="gray"); plt.colorbar(); plt.title("Sinogram Slice",        fontsize=11, pad=35)
-        plt.subplot(1,3,3); plt.imshow(slices_matrix[slice],    cmap="gray"); plt.colorbar(); plt.title("Reconstructed Slice",   fontsize=11, pad=15)
-        plt.text(-250, 300, f"Slice Number: {slice}", ha = 'center', fontsize = 11, color ='gray')
-        plt.show()
-
-def CoefficientstoHU(csv_slices, mu_water, air_parameter):
-
-    import plotly.graph_objects as go
+    from tqdm.notebook import tqdm
 
     slices = os.listdir(csv_slices)
     HU_images = np.zeros(len(slices), dtype="object")
 
-    for i in range(len(slices)):
+    for i in tqdm(range(len(slices)), desc = "Converting to HU Units", unit = " Slices", leave = True):
 
         slice = np.genfromtxt(f"{csv_slices}{slices[i]}", delimiter=',')
         
-        HU_images[i] = np.round(1000 * ((slice - mu_water) / mu_water)).astype(int)
-        # HU_images[i] = 1000*((slice - mu_water) / mu_water) + 1000
-        HU_images[i][HU_images[i] < air_parameter] = -1000
+        slice = slice + constant_factor
+        slice = slice * linear_factor
 
-    fig = go.Figure(go.Heatmap(z = HU_images[0], colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = 500, height = 500, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
-    fig.show()
+        # slice = 1000 * (slice - mu_water) / (mu_water - mu_air)
+        
+        # slice = (slice - 0.01) 
+        
+        slice = np.round(slice)
+        slice = slice.astype(int)
+        
+        slice[slice < air_parameter] = -1000
+        
+        positive_values = slice[slice > 0]
+        if positive_values.size > 0: 
+            threshold = np.percentile(positive_values, percentile)
+            slice[slice > threshold] = slice.min() #-1000 
+
+        if slice.max() < 0: print(f"Slice {i} maximum value ({slice.max()}) is lower than 0")
+        if slice.max() > 3000: print(f"Slice {i} maximum value ({slice.max()}) is higher than 3,000")
+        if slice.min() > -1000: print(f"Slice {i} minimum value ({slice.min()}) is higher than -1,000")
+
+        HU_images[i] = slice
+
+    Ploty_from_memory(HU_images[0])
 
     return HU_images
 
@@ -2158,5 +2149,57 @@ def Export_to_Dicom(HU_images, size_y, directory, compressed):
             ds.save_as(name + '.dcm')
 
     print(f"Written DICOMS to {directory}")
+
+# CT Plots ====================================================================================================================================================
+
+def Ploty_from_memory(projection):
+
+    import plotly.graph_objects as go
+
+    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
+    fig.update_layout(width = 500, height = 500, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.show()
+
+def Ploty_from_file(directory, filename):
+
+    import plotly.graph_objects as go
+
+    projection = np.genfromtxt(f"{directory}/{filename}", delimiter=',')
+
+    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
+    fig.update_layout(width = 800, height = 800, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.show()
+
+    return projection
+
+def Plotly_3x1(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
+
+    import plotly.graph_objects as go; from plotly.subplots import make_subplots
+
+    fig = make_subplots(rows = 1, cols = 3, shared_xaxes = False, shared_yaxes = False, horizontal_spacing = 0.05 )
+    fig.add_trace(go.Heatmap(z = heatmap_matrix[0],  colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 1)
+    fig.add_trace(go.Heatmap(z = sinogram_matrix[slice], colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 2)
+    fig.add_trace(go.Heatmap(z = slices_matrix[slice],   colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 3)
+    fig.update_layout(
+        height = 400, width = 1150, margin = dict(l = 40, r = 40, t = 60, b = 60),
+        yaxis1 = dict(autorange = 'reversed'), yaxis2 = dict(autorange = 'reversed'), yaxis3 = dict(autorange = 'reversed'),
+        annotations = [
+        dict(text = "Radiograph Projection",    x = 0.075, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+        dict(text = "Sinogram Slice",           x = 0.500, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+        dict(text = "Reconstructed Slice",      x = 0.915, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+        dict(text = f"Slice Number: {slice+1}", x = 0.500, y =-0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=14))]
+    )
+    fig.show()
+
+def MatPlotLib_CT(heatmap_matrix, sinogram_matrix, slices_matrix, step):
+
+    plotis = np.arange(0, 60, step)
+    for slice in plotis:
+        plt.figure(figsize = (10.5, 3)); 
+        plt.subplot(1,3,1); plt.imshow(heatmap_matrix[slice*6], cmap="gray"); plt.colorbar(); plt.title("Radiograph Projection", fontsize=11, pad=15)
+        plt.subplot(1,3,2); plt.imshow(sinogram_matrix[slice],  cmap="gray"); plt.colorbar(); plt.title("Sinogram Slice",        fontsize=11, pad=35)
+        plt.subplot(1,3,3); plt.imshow(slices_matrix[slice],    cmap="gray"); plt.colorbar(); plt.title("Reconstructed Slice",   fontsize=11, pad=15)
+        plt.text(-250, 300, f"Slice Number: {slice}", ha = 'center', fontsize = 11, color ='gray')
+        plt.show()
 
 # end ========================================================================================================================================================

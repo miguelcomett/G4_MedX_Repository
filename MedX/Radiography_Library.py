@@ -1749,7 +1749,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
             for y in range(y_start, y_end + 1, step): 
                 beam_lines += f"""
                 /Pgun/Y {y} mm
-                /run/beamOn 150000
+                /run/beamOn 500_000
                 """
 
             energy = 80

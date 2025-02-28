@@ -1700,7 +1700,7 @@ def MAC_Template_CT(
 
     return "\n".join(mac_template)  
 
-def CT_Loop(threads, starts_with, angles, slices, alarm):
+def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
 
     from tqdm import tqdm
 
@@ -1729,7 +1729,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
 
         global finished_flag
     
-        for angle in tqdm(range(angles[0], angles[1]), desc = "Creating CT", unit = "Angles", leave = True):
+        for angle in tqdm(angles, desc = "Creating CT", unit = "Angles", leave = True):
 
             if stop_flag.is_set(): 
                 global finished_flag
@@ -1749,7 +1749,7 @@ def CT_Loop(threads, starts_with, angles, slices, alarm):
             for y in range(y_start, y_end + 1, step): 
                 beam_lines += f"""
                 /Pgun/Y {y} mm
-                /run/beamOn 500_000
+                /run/beamOn {beams_per_line}
                 """
 
             energy = 80

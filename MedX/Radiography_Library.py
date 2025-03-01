@@ -1755,10 +1755,14 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
             filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
             with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
 
-            subprocess.run(run_sim, cwd = directory, check = True, shell = True)
+            if platform.system() == "Windows":
+
+                subprocess.run(run_sim, cwd = directory, shell = True)
+
+            else:
             
-            #try: subprocess.run(run_sim, cwd = directory, check = True, shell = True)#, stdout = subprocess.DEVNULL)
-            #except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
+                try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+                except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
 
             output_name = f"Aang_{angle}"
             if os.path.exists(temp_folder / f"{output_name}.root"):

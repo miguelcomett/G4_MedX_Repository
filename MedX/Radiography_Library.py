@@ -84,25 +84,22 @@ def Formatted_Time(elapsed_time):
 
 # 0.1 ========================================================================================================================================================
 
-def Compile_Geant4(directory):
+def Compile_Geant4():
 
+    Build_Path = Path('BUILD')
+    if not os.path.exists(Build_Path): os.makedirs(Build_Path)
+    
     if platform.system() == "Darwin":
         
-        if not os.path.exists(directory): os.makedirs(directory)
-
         cmake = "cmake .."
         make = "make -j8"
 
     elif platform.system() == "Linux":
-        
-        if not os.path.exists(directory): os.makedirs(directory)
 
         cmake = "cmake .."
         make = "make -j8"
     
     elif platform.system() == "Windows":
-        
-        if not os.path.exists(directory): os.makedirs(directory)
 
         cmake = "cmake .."
         make = "cmake --build . --config Release"
@@ -111,12 +108,12 @@ def Compile_Geant4(directory):
     
     print("-> Building Geant4... ", end = "", flush = True)
 
-    if not os.listdir(directory):
+    if not os.listdir(Build_Path):
         print("Empty directory. Running Cmake... ", end = "", flush = True)
-        try: subprocess.run(cmake, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+        try: subprocess.run(cmake, cwd = Build_Path, check = True, shell = True, stdout = subprocess.DEVNULL)
         except subprocess.CalledProcessError as error: print(f"Error Running Cmake: {error}"); raise
 
-    try: subprocess.run(make, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
+    try: subprocess.run(make, cwd = Build_Path, check = True, shell = True, stdout = subprocess.DEVNULL)
     except subprocess.CalledProcessError as error: print(f"Error During Compilation: {error}"); raise
     
     print("Built Successfully.")
@@ -124,24 +121,24 @@ def Compile_Geant4(directory):
 def Simulation_Setup(executable_file, mac_filename, temp_folder):
         
     from send2trash import send2trash
+
+    Compile_Geant4()
     
     if platform.system() == "Darwin":
         directory = Path('BUILD')
         run_sim = f"./{executable_file} {mac_filename} . . ."
 
     elif platform.system() == "Linux":
-        directory = Path('build')
+        directory = Path('BUILD')
         run_sim = f"./{executable_file} {mac_filename} . . ."
 
     elif platform.system() == "Windows":
-        directory = Path('build') / 'Release'
+        directory = Path('BUILD') / 'Release'
         executable_file = f"{executable_file}.exe"
         run_sim = fr".\{executable_file} .\{mac_filename} . . ."
 
     else: raise EnvironmentError("Unsupported operating system")
     
-    Compile_Geant4(directory)
-
     root_folder  = directory / "ROOT/"
     mac_filepath = directory / mac_filename
 

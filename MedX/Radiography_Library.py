@@ -1716,7 +1716,7 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
     y_end = slices[1]
     step = slices[2]
 
-    if step == 0: angle_step_str = f"at Every Angle"
+    if step == 1: angle_step_str = f"at Every Angle"
     if step >  1: angle_step_str = f"Every {step} Angles"
     print(f"-> Calculating Projections {angle_step_str}.")
 
@@ -1725,6 +1725,7 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
     def CT_Loop():
 
         global finished_flag
+        global angle
     
         for angle in tqdm(angles, desc = "Creating CT", unit = "Angles", leave = True):
 
@@ -1753,9 +1754,11 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
 
             filled_template = mac_template.format(angle = angle, Threads = threads, Energy = energy, beam_lines = beam_lines)
             with open(mac_filepath, 'w') as mac_file: mac_file.write(filled_template)
+
+            subprocess.run(run_sim, cwd = directory, check = True, shell = True)
             
-            try: subprocess.run(run_sim, cwd = directory, check = True, shell = True, stdout = subprocess.DEVNULL)
-            except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
+            #try: subprocess.run(run_sim, cwd = directory, check = True, shell = True)#, stdout = subprocess.DEVNULL)
+            #except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
 
             output_name = f"Aang_{angle}"
             if os.path.exists(temp_folder / f"{output_name}.root"):
@@ -1771,9 +1774,6 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
             try: shutil.move(merged_file_path, temp_folder)
             except OSError as error: print(f"Error moving file: {error}"); raise
 
-    Simulation_Thread = threading.Thread(target = CT_Loop, daemon = True)
-    Simulation_Thread.start()
-    
     def Finally():
 
         global finished_flag
@@ -1782,10 +1782,13 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
         
         end_time = time.perf_counter()
         formatted_Time = Formatted_Time(end_time - start_time)
-        print("Finished Simulating from {angles[0]} to {angle} angles. Time Elapsed: {formatted_Time}")
+        print(f"Finished Simulating from {angles[0]} to {angle} angles. Time Elapsed: {formatted_Time}")
 
         if alarm == True: PlayAlarm()
         finished_flag = True
+
+    Simulation_Thread = threading.Thread(target = CT_Loop, daemon = True)
+    Simulation_Thread.start()
 
     finally_thread = threading.Thread(target = Finally, daemon = True)
     finally_thread.start()

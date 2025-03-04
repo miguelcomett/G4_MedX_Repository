@@ -998,7 +998,7 @@ def Manage_Files(directory, starts_with, output_name):
 
     directory = os.path.join(directory, '')
 
-    trash_folder = directory + 'Trash_' + output_name + '/'
+    trash_folder = directory / 'Trash_' / output_name
     os.makedirs(trash_folder, exist_ok = True)
 
     file_list = []

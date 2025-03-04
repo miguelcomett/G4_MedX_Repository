@@ -1767,9 +1767,9 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
                 except subprocess.CalledProcessError as error: print(f"Error during simulation: {error}"); continue  # Skip to the next angle
 
             output_name = f"Aang_{angle}"
-            if os.path.exists(temp_folder / f"{output_name}.root"):
+            if os.path.exists(CT_Folder / f"{output_name}.root"):
                 counter = 0
-                while os.path.exists(temp_folder / f"{output_name}_{counter}.root"): counter = counter + 1
+                while os.path.exists(CT_Folder / f"{output_name}_{counter}.root"): counter = counter + 1
                 output_name = root_folder / f"{output_name}_{counter}"
 
             with open(os.devnull, "w") as fnull: 
@@ -1777,7 +1777,7 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
 
             merged_file_path = root_folder / f"{output_name}.root"
 
-            try: shutil.move(merged_file_path, temp_folder)
+            try: shutil.move(merged_file_path, CT_Folder)
             except OSError as error: print(f"Error moving file: {error}"); raise
 
     def Finally():

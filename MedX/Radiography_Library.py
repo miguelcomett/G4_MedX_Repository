@@ -1711,7 +1711,7 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
 
     directory, run_sim, root_folder, mac_filepath, temp_folder = Simulation_Setup(executable_file, mac_filename, None)
 
-    CT_Folder = 'Tomography'
+    CT_Folder = directory / 'ROOT' / 'Tomography'
     os.makedirs(CT_Folder, exist_ok = True)
 
     y_start = slices[0]

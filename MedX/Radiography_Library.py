@@ -913,11 +913,37 @@ def UI_RunDEXA():
 
 # 1.3. ========================================================================================================================================================
 
+def Manage_Merge_Files(directory, starts_with, output_name):
+
+    directory = os.path.join(directory, '')
+
+    trash_folder = f"{directory}Trash_{output_name}"
+    os.makedirs(trash_folder, exist_ok = True)
+
+    file_list = []
+    for file in os.listdir(directory):
+        if file.endswith('.root') and file.startswith(starts_with): 
+            file_path  = os.path.join(directory, file)
+            shutil.move(file_path, trash_folder)
+            file_list.append(os.path.join(trash_folder, file))
+
+    if file_list == []: raise RuntimeError("No files found. Please check your inputs.")
+
+    if output_name.endswith('.root'): output_name = output_name.rstrip('.root')
+    merged_file = directory + output_name 
+    if not os.path.exists(merged_file + ".root"): merged_file = merged_file + ".root"
+    if os.path.exists(merged_file + ".root"):
+        counter = 0
+        while os.path.exists(f"{merged_file}_{counter}.root"): counter += 1
+        merged_file = f"{merged_file}_{counter}.root"
+
+    return trash_folder, file_list, merged_file
+
 def Merge_Roots_HADD(directory, starts_with, output_name, trim_coords):
     
     if trim_coords == None: 
 
-        trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
+        trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
         hadd_command = ["hadd", '-f', merged_file] + file_list
 
         try:
@@ -946,7 +972,7 @@ def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
 
     import uproot, dask.array as da
 
-    trash_folder, file_list, merged_file = Manage_Files(directory, starts_with, output_name)
+    trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
 
     merged_trees_data = {}
 
@@ -993,32 +1019,6 @@ def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
 
     Trash_Folder(trash_folder)
     print(f"Merged data written to: {merged_file}")
-
-def Manage_Files(directory, starts_with, output_name):
-
-    directory = os.path.join(directory, '')
-
-    trash_folder = directory / 'Trash_' / output_name
-    os.makedirs(trash_folder, exist_ok = True)
-
-    file_list = []
-    for file in os.listdir(directory):
-        if file.endswith('.root') and file.startswith(starts_with): 
-            file_path  = os.path.join(directory, file)
-            shutil.move(file_path, trash_folder)
-            file_list.append(os.path.join(trash_folder, file))
-
-    if file_list == []: raise RuntimeError("No files found. Please check your inputs.")
-
-    if output_name.endswith('.root'): output_name = output_name.rstrip('.root')
-    merged_file = directory + output_name 
-    if not os.path.exists(merged_file + ".root"): merged_file = merged_file + ".root"
-    if os.path.exists(merged_file + ".root"):
-        counter = 0
-        while os.path.exists(f"{merged_file}_{counter}.root"): counter += 1
-        merged_file = f"{merged_file}_{counter}.root"
-
-    return trash_folder, file_list, merged_file
 
 # 1.4. ========================================================================================================================================================
 
@@ -1770,7 +1770,7 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
             if os.path.exists(CT_Folder / f"{output_name}.root"):
                 counter = 0
                 while os.path.exists(CT_Folder / f"{output_name}_{counter}.root"): counter = counter + 1
-                output_name = root_folder / f"{output_name}_{counter}"
+                output_name = f"{output_name}_{counter}"
 
             with open(os.devnull, "w") as fnull: 
                 with redirect_stdout(fnull): Merge_Roots_HADD(root_folder, starts_with, output_name, trim_coords = None)

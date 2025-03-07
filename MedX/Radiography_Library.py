@@ -1871,6 +1871,19 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
         root_name = f"{filename}_{i}.root"
         heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size, progress_bar=False)
 
+        xlength = heatmap.shape[0]
+        xlength = xlength * pixel_size
+
+        if i > 90 and i < 270:
+           
+           theta = (i-180) * (2*np.pi / 360)
+
+           min = math.floor( (xlength/2 - 230*np.cos(theta/2)) / pixel_size )
+           max = math.floor( (xlength/2 + 230*np.cos(theta/2)) / pixel_size )
+           
+           heatmap[:, : min] = 0
+           heatmap[:, max :] = 0
+
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
         np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
 
@@ -1937,10 +1950,19 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
 
-        if i >= 90 and i < 270:
+        # xlim = heatmap.shape[0]
+        # pixel_size = 0.5
+        # xlim = xlim * pixel_size
 
-           heatmap[:, :230   * np.cos(i/2)] = 0
-           heatmap[:, :230*2 * np.cos(i/2)] = 0
+        # if i > 90 and i < 270:
+           
+        #    theta = (i-180) * (2*np.pi / 360)
+
+        #    min = math.floor( (xlim/2 - 230*np.cos(theta/2)) / pixel_size )
+        #    max = math.floor( (xlim/2 + 230*np.cos(theta/2)) / pixel_size )
+           
+        #    heatmap[:, : min] = 0
+        #    heatmap[:, max :] = 0
 
         return heatmap
 
@@ -2011,7 +2033,7 @@ def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_facto
         slice = slice + constant_factor
         slice = slice * linear_factor
 
-        slice = 1000 * (slice - mu_water) / (mu_water - mu_air)
+        # slice = 1000 * (slice - mu_water) / (mu_water - mu_air)
         # slice = np.round(slice)
         # slice = slice.astype(int)
         

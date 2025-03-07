@@ -1697,7 +1697,7 @@ def MAC_Template_CT(
 
     return "\n".join(mac_template)  
 
-def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
+def CT_Loop(threads, starts_with, angles, slices, gun_parameters, beams_per_line, alarm):
 
     from tqdm import tqdm
 
@@ -1743,7 +1743,7 @@ def CT_Loop(threads, starts_with, angles, slices, beams_per_line, alarm):
                     file_path = os.path.join(directory, file_name)
                     Trash_Folder(file_path)
 
-            mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=None)
+            mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=gun_parameters)
             
             beam_lines = ""
             for y in range(y_start, y_end + 1, step): 
@@ -1895,6 +1895,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
     import dask; from dask.diagnostics import ProgressBar; from dask import delayed
     from skimage.transform import iradon; from scipy import ndimage
+    from tqdm import tqdm
 
     start = degrees[0]
     end = degrees[1]
@@ -1930,14 +1931,16 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     @delayed
     def process_heatmap(i, csv_read, sigma):
         
-        read_name = f"{csv_read}{'CT_raw_'}{i}.csv"
-        
-        # raw_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
-        # raw_heatmap = raw_heatmap.to_numpy()        
+        read_name = f"{csv_read}{'CT_raw_'}{i}.csv"   
         raw_heatmap = np.genfromtxt(read_name, delimiter=',')
         
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
+
+        if i >= 90 and i < 270:
+
+           heatmap[:, :230   * np.cos(i/2)] = 0
+           heatmap[:, :230*2 * np.cos(i/2)] = 0
 
         return heatmap
 
@@ -1980,7 +1983,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     print('Slices Matrix Shape:', slices_matrix.shape)
         
     os.makedirs(csv_write, exist_ok = True)
-    for i, y in enumerate(slices_vector): 
+    for i in tqdm(range(len(slices_vector)), desc = "Writting CSV's", unit = " Slices", leave = True): 
         
         slice = slices_matrix[i]
         slice[np.isnan(slice)] = 0
@@ -1990,7 +1993,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         write_name = f"{csv_write}{'CT_slice_'}{i}.csv"
         np.savetxt(write_name, slice, delimiter=',', fmt='%.8f') # .8f
 
-    print(f"\n Succesfully written slices to: {csv_write}")
+    print(f"\nSuccesfully written slices to: {csv_write}")
 
     return heatmap_matrix, sinogram_matrix, slices_matrix
 
@@ -2008,12 +2011,9 @@ def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_facto
         slice = slice + constant_factor
         slice = slice * linear_factor
 
-        # slice = 1000 * (slice - mu_water) / (mu_water - mu_air)
-        
-        # slice = (slice - 0.01) 
-        
-        slice = np.round(slice)
-        slice = slice.astype(int)
+        slice = 1000 * (slice - mu_water) / (mu_water - mu_air)
+        # slice = np.round(slice)
+        # slice = slice.astype(int)
         
         slice[slice < air_parameter] = -1000
         
@@ -2022,9 +2022,9 @@ def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_facto
             threshold = np.percentile(positive_values, percentile)
             slice[slice > threshold] = slice.min() #-1000 
 
-        if slice.max() < 0: print(f"Slice {i} maximum value ({slice.max()}) is lower than 0")
-        if slice.max() > 3000: print(f"Slice {i} maximum value ({slice.max()}) is higher than 3,000")
-        if slice.min() > -1000: print(f"Slice {i} minimum value ({slice.min()}) is higher than -1,000")
+        # if slice.max() < 0: print(f"Slice {i} maximum value ({slice.max()}) is lower than 0")
+        # if slice.max() > 3000: print(f"Slice {i} maximum value ({slice.max()}) is higher than 3,000")
+        # if slice.min() > -1000: print(f"Slice {i} minimum value ({slice.min()}) is higher than -1,000")
 
         HU_images[i] = slice
 
@@ -2032,129 +2032,69 @@ def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_facto
 
     return HU_images
 
-def Export_to_Dicom(HU_images, size_y, directory, compressed):
+def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compressed):
 
-    import pydicom; from pydicom.uid import RLELossless; from pydicom.encaps import encapsulate; from pydicom.dataset import Dataset; 
+    import pydicom; from pydicom.uid import RLELossless; from pydicom.encaps import encapsulate; from pydicom.dataset import Dataset
+    
+    def create_dicom_instance(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed):
 
-    os.makedirs(directory, exist_ok = True)
-
-    image2d = HU_images[0].astype('int16')
-    seriesUID = pydicom.uid.generate_uid()
-    studyInstance = pydicom.uid.generate_uid()
-    frameOfReference = pydicom.uid.generate_uid()
-
-    if compressed:
-        for i, image in enumerate(HU_images):
-            meta = pydicom.Dataset()
-            meta.MediaStorageSOPClassUID = pydicom.uid.CTImageStorage
-            instanceUID_var = pydicom.uid.generate_uid()
-            meta.MediaStorageSOPInstanceUID = instanceUID_var
-            meta.TransferSyntaxUID= pydicom.uid.ImplicitVRLittleEndian
-            ds = Dataset()
-            ds.file_meta = meta
-
-            ds.SOPInstanceUID = instanceUID_var
-            ds.SOPClassUID = pydicom.uid.CTImageStorage 
-            ds.PatientName = "NAME^NONE"
-            ds.PatientID = "NOID"
-
-            ds.Modality = "CT"
-            ds.SeriesInstanceUID = seriesUID
-            ds.StudyInstanceUID = studyInstance
-            ds.FrameOfReferenceUID = frameOfReference
-            ds.SeriesNumber = 3
-
-            ds.BitsStored = 16
-            ds.BitsAllocated = 16
-            ds.SamplesPerPixel = 1
-            ds.HighBit = 15
-            ds.WindowCenter = 30
-            ds.WindowWidth = 100
-
-            ds.Rows = image2d.shape[0]
-            ds.Columns = image2d.shape[1]
-            ds.AcquisitionNumber = 1
-
-            ds.ImageOrientationPatient = r"1\0\0\0\1\0"
-            ds.ImageType = r"ORIGINAL\PRIMARY\AXIAL"
-
-            ds.RescaleIntercept = "0"
-            ds.RescaleSlope = "1"
-            ds.PixelSpacing = r"0.5\0.5"
-            ds.PhotometricInterpretation = "MONOCHROME2"
-            ds.PixelRepresentation = 1
-            ds.RescaleType = 'HU'
-            name = directory + f"/I{i}"
-            thickness = (size_y * 2)/len(HU_images)
-            ds.SliceThickness = str(thickness)
-            ds.SpacingBetweenSlices = str(thickness)
-            ds.ImagePositionPatient = f"0\\0\\{thickness * i}"
-            ds.SliceLocation = str(thickness * i)+'00'
-            ds.InstanceNumber = i+1
-            image2d = image.astype('int16')
-            ds.PixelData = encapsulate([image2d.tobytes()])
-            ds.compress(RLELossless)
-            pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)
-            ds.save_as(name + '.dcm')
+        meta = Dataset()
+        meta.MediaStorageSOPClassUID = pydicom.uid.CTImageStorage
+        instanceUID_var = pydicom.uid.generate_uid()
+        meta.MediaStorageSOPInstanceUID = instanceUID_var
+        meta.TransferSyntaxUID = pydicom.uid.ImplicitVRLittleEndian
         
-    else:
-        for i, image in enumerate(HU_images):
-            
-            meta = pydicom.Dataset()
-            meta.MediaStorageSOPClassUID = pydicom.uid.CTImageStorage
-            instanceUID_var = pydicom.uid.generate_uid()
-            meta.MediaStorageSOPInstanceUID = instanceUID_var
-            meta.TransferSyntaxUID= pydicom.uid.ImplicitVRLittleEndian
-            ds = Dataset()
-            ds.file_meta = meta
+        ds = Dataset()
+        ds.file_meta = meta
+        ds.SOPInstanceUID = instanceUID_var
+        ds.SOPClassUID = pydicom.uid.CTImageStorage
+        ds.PatientName = "NAME^NONE"
+        ds.PatientID = "NOID"
+        ds.Modality = "CT"
+        ds.SeriesInstanceUID = seriesUID
+        ds.StudyInstanceUID = studyInstance
+        ds.FrameOfReferenceUID = frameOfReference
+        ds.SeriesNumber = 3
+        ds.BitsStored = ds.BitsAllocated = 16
+        ds.SamplesPerPixel = 1
+        ds.HighBit = 15
+        ds.WindowCenter = 30
+        ds.WindowWidth = 100
+        ds.Rows, ds.Columns = image.shape
+        ds.AcquisitionNumber = 1
+        ds.ImageOrientationPatient = "1\\0\\0\\0\\1\\0"
+        ds.ImageType = "ORIGINAL\\PRIMARY\\AXIAL"
+        ds.RescaleIntercept = "0"
+        ds.RescaleSlope = "1"
+        ds.PixelSpacing = f"{0.5:.6g}\\{0.5:.6g}"
+        ds.PhotometricInterpretation = "MONOCHROME2"
+        ds.PixelRepresentation = 1
+        ds.RescaleType = 'HU'
 
-            ds.is_little_endian = True
-            ds.is_implicit_VR = False
-
-            ds.SOPInstanceUID = instanceUID_var
-            ds.SOPClassUID = pydicom.uid.CTImageStorage 
-            ds.PatientName = "NAME^NONE"
-            ds.PatientID = "NOID"
-
-            ds.Modality = "CT"
-            ds.SeriesInstanceUID = seriesUID
-            ds.StudyInstanceUID = studyInstance
-            ds.FrameOfReferenceUID = frameOfReference
-            ds.SeriesNumber = 3
-
-            ds.BitsStored = 16
-            ds.BitsAllocated = 16
-            ds.SamplesPerPixel = 1
-            ds.HighBit = 15
-            ds.WindowCenter = 30
-            ds.WindowWidth = 100
-
-            ds.Rows = image2d.shape[0]
-            ds.Columns = image2d.shape[1]
-            ds.AcquisitionNumber = 1
-
-            ds.ImageOrientationPatient = r"1\0\0\0\1\0"
-            ds.ImageType = r"ORIGINAL\PRIMARY\AXIAL"
-
-            ds.RescaleIntercept = "0"
-            ds.RescaleSlope = "1"
-            ds.PixelSpacing = r"0.5\0.5"
-            ds.PhotometricInterpretation = "MONOCHROME2"
-            ds.PixelRepresentation = 1
-            ds.RescaleType = 'HU'
-            name = directory + f"/I{i}"
-            pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)
-            thickness = (size_y * 2)/len(HU_images)
-            ds.SliceThickness = str(thickness)
-            ds.SpacingBetweenSlices = str(thickness)
-            ds.ImagePositionPatient = f"0\\0\\{thickness * i}"
-            ds.SliceLocation = str(thickness * i)+'00'
-            ds.InstanceNumber = i+1
-            image2d = image.astype('int16')
-            ds.PixelData = image2d.tobytes()
-            ds.save_as(name + '.dcm')
-
+        ds.SliceThickness = str(slice_thickness)
+        ds.SpacingBetweenSlices = str(slice_spacing)
+        ds.ImagePositionPatient = f"{0:.6g}\\{0:.6g}\\{slice_spacing * i:.6g}"
+        ds.SliceLocation = f"{slice_spacing * i:.6g}"
+        
+        ds.InstanceNumber = i + 1
+        
+        image2d = image.astype('int16')
+        ds.PixelData = encapsulate([image2d.tobytes()]) if compressed else image2d.tobytes()
+        
+        if compressed: ds.compress(RLELossless)
+    
+        pydicom.dataset.validate_file_meta(ds.file_meta, enforce_standard=True)
+        ds.save_as(os.path.join(directory, f"I{i}.dcm"))
+    
+    os.makedirs(directory, exist_ok=True)
+    
+    seriesUID, studyInstance, frameOfReference = (pydicom.uid.generate_uid() for _ in range(3))
+    
+    for i, image in enumerate(HU_images):
+        create_dicom_instance(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed)
+    
     print(f"Written DICOMS to {directory}")
+
 
 # CT Plots ====================================================================================================================================================
 

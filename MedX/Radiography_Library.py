@@ -1656,7 +1656,7 @@ def MAC_Template_CT(
 
     if spectra_mode        is None: spectra_mode = 'mono'
     if detector_parameters is None: detector_parameters = {'nColumns': 1, 'nRows': 1}
-    if gun_parameters      is None: gun_parameters = {'X': 0, 'Y': 0, 'gaussX': 'true', 'SpanX': 230, 'SpanY': 0.01}
+    if gun_parameters      is None: gun_parameters = {'X': 0, 'gaussX': 'true', 'SpanX': 230, 'SpanY': 0.01}
 
     mac_template = []
 
@@ -1679,7 +1679,6 @@ def MAC_Template_CT(
         f"/Pgun/gaussX {gun_parameters['gaussX']}",
         f"/Pgun/SpanX {gun_parameters['SpanX']} mm",
         f"/Pgun/Xcos true",
-        f"/Pgun/Y {gun_parameters['Y']} mm",
         f"/Pgun/SpanY {gun_parameters['SpanY']} mm",
         f""
     ])
@@ -1697,7 +1696,7 @@ def MAC_Template_CT(
 
     return "\n".join(mac_template)  
 
-def CT_Loop(threads, starts_with, angles, slices, gun_parameters, beams_per_line, alarm):
+def CT_Loop(threads, starts_with, angles_range, slices, gun_parameters, beams_per_line, alarm):
 
     from tqdm import tqdm
 
@@ -1718,9 +1717,16 @@ def CT_Loop(threads, starts_with, angles, slices, gun_parameters, beams_per_line
     y_end = slices[1]
     step = slices[2]
 
-    if step == 1: angle_step_str = f"at Every Angle"
-    if step >  1: angle_step_str = f"Every {step} Angles"
-    print(f"-> Calculating Projections {angle_step_str}.")
+    angles = list(angles_range)
+
+    if len(angles) == 1: print(f"-> Calculating Projection at {angles[0]}° Degrees.")
+        
+    if len(angles) > 1: 
+        
+        angle_step = angles[1] - angles[0]
+
+        if angle_step == 1: print(f"-> Calculating Projections at Every Degree.")
+        if angle_step  > 1: print(f"-> Calculating Projections Every {angle_step} Degrees")
 
     Button_Main(); Button_Action()
 
@@ -1729,7 +1735,7 @@ def CT_Loop(threads, starts_with, angles, slices, gun_parameters, beams_per_line
         global finished_flag
         global angle
     
-        for angle in tqdm(angles, desc = "Creating CT", unit = "Angles", leave = True):
+        for angle in tqdm(angles_range, desc = "Creating CT", unit = " Angles", leave = True):
 
             if stop_flag.is_set(): 
                 global finished_flag
@@ -1850,7 +1856,7 @@ def CT_Summary_Data(directory, summary_tree_name, summary_branches, spectra_tree
     print(f"-> Energy Deposited in Tissue: \033[1m{EnergyDeposition:,.3f} TeV \033[0m")
     print(f"-> Dose of Radiation Received: \033[1m{RadiationDose:,.5f} uSv    \033[0m")
 
-def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, csv_folder):
+def Calculate_Projections(directory, filename, degrees, root_structure, dimensions, pixel_size, gun_span, csv_folder):
     
     import dask; from dask import delayed; from dask.diagnostics import ProgressBar
 
@@ -1874,20 +1880,20 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
         xlength = heatmap.shape[0]
         xlength = xlength * pixel_size
 
-        if i > 90 and i < 270:
+        # if i > 90 and i < 270:
            
-           theta = (i-180) * (2*np.pi / 360)
+        #    theta = (i-180) * (2*np.pi / 360)
 
-           min = math.floor( (xlength/2 - gun_span*np.cos(theta/2)) / pixel_size )
-           max = math.floor( (xlength/2 + gun_span*np.cos(theta/2)) / pixel_size )
+        #    min = int( (xlength/2 - gun_span*np.cos(theta/2)) / pixel_size )
+        #    max = int( (xlength/2 + gun_span*np.cos(theta/2)) / pixel_size )
            
-           heatmap[:, : min] = 0
-           heatmap[:, max :] = 0
+        #    heatmap[:, : min] = 0
+        #    heatmap[:, max :] = 0
 
-        else:
+        # else:
 
-            heatmap[:, : (xlength/2+ gun_span) / pixel_size] = 0
-            heatmap[:, (xlength/2 - gun_span) / pixel_size :] = 0
+        #     heatmap[:, : int( (xlength/2 - gun_span) / pixel_size )   ] = 0
+        #     heatmap[:,   int( (xlength/2 + gun_span) / pixel_size ) : ] = 0
 
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
         np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
@@ -1895,7 +1901,8 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
         return heatmap
 
     heatmap_tasks = []
-    for i in projections: heatmap_tasks += [calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder)]
+    for i in projections: 
+        heatmap_tasks += [calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, gun_span, csv_folder)]
     print('Calculating Heatmaps for Every Angle in CT:')
     with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
 
@@ -1909,7 +1916,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     return raw_heatmap
 
-def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sigma):
+def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sigma, write):
 
     import dask; from dask.diagnostics import ProgressBar; from dask import delayed
     from skimage.transform import iradon; from scipy import ndimage
@@ -1942,7 +1949,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     slices_vector = (np.arange(slice_0, slice_f, slice_step))
     slices_vector = np.round(slices_vector).astype(int)
 
-    heatmap_matrix  = np.zeros(len(projections), dtype = object)
+    heatmap_matrix  = np.zeros(len(projections),   dtype = object)
     sinogram_matrix = np.zeros(len(slices_vector), dtype = object)
     slices_matrix   = np.zeros(len(slices_vector), dtype = object)
 
@@ -1979,36 +1986,58 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     print('Reading and Performing Logarithmic Transform (1/3)...')
     with ProgressBar(): heatmaps = dask.compute(*heatmap_tasks, scheduler='processes')
     heatmap_matrix = np.stack(heatmaps, axis=0)
-    print('Heatmap Matrix Shape:', heatmap_matrix.shape)
+    # print('Heatmap Matrix Shape:', heatmap_matrix.shape)
 
     sinogram_tasks = []
     for y in slices_vector: sinogram_tasks = sinogram_tasks + [compute_sinogram(y, heatmap_matrix)]
     print('\nComputing Sinograms (2/3)...')
     with ProgressBar(): sinograms = dask.compute(*sinogram_tasks)    
     sinogram_matrix = np.stack(sinograms, axis=0)
-    print('Sinogram Matrix Shape:', sinogram_matrix.shape)
+    # print('Sinogram Matrix Shape:', sinogram_matrix.shape)
 
     slices_tasks = []
     for i in range(len(slices_vector)): slices_tasks = slices_tasks + [reconstruct_slice(i, sinogram_matrix, projections)]
     print('\nReconstructing slices (3/3)...')
     with ProgressBar(): slices = dask.compute(*slices_tasks) 
     slices_matrix = np.stack(slices, axis=0)
-    print('Slices Matrix Shape:', slices_matrix.shape)
-        
-    os.makedirs(csv_write, exist_ok = True)
-    for i in tqdm(range(len(slices_vector)), desc = "Writting CSV's", unit = " Slices", leave = True): 
-        
-        slice = slices_matrix[i]
-        slice[np.isnan(slice)] = 0
-        
-        slice[slice < 0] = 0
+    # print('Slices Matrix Shape:', slices_matrix.shape)
+    print()
 
-        write_name = f"{csv_write}{'CT_slice_'}{i}.csv"
-        np.savetxt(write_name, slice, delimiter=',', fmt='%.8f') # .8f
+    if write == True:
+        
+        os.makedirs(csv_write, exist_ok = True)
+        os.makedirs(csv_write + '/Heatmaps',  exist_ok = True)
+        os.makedirs(csv_write + '/Sinograms', exist_ok = True)
+        os.makedirs(csv_write + '/Slices',    exist_ok = True)
 
-    print(f"\nSuccesfully written slices to: {csv_write}")
+        for i in tqdm(range(len(projections)), desc = "Saving Heatmaps", unit = " Degrees", leave = True): 
+            
+            heatmap = heatmap_matrix[i]
+            heatmap[np.isnan(heatmap)] = 0
+            heatmap[heatmap < 0] = 0
 
-    return heatmap_matrix, sinogram_matrix, slices_matrix
+            write_name = f"{csv_write}/Heatmaps/{'Projection_'}{i}.csv"
+            np.savetxt(write_name, heatmap, delimiter=',', fmt='%.6f')
+
+        for i in tqdm(range(len(slices_vector)), desc = "Saving Sinograms", unit = " Sinograms", leave = True): 
+            
+            sinogram = sinogram_matrix[i]
+            sinogram[np.isnan(sinogram)] = 0
+            sinogram[sinogram < 0] = 0
+
+            write_name = f"{csv_write}/Sinograms/{'Sinogram_'}{i}.csv"
+            np.savetxt(write_name, sinogram, delimiter=',', fmt='%.6f')
+
+        for i in tqdm(range(len(slices_vector)), desc = "Saving Slices", unit = " Slices", leave = True): 
+            
+            slice = slices_matrix[i]
+            slice[np.isnan(slice)] = 0
+            slice[slice < 0] = 0
+
+            write_name = f"{csv_write}/Slices/{'Slice_'}{i}.csv"
+            np.savetxt(write_name, slice, delimiter=',', fmt='%.6f')
+
+        print(f"\nSuccesfully Written Data to: {csv_write}")
 
 def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
 
@@ -2130,34 +2159,55 @@ def Ploty_from_file(directory, filename):
 
     return projection
 
-def Plotly_3x1(heatmap_matrix, sinogram_matrix, slices_matrix, slice):
+def Plotly_3x1(csv_folder, step):
 
     import plotly.graph_objects as go; from plotly.subplots import make_subplots
 
-    fig = make_subplots(rows = 1, cols = 3, shared_xaxes = False, shared_yaxes = False, horizontal_spacing = 0.05 )
-    fig.add_trace(go.Heatmap(z = heatmap_matrix[0],  colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 1)
-    fig.add_trace(go.Heatmap(z = sinogram_matrix[slice], colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 2)
-    fig.add_trace(go.Heatmap(z = slices_matrix[slice],   colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 3)
-    fig.update_layout(
-        height = 400, width = 1150, margin = dict(l = 40, r = 40, t = 60, b = 60),
-        yaxis1 = dict(autorange = 'reversed'), yaxis2 = dict(autorange = 'reversed'), yaxis3 = dict(autorange = 'reversed'),
-        annotations = [
-        dict(text = "Radiograph Projection",    x = 0.075, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
-        dict(text = "Sinogram Slice",           x = 0.500, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
-        dict(text = "Reconstructed Slice",      x = 0.915, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
-        dict(text = f"Slice Number: {slice+1}", x = 0.500, y =-0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=14))]
-    )
-    fig.show()
+    heatmap_folder  = csv_folder + '/Heatmaps/'
+    sinogram_folder = csv_folder + '/Sinograms/'
+    slices_folder   = csv_folder + '/Slices/'
 
-def MatPlotLib_CT(heatmap_matrix, sinogram_matrix, slices_matrix, step):
+    heatmap_files = [f for f in os.listdir(heatmap_folder) if os.path.isfile(os.path.join(heatmap_folder, f))]
+    slices_files  = [f for f in os.listdir(slices_folder)  if os.path.isfile(os.path.join(slices_folder, f))]
 
-    plotis = np.arange(0, 60, step)
-    for slice in plotis:
-        plt.figure(figsize = (10.5, 3)); 
-        plt.subplot(1,3,1); plt.imshow(heatmap_matrix[slice*6], cmap="gray"); plt.colorbar(); plt.title("Radiograph Projection", fontsize=11, pad=15)
-        plt.subplot(1,3,2); plt.imshow(sinogram_matrix[slice],  cmap="gray"); plt.colorbar(); plt.title("Sinogram Slice",        fontsize=11, pad=35)
-        plt.subplot(1,3,3); plt.imshow(slices_matrix[slice],    cmap="gray"); plt.colorbar(); plt.title("Reconstructed Slice",   fontsize=11, pad=15)
-        plt.text(-250, 300, f"Slice Number: {slice}", ha = 'center', fontsize = 11, color ='gray')
-        plt.show()
+    number_of_projections = len(heatmap_files)
+    number_of_slices = len(slices_files)
+
+    # print(number_of_projections)
+    # print(number_of_slices)
+
+    i = number_of_projections / number_of_slices
+    plotis = range(0, number_of_slices, int(step))
+
+    for index in plotis:
+
+        deg_id = int(index * i)
+        
+        heatmap  = np.genfromtxt(heatmap_folder  + f'Projection_{deg_id}.csv', delimiter=',')
+        sinogram = np.genfromtxt(sinogram_folder + f'Sinogram_{index}.csv',    delimiter=',')
+        slice    = np.genfromtxt(slices_folder   + f'Slice_{index}.csv',       delimiter=',')
+
+        width = sinogram.shape[1]
+        if width < 360: sinogram = np.pad(sinogram, ((0, 0), (0, 360-width)), mode='constant', constant_values=0)      
+
+        fig = make_subplots(rows = 1, cols = 3, shared_xaxes = False, shared_yaxes = False, horizontal_spacing = 0.05 )
+        
+        fig.add_trace(go.Heatmap(z = heatmap,  colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 1)
+        fig.add_trace(go.Heatmap(z = sinogram, colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 2)
+        fig.add_trace(go.Heatmap(z = slice,    colorscale = [[0, 'black'], [1, 'white']], showscale = False), row = 1, col = 3)
+        
+        fig.update_layout(
+            
+            height = 400, width = 1150, margin = dict(l = 40, r = 40, t = 60, b = 60),
+            yaxis1 = dict(autorange = 'reversed'), yaxis2 = dict(autorange = 'reversed'), yaxis3 = dict(autorange = 'reversed'),
+            annotations = [
+            dict(text = "Radiograph Projection",    x = 0.070, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+            dict(text = "Sinogram Slice",           x = 0.500, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+            dict(text = "Reconstructed Slice",      x = 0.925, y = 1.12, showarrow=False, xref="paper", yref="paper", font=dict(size=15)),
+            dict(text = f"Projection: {deg_id+1}",  x = 0.110, y =-0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=14)),
+            dict(text = f"Slice: {index+1}",        x = 0.700, y =-0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=14))]
+        )
+        
+        fig.show()
 
 # end ========================================================================================================================================================

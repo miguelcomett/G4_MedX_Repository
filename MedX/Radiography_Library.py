@@ -1866,7 +1866,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     y_branch = root_structure[2]
 
     @delayed
-    def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, csv_folder):
+    def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, gun_span, csv_folder):
         
         root_name = f"{filename}_{i}.root"
         heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size, progress_bar=False)
@@ -1878,11 +1878,16 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
            
            theta = (i-180) * (2*np.pi / 360)
 
-           min = math.floor( (xlength/2 - 230*np.cos(theta/2)) / pixel_size )
-           max = math.floor( (xlength/2 + 230*np.cos(theta/2)) / pixel_size )
+           min = math.floor( (xlength/2 - gun_span*np.cos(theta/2)) / pixel_size )
+           max = math.floor( (xlength/2 + gun_span*np.cos(theta/2)) / pixel_size )
            
            heatmap[:, : min] = 0
            heatmap[:, max :] = 0
+
+        else:
+
+            heatmap[:, : (xlength/2+ gun_span) / pixel_size] = 0
+            heatmap[:, (xlength/2 - gun_span) / pixel_size :] = 0
 
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
         np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
@@ -1950,20 +1955,6 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
 
-        # xlim = heatmap.shape[0]
-        # pixel_size = 0.5
-        # xlim = xlim * pixel_size
-
-        # if i > 90 and i < 270:
-           
-        #    theta = (i-180) * (2*np.pi / 360)
-
-        #    min = math.floor( (xlim/2 - 230*np.cos(theta/2)) / pixel_size )
-        #    max = math.floor( (xlim/2 + 230*np.cos(theta/2)) / pixel_size )
-           
-        #    heatmap[:, : min] = 0
-        #    heatmap[:, max :] = 0
-
         return heatmap
 
     @delayed
@@ -1999,7 +1990,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
     slices_tasks = []
     for i in range(len(slices_vector)): slices_tasks = slices_tasks + [reconstruct_slice(i, sinogram_matrix, projections)]
-    print('\nReconstruction slices (3/3)...')
+    print('\nReconstructing slices (3/3)...')
     with ProgressBar(): slices = dask.compute(*slices_tasks) 
     slices_matrix = np.stack(slices, axis=0)
     print('Slices Matrix Shape:', slices_matrix.shape)
@@ -2116,7 +2107,6 @@ def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compre
         create_dicom_instance(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed)
     
     print(f"Written DICOMS to {directory}")
-
 
 # CT Plots ====================================================================================================================================================
 

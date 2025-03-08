@@ -44,14 +44,14 @@ class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
         G4ParticleGun * GetParticleGun() const {return particleGun;}
 
         G4int GetGunMode() const {return SpectraMode;}
-        std::map<G4float, G4int> GetEnergySpectra() const {return energyHistogram;}
+        std::map <G4float, G4int> GetEnergySpectra() const {return energyHistogram;}
         void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & energyDataPoints);
         G4double InverseCumul();
         void SpectraFunction(); 
         
     private:
 
-        std::map<G4float, G4int> energyHistogram; 
+        std::map <G4float, G4int> energyHistogram; 
 
         G4ParticleGun * particleGun;        
         PrimaryGeneratorMessenger * GeneratorMessenger;
@@ -66,7 +66,8 @@ class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
         G4int threadID, SpectraMode, Decimals, roundingScale;
         G4float RealEnergy;
         const G4double pi = 3.14159265358979323846;
-        G4double x0, y0, z0, thoraxAngle, gunAngle, Theta, Phi, AngleInCarts, Xpos, Ypos, Zpos, SpanX, SpanY, GunAngle, random, peak, min, max;
+        G4double x0, y0, z0, model_width, model_depth, minimum_span, thoraxAngle, gunAngle, Theta, Phi, AngleInCarts, Xpos, Ypos, Zpos, 
+                SpanX, SpanY, GunAngle, random, peak, min, max;
 
         G4ThreeVector photonPosition, photonMomentum;
         

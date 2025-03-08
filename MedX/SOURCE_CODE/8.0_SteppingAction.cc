@@ -30,7 +30,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
             }
         }
 
-        Stuck = true;
+        Stuck = false;
         
         if (Stuck == true) 
         {

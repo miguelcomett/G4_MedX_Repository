@@ -56,10 +56,19 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     if (Xcos == true) 
     {
         if (detectorConstruction) {thoraxAngle = detectorConstruction -> GetThoraxAngle();} else {thoraxAngle = 0;}
-        if (thoraxAngle > 90)  {gunAngle = thoraxAngle - 180;}
-        if (thoraxAngle > 270) {gunAngle = thoraxAngle - 360;}
-        gunAngle = gunAngle * (2*pi / 360);
-        x0 = x0 * std::cos(gunAngle/2);
+        
+        // if (thoraxAngle < 90)  {gunAngle = thoraxAngle;}
+        // if (thoraxAngle >= 90) {gunAngle = thoraxAngle - 180;}
+        // if (thoraxAngle > 270) {gunAngle = thoraxAngle - 360;}
+        // gunAngle = gunAngle * (2*pi / 360);
+        // x0 = x0 * std::cos(gunAngle/2);
+
+        gunAngle = thoraxAngle * (2*pi / 360);
+        model_width = 230; 
+        model_depth = 150;
+        minimum_span = model_depth / model_width;
+        minimum_span = minimum_span * 1.15; // padding for safety
+        x0 = x0 * ( (std::cos(gunAngle) * std::cos(gunAngle)) * (1-minimum_span) + minimum_span);
     }
 
     x0 = x0 + Xpos; 

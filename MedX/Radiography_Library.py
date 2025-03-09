@@ -1262,12 +1262,12 @@ def Plot_Heatmap(heatmap, save_as):
     plt.subplot(1, 3, 2); plt.plot(heatmap[rows//2, :])
     plt.subplot(1, 3, 3); plt.plot(heatmap[:, cols//2])
 
-def Plot_Plotly(heatmap, xlim, ylim):
+def Plotly_from_memory(projection, size):
 
     import plotly.graph_objects as go
 
-    fig = go.Figure(go.Heatmap(z = heatmap, x = xlim, y = ylim, colorscale = [[0, 'black'], [1, 'white']], showscale = True))
-    fig.update_layout(width = 800, height = 800, yaxis = dict(autorange = 'reversed'))    
+    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
+    fig.update_layout(width = size[0], height = size[1], xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
     fig.show()
 
 def Save_Heatmap_to_CSV(heatmap, save_folder, save_as):
@@ -1916,12 +1916,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     del heatmap_tasks
 
-    read_name = write_folder + f"{file_name}{start}.csv"
-    raw_heatmap = np.genfromtxt(read_name, delimiter=',')
-    lower = np.percentile(raw_heatmap, 0)
-    upper = np.percentile(raw_heatmap, 98)
-    clipped_htmp = np.clip(raw_heatmap, lower, upper)
-    Plotly_from_memory(clipped_htmp, size=[500, 500])
+    Plotly_from_file(directory = write_folder, filename = f"{file_name}{start}.csv", size = [500, 500])
 
 def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sigma, write):
 
@@ -1942,37 +1937,15 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     sample_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
     rows = sample_heatmap.shape[1]
 
-    y0   = slices_in[0]
-    yf   = slices_in[1]
-    step = slices_in[2]
-
-    slices_num = len(np.arange(y0, yf, step))
+    slices_num = len(np.arange(slices_in["initial"], slices_in["final"], slices_in["step"]))
     proportion = int(round(rows / slices_num)) # proportion = int(rows / slices_num)
 
-    slice_0 = slices_out[0]
-    slice_f = slices_out[1]
-    slice_step = slices_out[2]
-
-    slice_0 = slice_0 * proportion
-    slice_f = slice_f * proportion
-    slice_step = slice_step * proportion
-
-    slices_vector = np.arange(slice_0, slice_f, slice_step)
+    scaled_slices = {key: value * proportion for key, value in slices_out.items()}
+    slices_vector = np.arange(scaled_slices["initial"], scaled_slices["final"], scaled_slices["step"])
     slices_vector = np.round(slices_vector).astype(int)
 
     heatmap_matrix  = np.zeros(len(projections),   dtype = object)
     sinogram_matrix = np.zeros(len(slices_vector), dtype = object)
-    slices_matrix   = np.zeros(len(slices_vector), dtype = object)
-
-    # print(f"Height of Heatmap: {rows} pixels \n")
-    # print(sample_heatmap.shape[0])
-    # print('slices_num: ', slices_num)
-    # print('proportion: ', proportion)
-    # print(slice_0)
-    # print(slices_vector)
-    # print(heatmap_matrix.shape)
-    # print(sinogram_matrix.shape)
-    # print(slices_matrix.shape)
 
     if write == True:
 
@@ -2036,8 +2009,6 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
             write_name = f"{csv_write}{slices_folder}{'Slice_'}{i}.csv"
             np.savetxt(write_name, slice, delimiter = ',', fmt = decimals)
-        
-        return slice
     
     heatmap_tasks = []
     for i in projections: heatmap_tasks = heatmap_tasks + [process_heatmap(i, csv_read, sigma)]
@@ -2056,9 +2027,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     slices_tasks = []
     for i in range(len(slices_vector)): slices_tasks = slices_tasks + [reconstruct_slice(i, sinogram_matrix, projections)]
     print('\nReconstructing slices (3/3)...')
-    with ProgressBar(): slices = dask.compute(*slices_tasks) 
-    slices_matrix = np.stack(slices, axis=0)
-    # print('Slices Matrix Shape:', slices_matrix.shape)
+    with ProgressBar(): dask.compute(*slices_tasks)
     print()
 
     if write == True: 
@@ -2066,7 +2035,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         print(f"Succesfully Written Data to: {csv_write}")
         Plotly_3x1(csv_write, step=int(len(slices_vector)/3))
 
-    del heatmap_matrix, sinogram_matrix, slices_matrix
+    del heatmap_matrix, sinogram_matrix
 
 def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
 
@@ -2143,7 +2112,7 @@ def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compre
         ds.RescaleType = 'HU'
 
         ds.SliceThickness = str(slice_thickness)
-        ds.SpacingBetweenSlices = str(slice_spacing)
+        ds.SpacingBetweenSlices = str(slice_spacing + slice_thickness)
         ds.ImagePositionPatient = f"{0:.6g}\\{0:.6g}\\{slice_spacing * i:.6g}"
         ds.SliceLocation = f"{slice_spacing * i:.6g}"
         
@@ -2168,25 +2137,22 @@ def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compre
 
 # CT Plots ====================================================================================================================================================
 
-def Plotly_from_memory(projection, size):
-
-    import plotly.graph_objects as go
-
-    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = size[0], height = size[1], xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
-    fig.show()
-
 def Plotly_from_file(directory, filename, size):
 
     import plotly.graph_objects as go
 
     projection = np.genfromtxt(f"{directory}/{filename}", delimiter=',')
 
-    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = size[0], height = size[1], xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
-    fig.show()
+    lower = np.percentile(projection, 0)
+    upper = np.percentile(projection, 95)
+    projection = np.clip(projection, lower, upper)
 
-    return projection
+    fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
+    fig.update_layout(
+        width = size[0], height = size[1], xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'),
+        annotations = [dict(text = f"Dimensions: {projection.shape} px", x = 0.5, y = -0.15, showarrow=False, xref="paper", yref="paper", font=dict(size=15))]
+    )
+    fig.show()
 
 def Plotly_3x1(csv_folder, step):
 
@@ -2212,6 +2178,10 @@ def Plotly_3x1(csv_folder, step):
         heatmap  = np.genfromtxt(heatmap_folder  + f'Projection_{deg_id}.csv', delimiter=',')
         sinogram = np.genfromtxt(sinogram_folder + f'Sinogram_{index}.csv',    delimiter=',')
         slice    = np.genfromtxt(slices_folder   + f'Slice_{index}.csv',       delimiter=',')
+
+        lower = np.percentile(heatmap, 0)
+        upper = np.percentile(heatmap, 95)
+        heatmap = np.clip(heatmap, lower, upper)
 
         width = sinogram.shape[1]
         if width < 360: sinogram = np.pad(sinogram, ((0, 0), (0, 360-width)), mode='constant', constant_values=0)      

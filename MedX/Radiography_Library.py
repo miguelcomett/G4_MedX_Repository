@@ -1880,20 +1880,22 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
         xlength = heatmap.shape[0]
         xlength = xlength * pixel_size
 
-        # if i > 90 and i < 270:
-           
-        #    theta = (i-180) * (2*np.pi / 360)
+        if gun_span is not None:
 
-        #    min = int( (xlength/2 - gun_span*np.cos(theta/2)) / pixel_size )
-        #    max = int( (xlength/2 + gun_span*np.cos(theta/2)) / pixel_size )
-           
-        #    heatmap[:, : min] = 0
-        #    heatmap[:, max :] = 0
+            if i > 90 and i < 270:
+            
+               theta = (i-180) * (2*np.pi / 360)
 
-        # else:
+               min = int( (xlength/2 - gun_span*np.cos(theta/2)) / pixel_size )
+               max = int( (xlength/2 + gun_span*np.cos(theta/2)) / pixel_size )
+            
+               heatmap[:, : min] = 0
+               heatmap[:, max :] = 0
 
-        #     heatmap[:, : int( (xlength/2 - gun_span) / pixel_size )   ] = 0
-        #     heatmap[:,   int( (xlength/2 + gun_span) / pixel_size ) : ] = 0
+            else:
+
+                heatmap[:, : int( (xlength/2 - gun_span) / pixel_size )   ] = 0
+                heatmap[:,   int( (xlength/2 + gun_span) / pixel_size ) : ] = 0
 
         write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
         np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
@@ -1908,13 +1910,10 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     read_name = csv_folder + f"{'CT_raw_'}{start}.csv"
     raw_heatmap = np.genfromtxt(read_name, delimiter=',')
-
     lower = np.percentile(raw_heatmap, 0)
     upper = np.percentile(raw_heatmap, 98)
     clipped_htmp = np.clip(raw_heatmap, lower, upper)
-    Plot_Heatmap(clipped_htmp, save_as='')
-
-    return raw_heatmap
+    Plotly_from_memory(clipped_htmp, size=[500, 500])
 
 def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sigma, write):
 
@@ -2039,6 +2038,8 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
         print(f"\nSuccesfully Written Data to: {csv_write}")
 
+        Plotly_3x1(csv_write, step=len(slices_vector))
+
 def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
 
     from tqdm.notebook import tqdm
@@ -2070,7 +2071,7 @@ def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_facto
 
         HU_images[i] = slice
 
-    Ploty_from_memory(HU_images[0])
+    Plotly_from_memory(HU_images[0], size=[500, 500])
 
     return HU_images
 
@@ -2139,22 +2140,22 @@ def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compre
 
 # CT Plots ====================================================================================================================================================
 
-def Ploty_from_memory(projection):
+def Plotly_from_memory(projection, size):
 
     import plotly.graph_objects as go
 
     fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = 500, height = 500, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.update_layout(width = size[0], height = size[1], xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
     fig.show()
 
-def Ploty_from_file(directory, filename):
+def Plotly_from_file(directory, filename, size):
 
     import plotly.graph_objects as go
 
     projection = np.genfromtxt(f"{directory}/{filename}", delimiter=',')
 
     fig = go.Figure(go.Heatmap(z = projection, colorscale = [[0, 'black'], [1, 'white']],))
-    fig.update_layout(width = 800, height = 800, xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
+    fig.update_layout(width = size[0], height = size[1], xaxis = dict(autorange = 'reversed'), yaxis = dict(autorange = 'reversed'))
     fig.show()
 
     return projection

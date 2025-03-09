@@ -1228,7 +1228,7 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     bins_x0 = np.arange(-xlim, xlim + pixel_size, pixel_size)
     bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
 
-    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0], density = True)[0]
+    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0], density = True)[0] # , density = True
     
     if progress_bar == True: 
         print('Computing heatmap...')
@@ -1877,9 +1877,6 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     os.makedirs(csv_folder, exist_ok = True)
     os.makedirs(write_folder, exist_ok = True)
 
-    def custom_formatter(x):
-        return "0" if x == 0 else f"{x:.9f}"
-
     @delayed
     def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, gun_span, csv_folder):
         
@@ -1907,8 +1904,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
                 heatmap[:,   int( (x_length/2 + gun_span) / pixel_size ) : ] = 0
 
         write_path = write_folder + f"{file_name}{i}.csv"
-        # np.savetxt(write_path, heatmap, delimiter=',', fmt='%.9f')
-        np.savetxt(write_path, heatmap, delimiter=',', fmt=custom_formatter)
+        np.savetxt(write_path, heatmap, delimiter=',', fmt='%.6f')
 
         return heatmap
 
@@ -1951,8 +1947,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     step = slices_in[2]
 
     slices_num = len(np.arange(y0, yf, step))
-    # proportion = int(round(rows / slices_num))
-    proportion = int(rows / slices_num)
+    proportion = int(round(rows / slices_num)) # proportion = int(rows / slices_num)
 
     slice_0 = slices_out[0]
     slice_f = slices_out[1]
@@ -1979,14 +1974,35 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     # print(sinogram_matrix.shape)
     # print(slices_matrix.shape)
 
+    if write == True:
+
+        heatmap_folder  = "/1_Heatmaps/"
+        sinogram_folder = "/2_Sinograms/"
+        slices_folder   = "/3_Slices/"
+        
+        os.makedirs(csv_write, exist_ok = True)
+        os.makedirs(csv_write + heatmap_folder,  exist_ok = True)
+        os.makedirs(csv_write + sinogram_folder, exist_ok = True)
+        os.makedirs(csv_write + slices_folder,   exist_ok = True)
+
+        decimals = '%6f'
+
     @delayed
     def process_heatmap(i, csv_read, sigma):
         
-        read_name = f"{csv_read}{raw_folder}{raw_file}{start}.csv"
+        read_name = f"{csv_read}{raw_folder}{raw_file}{i}.csv"
         raw_heatmap = np.genfromtxt(read_name, delimiter=',')
         
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
         heatmap = Logarithmic_Transform(raw_heatmap)
+
+        if write == True:
+
+            heatmap[np.isnan(heatmap)] = 0
+            heatmap[heatmap < 0] = 0
+
+            write_name = f"{csv_write}{heatmap_folder}{'Projection_'}{i}.csv"
+            np.savetxt(write_name, heatmap, delimiter = ',', fmt = decimals)
 
         return heatmap
 
@@ -1997,15 +2013,31 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
         sinogram = np.array(sinogram).T
 
+        if write == True:
+
+            sinogram[np.isnan(sinogram)] = 0
+            sinogram[sinogram < 0] = 0
+
+            write_name = f"{csv_write}{sinogram_folder}{'Sinogram_'}{y}.csv"
+            np.savetxt(write_name, sinogram, delimiter = ',', fmt = decimals)
+
         return sinogram
 
     @delayed
     def reconstruct_slice(i, sinogram_matrix, projections):
         
         sinogram = sinogram_matrix[i]
-        reconstructed_slice = iradon(sinogram, theta=projections, circle=True, preserve_range=True, filter_name='hamming')
+        slice = iradon(sinogram, theta=projections, circle=True, preserve_range=True, filter_name='hamming')
+
+        if write == True:
+
+            slice[np.isnan(slice)] = 0
+            slice[slice < 0] = 0
+
+            write_name = f"{csv_write}{slices_folder}{'Slice_'}{i}.csv"
+            np.savetxt(write_name, slice, delimiter = ',', fmt = decimals)
         
-        return reconstructed_slice
+        return slice
     
     heatmap_tasks = []
     for i in projections: heatmap_tasks = heatmap_tasks + [process_heatmap(i, csv_read, sigma)]
@@ -2029,46 +2061,9 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     # print('Slices Matrix Shape:', slices_matrix.shape)
     print()
 
-    if write == True:
-
-        heatmap_folder = "/1_Heatmaps/"
-        sinogram_folder = "/2_Sinograms/"
-        slices_folder = "/3_Slices/"
+    if write == True: 
         
-        os.makedirs(csv_write, exist_ok = True)
-        os.makedirs(csv_write + heatmap_folder,  exist_ok = True)
-        os.makedirs(csv_write + sinogram_folder, exist_ok = True)
-        os.makedirs(csv_write + slices_folder,    exist_ok = True)
-
-        for i in tqdm(range(len(projections)), desc = "Saving Heatmaps", unit = " Degrees", leave = True): 
-            
-            heatmap = heatmap_matrix[i]
-            heatmap[np.isnan(heatmap)] = 0
-            heatmap[heatmap < 0] = 0
-
-            write_name = f"{csv_write}{heatmap_folder}{'Projection_'}{i}.csv"
-            np.savetxt(write_name, heatmap, delimiter=',', fmt='%.4f')
-
-        for i in tqdm(range(len(slices_vector)), desc = "Saving Sinograms", unit = " Sinograms", leave = True): 
-            
-            sinogram = sinogram_matrix[i]
-            sinogram[np.isnan(sinogram)] = 0
-            sinogram[sinogram < 0] = 0
-
-            write_name = f"{csv_write}{sinogram_folder}{'Sinogram_'}{i}.csv"
-            np.savetxt(write_name, sinogram, delimiter=',', fmt='%.4f')
-
-        for i in tqdm(range(len(slices_vector)), desc = "Saving Slices", unit = " Slices", leave = True): 
-            
-            slice = slices_matrix[i]
-            slice[np.isnan(slice)] = 0
-            slice[slice < 0] = 0
-
-            write_name = f"{csv_write}{slices_folder}{'Slice_'}{i}.csv"
-            np.savetxt(write_name, slice, delimiter=',', fmt='%.4f')
-
-        print(f"\nSuccesfully Written Data to: {csv_write}")
-
+        print(f"Succesfully Written Data to: {csv_write}")
         Plotly_3x1(csv_write, step=int(len(slices_vector)/3))
 
     del heatmap_matrix, sinogram_matrix, slices_matrix

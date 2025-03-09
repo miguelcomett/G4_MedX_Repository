@@ -1228,7 +1228,7 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     bins_x0 = np.arange(-xlim, xlim + pixel_size, pixel_size)
     bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
 
-    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0])[0]
+    heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0], density = True)[0]
     
     if progress_bar == True: 
         print('Computing heatmap...')
@@ -1860,8 +1860,6 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     
     import dask; from dask import delayed; from dask.diagnostics import ProgressBar
 
-    os.makedirs(csv_folder, exist_ok = True)
-
     start = degrees[0]
     end = degrees[1]
     deg = degrees[2]
@@ -1871,14 +1869,25 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     x_branch = root_structure[1]
     y_branch = root_structure[2]
 
+    directory = os.path.join(directory, '')
+    raw_folder = "0_Raw_Projections/"
+    write_folder = csv_folder + raw_folder
+    file_name = "CT_Raw_"
+    
+    os.makedirs(csv_folder, exist_ok = True)
+    os.makedirs(write_folder, exist_ok = True)
+
+    def custom_formatter(x):
+        return "0" if x == 0 else f"{x:.9f}"
+
     @delayed
     def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, gun_span, csv_folder):
         
         root_name = f"{filename}_{i}.root"
         heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size, progress_bar=False)
 
-        xlength = heatmap.shape[0]
-        xlength = xlength * pixel_size
+        x_length = heatmap.shape[0]
+        x_length = x_length * pixel_size
 
         if gun_span is not None:
 
@@ -1886,19 +1895,20 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
             
                theta = (i-180) * (2*np.pi / 360)
 
-               min = int( (xlength/2 - gun_span*np.cos(theta/2)) / pixel_size )
-               max = int( (xlength/2 + gun_span*np.cos(theta/2)) / pixel_size )
+               min = int( (x_length/2 - gun_span*np.cos(theta/2)) / pixel_size )
+               max = int( (x_length/2 + gun_span*np.cos(theta/2)) / pixel_size )
             
                heatmap[:, : min] = 0
                heatmap[:, max :] = 0
 
             else:
 
-                heatmap[:, : int( (xlength/2 - gun_span) / pixel_size )   ] = 0
-                heatmap[:,   int( (xlength/2 + gun_span) / pixel_size ) : ] = 0
+                heatmap[:, : int( (x_length/2 - gun_span) / pixel_size )   ] = 0
+                heatmap[:,   int( (x_length/2 + gun_span) / pixel_size ) : ] = 0
 
-        write_name = csv_folder + f"{'CT_raw_'}{i}.csv"
-        np.savetxt(write_name, heatmap, delimiter=',', fmt='%.2f')
+        write_path = write_folder + f"{file_name}{i}.csv"
+        # np.savetxt(write_path, heatmap, delimiter=',', fmt='%.9f')
+        np.savetxt(write_path, heatmap, delimiter=',', fmt=custom_formatter)
 
         return heatmap
 
@@ -1908,7 +1918,9 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     print('Calculating Heatmaps for Every Angle in CT:')
     with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
 
-    read_name = csv_folder + f"{'CT_raw_'}{start}.csv"
+    del heatmap_tasks
+
+    read_name = write_folder + f"{file_name}{start}.csv"
     raw_heatmap = np.genfromtxt(read_name, delimiter=',')
     lower = np.percentile(raw_heatmap, 0)
     upper = np.percentile(raw_heatmap, 98)
@@ -1926,7 +1938,11 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     deg = degrees[2]
     projections = np.arange(start, end+1, deg)
 
-    read_name = f"{csv_read}{'CT_raw_'}{start}.csv"
+    csv_write = os.path.join(csv_write, '')
+    raw_folder = '0_Raw_Projections/'
+    raw_file = 'CT_Raw_'
+    read_name = f"{csv_read}{raw_folder}{raw_file}{start}.csv"
+
     sample_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
     rows = sample_heatmap.shape[1]
 
@@ -1935,6 +1951,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     step = slices_in[2]
 
     slices_num = len(np.arange(y0, yf, step))
+    # proportion = int(round(rows / slices_num))
     proportion = int(rows / slices_num)
 
     slice_0 = slices_out[0]
@@ -1945,17 +1962,27 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     slice_f = slice_f * proportion
     slice_step = slice_step * proportion
 
-    slices_vector = (np.arange(slice_0, slice_f, slice_step))
+    slices_vector = np.arange(slice_0, slice_f, slice_step)
     slices_vector = np.round(slices_vector).astype(int)
 
     heatmap_matrix  = np.zeros(len(projections),   dtype = object)
     sinogram_matrix = np.zeros(len(slices_vector), dtype = object)
     slices_matrix   = np.zeros(len(slices_vector), dtype = object)
 
+    # print(f"Height of Heatmap: {rows} pixels \n")
+    # print(sample_heatmap.shape[0])
+    # print('slices_num: ', slices_num)
+    # print('proportion: ', proportion)
+    # print(slice_0)
+    # print(slices_vector)
+    # print(heatmap_matrix.shape)
+    # print(sinogram_matrix.shape)
+    # print(slices_matrix.shape)
+
     @delayed
     def process_heatmap(i, csv_read, sigma):
         
-        read_name = f"{csv_read}{'CT_raw_'}{i}.csv"   
+        read_name = f"{csv_read}{raw_folder}{raw_file}{start}.csv"
         raw_heatmap = np.genfromtxt(read_name, delimiter=',')
         
         raw_heatmap = ndimage.gaussian_filter(raw_heatmap, sigma)
@@ -2003,11 +2030,15 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     print()
 
     if write == True:
+
+        heatmap_folder = "/1_Heatmaps/"
+        sinogram_folder = "/2_Sinograms/"
+        slices_folder = "/3_Slices/"
         
         os.makedirs(csv_write, exist_ok = True)
-        os.makedirs(csv_write + '/Heatmaps',  exist_ok = True)
-        os.makedirs(csv_write + '/Sinograms', exist_ok = True)
-        os.makedirs(csv_write + '/Slices',    exist_ok = True)
+        os.makedirs(csv_write + heatmap_folder,  exist_ok = True)
+        os.makedirs(csv_write + sinogram_folder, exist_ok = True)
+        os.makedirs(csv_write + slices_folder,    exist_ok = True)
 
         for i in tqdm(range(len(projections)), desc = "Saving Heatmaps", unit = " Degrees", leave = True): 
             
@@ -2015,8 +2046,8 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
             heatmap[np.isnan(heatmap)] = 0
             heatmap[heatmap < 0] = 0
 
-            write_name = f"{csv_write}/Heatmaps/{'Projection_'}{i}.csv"
-            np.savetxt(write_name, heatmap, delimiter=',', fmt='%.6f')
+            write_name = f"{csv_write}{heatmap_folder}{'Projection_'}{i}.csv"
+            np.savetxt(write_name, heatmap, delimiter=',', fmt='%.4f')
 
         for i in tqdm(range(len(slices_vector)), desc = "Saving Sinograms", unit = " Sinograms", leave = True): 
             
@@ -2024,8 +2055,8 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
             sinogram[np.isnan(sinogram)] = 0
             sinogram[sinogram < 0] = 0
 
-            write_name = f"{csv_write}/Sinograms/{'Sinogram_'}{i}.csv"
-            np.savetxt(write_name, sinogram, delimiter=',', fmt='%.6f')
+            write_name = f"{csv_write}{sinogram_folder}{'Sinogram_'}{i}.csv"
+            np.savetxt(write_name, sinogram, delimiter=',', fmt='%.4f')
 
         for i in tqdm(range(len(slices_vector)), desc = "Saving Slices", unit = " Slices", leave = True): 
             
@@ -2033,12 +2064,14 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
             slice[np.isnan(slice)] = 0
             slice[slice < 0] = 0
 
-            write_name = f"{csv_write}/Slices/{'Slice_'}{i}.csv"
-            np.savetxt(write_name, slice, delimiter=',', fmt='%.6f')
+            write_name = f"{csv_write}{slices_folder}{'Slice_'}{i}.csv"
+            np.savetxt(write_name, slice, delimiter=',', fmt='%.4f')
 
         print(f"\nSuccesfully Written Data to: {csv_write}")
 
-        Plotly_3x1(csv_write, step=len(slices_vector))
+        Plotly_3x1(csv_write, step=int(len(slices_vector)/3))
+
+    del heatmap_matrix, sinogram_matrix, slices_matrix
 
 def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
 
@@ -2164,18 +2197,15 @@ def Plotly_3x1(csv_folder, step):
 
     import plotly.graph_objects as go; from plotly.subplots import make_subplots
 
-    heatmap_folder  = csv_folder + '/Heatmaps/'
-    sinogram_folder = csv_folder + '/Sinograms/'
-    slices_folder   = csv_folder + '/Slices/'
+    heatmap_folder  = csv_folder + '1_Heatmaps/'
+    sinogram_folder = csv_folder + '2_Sinograms/'
+    slices_folder   = csv_folder + '3_Slices/'
 
     heatmap_files = [f for f in os.listdir(heatmap_folder) if os.path.isfile(os.path.join(heatmap_folder, f))]
     slices_files  = [f for f in os.listdir(slices_folder)  if os.path.isfile(os.path.join(slices_folder, f))]
 
     number_of_projections = len(heatmap_files)
     number_of_slices = len(slices_files)
-
-    # print(number_of_projections)
-    # print(number_of_slices)
 
     i = number_of_projections / number_of_slices
     plotis = range(0, number_of_slices, int(step))

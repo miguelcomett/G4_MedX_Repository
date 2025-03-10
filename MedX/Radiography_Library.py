@@ -1871,25 +1871,29 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
         root_name = f"{filename}_{i}.root"
         heatmap = Root_to_Heatmap(directory, root_name, root_structure, dimensions, pixel_size, progress_bar=False)
 
-        x_length = heatmap.shape[0]
-        x_length = x_length * pixel_size
-
         if gun_span is not None:
 
+            x_length = heatmap.shape[1]
+
+            # print("x_length: ", heatmap.shape)
+            # print(gun_span/pixel_size)
+            
             if i > 90 and i < 270:
             
                theta = (i-180) * (2*np.pi / 360)
 
-               min = int( (x_length/2 - gun_span*np.cos(theta/2)) / pixel_size )
-               max = int( (x_length/2 + gun_span*np.cos(theta/2)) / pixel_size )
-            
-               heatmap[:, : min] = 0
-               heatmap[:, max :] = 0
+               min = int( x_length/2 - (gun_span*np.cos(theta/2) / pixel_size) )
+               max = int( x_length/2 + (gun_span*np.cos(theta/2) / pixel_size) )
+
+            #    print("theta: ", i, " min: ", min, " max: ", max)
 
             else:
 
-                heatmap[:, : int( (x_length/2 - gun_span) / pixel_size )   ] = 0
-                heatmap[:,   int( (x_length/2 + gun_span) / pixel_size ) : ] = 0
+                min = int( x_length/2 - (gun_span / pixel_size) )
+                max = int( x_length/2 + (gun_span / pixel_size) )
+
+            heatmap[:, : min ] = 0
+            heatmap[:, max : ] = 0
 
         write_path = write_folder + f"{file_name}{i}.csv"
         np.savetxt(write_path, heatmap, delimiter=',', fmt='%.6f')
@@ -1900,7 +1904,8 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     for i in projections: 
         heatmap_tasks += [calculate_heatmaps(i, directory, root_structure, dimensions, pixel_size, gun_span, csv_folder)]
     print('Calculating Heatmaps for Every Angle in CT:')
-    with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
+    # with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
+    dask.compute(*heatmap_tasks, scheduler='processes')
 
     del heatmap_tasks
 
@@ -1919,7 +1924,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     read_name = f"{csv_read}{raw_folder}{raw_file}{degrees["start"]}.csv"
 
     sample_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
-    rows = sample_heatmap.shape[1]
+    rows = sample_heatmap.shape[0]
 
     slices_num = len(np.arange(slices_in["initial"], slices_in["final"], slices_in["step"]))
     proportion = int(round(rows / slices_num)) # proportion = int(rows / slices_num)
@@ -1964,7 +1969,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
         return heatmap
 
     @delayed
-    def compute_sinogram(y, heatmap_matrix):
+    def compute_sinogram(i, y, heatmap_matrix):
         
         sinogram = []
         for heatmap in heatmap_matrix: sinogram.append(heatmap[y])
@@ -1975,7 +1980,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
             sinogram[np.isnan(sinogram)] = 0
             sinogram[sinogram < 0] = 0
 
-            write_name = f"{csv_write}{sinogram_folder}{'Sinogram_'}{y}.csv"
+            write_name = f"{csv_write}{sinogram_folder}{'Sinogram_'}{i}.csv"
             np.savetxt(write_name, sinogram, delimiter = ',', fmt = decimals)
 
         return sinogram
@@ -1984,7 +1989,8 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     def reconstruct_slice(i, sinogram_matrix, projections):
         
         sinogram = sinogram_matrix[i]
-        slice = iradon(sinogram, theta=projections, circle=True, preserve_range=True, filter_name='hamming')
+        # slice = iradon(sinogram, theta=projections, circle=True, preserve_range=True, filter_name='hamming')
+        slice = iradon(sinogram, theta=projections)
 
         if write == True:
 
@@ -2002,7 +2008,7 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
     # print('Heatmap Matrix Shape:', heatmap_matrix.shape)
 
     sinogram_tasks = []
-    for y in slices_vector: sinogram_tasks = sinogram_tasks + [compute_sinogram(y, heatmap_matrix)]
+    for i, y in enumerate(slices_vector): sinogram_tasks = sinogram_tasks + [compute_sinogram(i, y, heatmap_matrix)]
     print('\nComputing Sinograms (2/3)...')
     with ProgressBar(): sinograms = dask.compute(*sinogram_tasks)    
     sinogram_matrix = np.stack(sinograms, axis=0)
@@ -2021,12 +2027,16 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
     del heatmap_matrix, sinogram_matrix
 
-def CoefficientstoHU(slices, csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
+def CoefficientstoHU(slices, csv_slices, constants, constant_factor, linear_factor, percentile):
 
     from tqdm.notebook import tqdm
 
     valid_slices = np.arange(slices["start"], slices["end"]+1, slices["step"])
     base_name = "Slice"
+
+    csv_slices = os.path.join(csv_slices, '') + "3_Slices/"
+
+    print(csv_slices)
 
     selected_slices = []
     for i in valid_slices:
@@ -2043,11 +2053,11 @@ def CoefficientstoHU(slices, csv_slices, mu_water, mu_air, air_parameter, consta
         slice = slice + constant_factor
         slice = slice * linear_factor
 
-        # slice = 1000 * (slice - mu_water) / (mu_water - mu_air)
+        # slice = 1000 * (slice - constants["µ_water"]) / (constants["µ_water"] - constants["µ_air"])
         # slice = np.round(slice)
         # slice = slice.astype(int)
         
-        slice[slice < air_parameter] = -1000
+        slice[slice < constants["air_tolerance"]] = -1000
         
         positive_values = slice[slice > 0]
         if positive_values.size > 0: 
@@ -2060,7 +2070,7 @@ def CoefficientstoHU(slices, csv_slices, mu_water, mu_air, air_parameter, consta
 
         HU_images[i] = slice
 
-    Plotly_from_memory(HU_images[0], size=[500, 500])
+    Plotly_from_memory(HU_images[int(i/2)], size=[500, 500])
 
     return HU_images
 

@@ -1190,16 +1190,15 @@ def XY_1D_Histogram(directory, root_file, hits_tree, hits_branches, spectra_tree
     
 # 2.0. ========================================================================================================================================================
 
-def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, pixel_size, progress_bar):
+def Root_to_Heatmap(directory, root_file, root_structure, dimensions, pixel_size, progress_bar):
 
     import uproot, dask.array as dask_da; from dask.diagnostics import ProgressBar
 
     directory = os.path.join(directory, '')
 
-    xlim = size[0]
-    ylim = size[1]
-    x_shift = size[2]
-    y_shift = size[3]
+    tree_name = root_structure["tree_name"]
+    x_branch = root_structure["x_branch"]
+    y_branch = root_structure["y_branch"]
 
     if not root_file.endswith('.root'): root_file = root_file + '.root'
     file_path = directory + root_file
@@ -1222,11 +1221,11 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     x_values = dataframe[x_branch]
     y_values = dataframe[y_branch]
 
-    x_data_shifted = x_values + x_shift            
-    y_data_shifted = y_values + y_shift
+    x_data_shifted = x_values + dimensions["shift_X"]            
+    y_data_shifted = y_values + dimensions["shift_Y"]
 
-    bins_x0 = np.arange(-xlim, xlim + pixel_size, pixel_size)
-    bins_y0 = np.arange(-ylim, ylim + pixel_size, pixel_size)
+    bins_x0 = np.arange(-dimensions["len_X"], dimensions["len_X"] + pixel_size, pixel_size)
+    bins_y0 = np.arange(-dimensions["len_Y"], dimensions["len_Y"] + pixel_size, pixel_size)
 
     heatmap = dask_da.histogram2d(x_data_shifted, y_data_shifted, bins=[bins_x0, bins_y0], density = True)[0] # , density = True
     
@@ -1237,7 +1236,7 @@ def Root_to_Heatmap(directory, root_file, tree_name, x_branch, y_branch, size, p
     
     heatmap = np.rot90(heatmap.T, 2)
 
-    return heatmap, bins_x0, bins_y0
+    return heatmap
 
 def Logarithmic_Transform(heatmap):
 
@@ -1713,10 +1712,6 @@ def CT_Loop(threads, starts_with, angles_range, slices, gun_parameters, beams_pe
     CT_Folder = directory / 'ROOT' / 'Tomography'
     os.makedirs(CT_Folder, exist_ok = True)
 
-    y_start = slices[0]
-    y_end = slices[1]
-    step = slices[2]
-
     angles = list(angles_range)
 
     if len(angles) == 1: print(f"-> Calculating Projection at {angles[0]}° Degrees.")
@@ -1752,7 +1747,7 @@ def CT_Loop(threads, starts_with, angles_range, slices, gun_parameters, beams_pe
             mac_template = MAC_Template_CT(threads, spectra_mode='mono', detector_parameters=None, gun_parameters=gun_parameters)
             
             beam_lines = ""
-            for y in range(y_start, y_end + 1, step): 
+            for y in range(slices["y0"], slices["y1"] + 1, slices["step"]): 
                 beam_lines += f"""
                 /Pgun/Y {y} mm
                 /run/beamOn {beams_per_line}
@@ -1860,14 +1855,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     
     import dask; from dask import delayed; from dask.diagnostics import ProgressBar
 
-    start = degrees[0]
-    end = degrees[1]
-    deg = degrees[2]
-    projections = np.arange(start, end+1, deg)
-
-    tree_name = root_structure[0]
-    x_branch = root_structure[1]
-    y_branch = root_structure[2]
+    projections = np.arange(degrees["start"], degrees["end"]+1, degrees["step"])
 
     directory = os.path.join(directory, '')
     raw_folder = "0_Raw_Projections/"
@@ -1878,10 +1866,10 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     os.makedirs(write_folder, exist_ok = True)
 
     @delayed
-    def calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, gun_span, csv_folder):
+    def calculate_heatmaps(i, directory, root_structure, dimensions, pixel_size, gun_span, csv_folder):
         
         root_name = f"{filename}_{i}.root"
-        heatmap, xlim, ylim = Root_to_Heatmap(directory, root_name, tree_name, x_branch, y_branch, dimensions, pixel_size, progress_bar=False)
+        heatmap = Root_to_Heatmap(directory, root_name, root_structure, dimensions, pixel_size, progress_bar=False)
 
         x_length = heatmap.shape[0]
         x_length = x_length * pixel_size
@@ -1910,29 +1898,25 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
     heatmap_tasks = []
     for i in projections: 
-        heatmap_tasks += [calculate_heatmaps(i, directory, tree_name, x_branch, y_branch, dimensions, pixel_size, gun_span, csv_folder)]
+        heatmap_tasks += [calculate_heatmaps(i, directory, root_structure, dimensions, pixel_size, gun_span, csv_folder)]
     print('Calculating Heatmaps for Every Angle in CT:')
     with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
 
     del heatmap_tasks
 
-    Plotly_from_file(directory = write_folder, filename = f"{file_name}{start}.csv", size = [500, 500])
+    Plotly_from_file(directory = write_folder, filename = f"{file_name}{degrees["start"]}.csv", size = [500, 500])
 
 def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sigma, write):
 
     import dask; from dask.diagnostics import ProgressBar; from dask import delayed
     from skimage.transform import iradon; from scipy import ndimage
-    from tqdm import tqdm
 
-    start = degrees[0]
-    end = degrees[1]
-    deg = degrees[2]
-    projections = np.arange(start, end+1, deg)
+    projections = np.arange(degrees["start"], degrees["end"]+1, degrees["step"])
 
     csv_write = os.path.join(csv_write, '')
     raw_folder = '0_Raw_Projections/'
     raw_file = 'CT_Raw_'
-    read_name = f"{csv_read}{raw_folder}{raw_file}{start}.csv"
+    read_name = f"{csv_read}{raw_folder}{raw_file}{degrees["start"]}.csv"
 
     sample_heatmap = pd.read_csv(read_name, delimiter=',', header=None)
     rows = sample_heatmap.shape[1]
@@ -2037,17 +2021,25 @@ def RadonReconstruction(csv_read, csv_write, degrees, slices_in, slices_out, sig
 
     del heatmap_matrix, sinogram_matrix
 
-def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
+def CoefficientstoHU(slices, csv_slices, mu_water, mu_air, air_parameter, constant_factor, linear_factor, percentile):
 
     from tqdm.notebook import tqdm
 
-    slices = os.listdir(csv_slices)
-    HU_images = np.zeros(len(slices), dtype="object")
+    valid_slices = np.arange(slices["start"], slices["end"]+1, slices["step"])
+    base_name = "Slice"
 
-    for i in tqdm(range(len(slices)), desc = "Converting to HU Units", unit = " Slices", leave = True):
+    selected_slices = []
+    for i in valid_slices:
+        if f"{base_name}_{i}.csv" in os.listdir(csv_slices):
+            selected_slices.append(f"{csv_slices}{base_name}_{i}.csv")
 
-        slice = np.genfromtxt(f"{csv_slices}{slices[i]}", delimiter=',')
+    HU_images = np.zeros(len(selected_slices), dtype="object")
+
+    for i in tqdm(range(len(selected_slices)), desc = "Converting to HU Units", unit = " Slices", leave = True):
         
+        try: slice = np.genfromtxt(selected_slices[i], delimiter=',')
+        except Exception as error: print(f"Error processing {selected_slices[i]}: {error}")
+
         slice = slice + constant_factor
         slice = slice * linear_factor
 
@@ -2075,8 +2067,9 @@ def CoefficientstoHU(csv_slices, mu_water, mu_air, air_parameter, constant_facto
 def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compressed):
 
     import pydicom; from pydicom.uid import RLELossless; from pydicom.encaps import encapsulate; from pydicom.dataset import Dataset
-    
-    def create_dicom_instance(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed):
+    from tqdm.notebook import tqdm
+
+    def Create_DICOMs(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed):
 
         meta = Dataset()
         meta.MediaStorageSOPClassUID = pydicom.uid.CTImageStorage
@@ -2100,7 +2093,8 @@ def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compre
         ds.HighBit = 15
         ds.WindowCenter = 30
         ds.WindowWidth = 100
-        ds.Rows, ds.Columns = image.shape
+        ds.Rows = image.shape[0]
+        ds.Columns = image.shape[1]
         ds.AcquisitionNumber = 1
         ds.ImageOrientationPatient = "1\\0\\0\\0\\1\\0"
         ds.ImageType = "ORIGINAL\\PRIMARY\\AXIAL"
@@ -2130,8 +2124,8 @@ def Export_to_Dicom(HU_images, slice_thickness, slice_spacing, directory, compre
     
     seriesUID, studyInstance, frameOfReference = (pydicom.uid.generate_uid() for _ in range(3))
     
-    for i, image in enumerate(HU_images):
-        create_dicom_instance(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed)
+    for i, image in enumerate(tqdm(HU_images, desc = "Saving DICOMS", unit = " Slices", leave = True)):
+        Create_DICOMs(image, i, seriesUID, studyInstance, frameOfReference, slice_thickness, slice_spacing, directory, compressed)
     
     print(f"Written DICOMS to {directory}")
 

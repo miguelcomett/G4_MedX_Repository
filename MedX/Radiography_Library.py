@@ -1875,22 +1875,12 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
 
             x_length = heatmap.shape[1]
 
-            # print("x_length: ", heatmap.shape)
-            # print(gun_span/pixel_size)
-            
-            if i > 90 and i < 270:
-            
-               theta = (i-180) * (2*np.pi / 360)
+            if i < 90: theta = i * (2*np.pi / 360)
+            if i >= 90 and i <= 270: theta = (i-180) * (2*np.pi / 360)
+            if i > 270: theta = (i-360) * (2*np.pi / 360)
 
-               min = int( x_length/2 - (gun_span*np.cos(theta/2) / pixel_size) )
-               max = int( x_length/2 + (gun_span*np.cos(theta/2) / pixel_size) )
-
-            #    print("theta: ", i, " min: ", min, " max: ", max)
-
-            else:
-
-                min = int( x_length/2 - (gun_span / pixel_size) )
-                max = int( x_length/2 + (gun_span / pixel_size) )
+            min = int( x_length/2 - (gun_span*np.cos(theta/2) / pixel_size) )
+            max = int( x_length/2 + (gun_span*np.cos(theta/2) / pixel_size) )
 
             heatmap[:, : min ] = 0
             heatmap[:, max : ] = 0
@@ -1904,8 +1894,7 @@ def Calculate_Projections(directory, filename, degrees, root_structure, dimensio
     for i in projections: 
         heatmap_tasks += [calculate_heatmaps(i, directory, root_structure, dimensions, pixel_size, gun_span, csv_folder)]
     print('Calculating Heatmaps for Every Angle in CT:')
-    # with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
-    dask.compute(*heatmap_tasks, scheduler='processes')
+    with ProgressBar(): dask.compute(*heatmap_tasks, scheduler='processes')
 
     del heatmap_tasks
 

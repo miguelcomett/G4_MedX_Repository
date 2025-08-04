@@ -84,6 +84,18 @@ def Formatted_Time(elapsed_time):
 
 # 0.1 ========================================================================================================================================================
 
+def Build_Geant4():
+
+    import subprocess
+    import os
+    import sys
+
+    Build_Path = Path('BUILD')
+    if not os.path.exists(Build_Path): os.makedirs(Build_Path)
+    
+    # if platform.system() == "Darwin":
+    
+
 def Compile_Geant4():
 
     Build_Path = Path('BUILD')
@@ -970,9 +982,14 @@ def Merge_Roots_HADD(directory, starts_with, output_name, trim_coords):
 
 def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
 
-    import uproot, dask.array as da
+    import uproot, dask.array as da; import shutil
+
+    branch_name_x = "X_axis"
+    branch_name_y = "Y_axis"
 
     trash_folder, file_list, merged_file = Manage_Merge_Files(directory, starts_with, output_name)
+
+    i = int(starts_with.split('_')[1].split('.')[0])
 
     merged_trees_data = {}
 
@@ -985,16 +1002,18 @@ def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
             if not tree_name.endswith(";1"): continue
 
             tree_key = tree_name.rstrip(";1")
-            tree = uproot.dask(opened_file[tree_key], library="np")
+            tree = uproot.dask(opened_file[tree_key], library="np", chunks='50 MB')
 
             if tree_key not in merged_trees_data: merged_trees_data[tree_key] = {}
 
             branches = tree.keys()
             for branch_name in branches:
 
-                branch_data = tree[branch_name]
-                if branch_name not in merged_trees_data[tree_key]: merged_trees_data[tree_key][branch_name] = [branch_data]
-                else: merged_trees_data[tree_key][branch_name].append(branch_data)
+                if branch_name == branch_name_x or branch_name == branch_name_y: 
+
+                    branch_data = tree[branch_name]
+                    if branch_name not in merged_trees_data[tree_key]: merged_trees_data[tree_key][branch_name] = [branch_data]
+                    else: merged_trees_data[tree_key][branch_name].append(branch_data)
 
     for tree_name, branches_data in merged_trees_data.items():
         for branch_name, data_list in branches_data.items():
@@ -1003,9 +1022,16 @@ def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
     if trim_coords:
         x_min, x_max, y_min, y_max = trim_coords
         for tree_name in list(merged_trees_data.keys()):  # Use list() to avoid runtime error while modifying dict
-            if "x_ax" in merged_trees_data[tree_name] and "y_ax" in merged_trees_data[tree_name]:
-                x_data = merged_trees_data[tree_name]["x_ax"]
-                y_data = merged_trees_data[tree_name]["y_ax"]
+            if branch_name_x in merged_trees_data[tree_name] and branch_name_y in merged_trees_data[tree_name]:
+                x_data = merged_trees_data[tree_name][branch_name_x]
+                y_data = merged_trees_data[tree_name][branch_name_y]
+
+                if i < 90: theta = i * (2*np.pi / 360)
+                if i >= 90 and i <= 270: theta = (i-180) * (2*np.pi / 360)
+                if i > 270: theta = (i-360) * (2*np.pi / 360)
+
+                x_min = int(x_min*np.cos(theta/2))
+                x_max = int(x_max*np.cos(theta/2))
 
                 mask = ((x_data >= x_min) & (x_data <= x_max) & (y_data >= y_min) & (y_data <= y_max))
                 if mask.sum().compute() == 0:
@@ -1017,7 +1043,8 @@ def Merge_Roots_Dask(directory, starts_with, output_name, trim_coords):
         for tree_name, branches_data in merged_trees_data.items():
             new_root_file[tree_name] = branches_data
 
-    Trash_Folder(trash_folder)
+    # Trash_Folder(trash_folder)
+    shutil.rmtree(trash_folder)
     print(f"Merged data written to: {merged_file}")
 
 # 1.4. ========================================================================================================================================================
@@ -1218,6 +1245,7 @@ def Root_to_Heatmap(directory, root_file, root_structure, dimensions, pixel_size
     else: chunk_size = '50 MB'
 
     dataframe = uproot.dask(opened_file[tree_name], library='np', step_size = chunk_size)
+
     x_values = dataframe[x_branch]
     y_values = dataframe[y_branch]
 

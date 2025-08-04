@@ -14,6 +14,7 @@
 #include "5.0_PrimaryGenerator.hh"
 
 class PrimaryGenerator; 
+
 class PrimaryGeneratorMessenger : public G4UImessenger
 {
 	public:

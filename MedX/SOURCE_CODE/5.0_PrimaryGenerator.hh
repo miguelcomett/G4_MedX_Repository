@@ -48,6 +48,7 @@ class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
         void ReadSpectrumFromFile(const std::string & filename, std::vector<G4double> & xx, std::vector<G4double> & yy, G4int & energyDataPoints);
         G4double InverseCumul();
         void SpectraFunction(); 
+        G4double GetTotalEnergy() const {return totalEnergy;}; 
         
     private:
 
@@ -62,18 +63,16 @@ class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
         G4ParticleTable * particleTable;
         G4ParticleDefinition * particleName;
 
+        G4String spectrumFile; 	       
         G4bool Xtriangular, newXtriangular, Xcos, Xgauss, newXgauss;
-        G4int threadID, SpectraMode, Decimals, roundingScale;
+        G4int threadID, SpectraMode, Decimals, roundingScale, energyDataPoints, bins, sign;
         G4float RealEnergy;
         const G4double pi = 3.14159265358979323846;
         G4double x0, y0, z0, model_width, model_depth, minimum_span, thoraxAngle, gunAngle, Theta, Phi, AngleInCarts, Xpos, Ypos, Zpos, 
-                SpanX, SpanY, GunAngle, random, peak, min, max;
+                SpanX, SpanY, GunAngle, random, peak, min, max,
+                Y_max, X_random, Y_random, Alfa, Beta, Gamma, Delta, energy, intensity, totalEnergy;
 
         G4ThreeVector photonPosition, photonMomentum;
-        
-        G4String spectrumFile; 	       
-        G4int energyDataPoints, bins, sign;
-        G4double Y_max, X_random, Y_random, Alfa, Beta, Gamma, Delta, energy, intensity;
         std::vector<G4double> EnergyVector, IntensityVector, X_vector, Y_vector, Slopes_vector, Y_Cumulative;
 };
 

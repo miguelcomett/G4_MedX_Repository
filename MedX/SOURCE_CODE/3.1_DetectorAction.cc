@@ -1,4 +1,5 @@
 #include "3.1_DetectorAction.hh"
+#include "6.0_RunAction.hh"
 
 SensitiveDetector::SensitiveDetector(G4String name):G4VSensitiveDetector(name){}
 SensitiveDetector::~SensitiveDetector(){}
@@ -12,13 +13,17 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
     
     particleName = particleTrack -> GetDefinition() -> GetParticleName();
     photonEnergy = preStepPoint -> GetKineticEnergy();
-    photonEnergy = photonEnergy / keV;
+    photonEnergy_keV = photonEnergy / keV;
 
-    if (particleName == "gamma" && photonEnergy >= 1.0)
+    if (particleName == "gamma" && photonEnergy_keV >= 1.0)
     {   
         posPhoton = preStepPoint -> GetPosition();
+        
+        const RunAction * constRunAction = dynamic_cast <const RunAction*> (userRunAction);
+        RunAction * runAction = const_cast <RunAction*> (constRunAction);
+        if (runAction) {runAction -> AddDetEDep(photonEnergy);}
 
-        Wavelength = (1.239841939 / photonEnergy);
+        Wavelength = (1.239841939 / photonEnergy_keV);
         
         touchable = currentStep -> GetPreStepPoint() -> GetTouchable();
         detectorVolume = touchable -> GetVolume();

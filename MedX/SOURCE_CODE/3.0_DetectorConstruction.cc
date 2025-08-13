@@ -37,15 +37,15 @@ DetectorConstruction::DetectorConstruction()
     posYDist   = std::uniform_real_distribution<>(-40.0 * mm, 40.0 * mm);
     posXDist   = std::uniform_real_distribution<>(-01.0 * mm, 01.0 * mm);
 
-    isArm = true;
+    isArm = false;
         isBoneDivided = false;
         isHealthyBone = true;
         isOsteoBone = true;
-    is3DModel = false;
+    is3DModel = true;
         isHeart = true;
         isLungs = true;
             isTraquea = false;
-            isTumorReal = true;
+            isTumorReal = false;
         isRibcage = true;
         isThorax = true;
         isFiller = true;

@@ -1,3 +1,4 @@
+// #include "3.1_DetectorAction.hh"
 #include "6.0_RunAction.hh"
 #include "8.0_SteppingAction.hh"
 
@@ -16,6 +17,7 @@ RunAction::RunAction()
 
     accumulableManager = G4AccumulableManager::Instance();
     accumulableManager -> RegisterAccumulable(EDepSum);
+    accumulableManager -> RegisterAccumulable(DetEDep);
 
     analysisManager = G4AnalysisManager::Instance();
     analysisManager -> SetDefaultFileType("root");
@@ -139,10 +141,10 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
     currentRun = static_cast <const Run *> (thisRun);
     particleName = currentRun -> GetPrimaryParticleName();
     totalNumberOfEvents = currentRun -> GetNumberOfEventToBeProcessed();
-    primaryEnergy = currentRun -> GetPrimaryEnergy();   
     
     if (primaryGenerator) {GunMode = primaryGenerator -> GetGunMode();} 
     
+    if (GunMode == 0) {primaryEnergy = currentRun -> GetPrimaryEnergy();}
     if (GunMode == 1) {primaryEnergy = 80;}
     if (GunMode == 2) {primaryEnergy = 140;}
 
@@ -154,12 +156,14 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
 
     if (threadID == 0)
     {
+        std::cout << std::endl;
+
         std::cout << "\033[32m" << "================= RUN " << runID + 1 << " ==================" << std::endl;
-        std::cout << "    The run is: " << "\033[1m" << totalNumberOfEvents << " " << particleName << "\033[22m" << " of ";
+        std::cout << "The run is: " << "\033[1m" << totalNumberOfEvents << " " << particleName << "\033[22m" << " of ";
 
         std::cout << "\033[1m";
         if (GunMode == 0) {std::cout << G4BestUnit(primaryEnergy, "Energy") << std::endl;}
-        if (GunMode  > 0) {std::cout << primaryEnergy << " kVp" << std::endl;};
+        if (GunMode  > 0) {std::cout << primaryEnergy << " kVp Distribution" << std::endl;};
         std::cout << "\033[22m";
 
         std::cout << "Start time: " << std::put_time(now_tm_0, "%H:%M:%S") << "    Date: " << std::put_time(now_tm_0, "%d-%m-%Y") << "\033[0m" << std::endl;
@@ -187,18 +191,41 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                 } 
             }
             
-            particleName = currentRun -> GetPrimaryParticleName();
             primaryEnergy = currentRun -> GetPrimaryEnergy();
             numberOfEvents = thisRun -> GetNumberOfEvent();
 
             TotalEnergyDeposit = EDepSum.GetValue();
             radiationDose = TotalEnergyDeposit / totalMass;
 
-            G4cout << G4endl; 
-            G4cout << "\033[32m" << "Run Summary:" << G4endl;
+            DetectorEnergyDeposition = DetEDep.GetValue();
+
+            if (masterEnergySpectra.size() == 0) // mono
+            {
+                totalEnergy = primaryEnergy * numberOfEvents;
+            }
+            if (masterEnergySpectra.size() > 0) // poly
+            {                
+                for (const auto & entry : masterEnergySpectra) 
+                {
+                    energies = entry.first;
+                    frequency = entry.second;
+                    
+                    totalEnergy = totalEnergy + (energies * frequency);
+                }
+
+                totalEnergy = totalEnergy * keV;
+            }
+
+            G4cout                                                                                                        << G4endl; 
+            G4cout << "\033[32m" << "Run Summary:"                                                                        << G4endl;
+            G4cout << "--> Total Initial Energy: " << "\033[1m" << G4BestUnit(totalEnergy, "Energy")        << "\033[22m" << G4endl;
+            G4cout << "--> Energy Deposition in Detector: " << "\033[1m" << G4BestUnit(DetectorEnergyDeposition, "Energy")   
+                                         << " (" << (DetectorEnergyDeposition / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
+            G4cout                                                                                                        << G4endl; 
             G4cout << "--> Total Mass of Sample: " << "\033[1m" << G4BestUnit(totalMass, "Mass")            << "\033[22m" << G4endl;
-            G4cout << "--> Energy Deposition: "    << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << "\033[22m" << G4endl;
-            G4cout << G4endl;
+            G4cout << "--> Energy Deposition: "    << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << " ("
+                                                       << (TotalEnergyDeposit / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
+            G4cout                                                                                                        << G4endl;
             G4cout << "--> Radiation Dose: "       << "\033[1m" << G4BestUnit(radiationDose, "Dose")        << "\033[22m" << G4endl;
 
             totalMass = totalMass / kg;
@@ -245,7 +272,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
             if (masterEnergySpectra.size() == 0) // mono
             {
                 analysisManager -> FillNtupleFColumn(3, 0, primaryEnergy);
-                analysisManager -> FillNtupleIColumn(3, 1, 1);
+                analysisManager -> FillNtupleIColumn(3, 1, numberOfEvents);
                 analysisManager -> AddNtupleRow(3);
             }
             if (masterEnergySpectra.size() > 0) // poly
@@ -286,20 +313,26 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
 
 void RunAction::MergeDataToMaster()
 {
-    if (primaryGenerator) {energyHistogram = primaryGenerator -> GetEnergySpectra();}
+    if (primaryGenerator) 
+    {
+        workerEnergyHistogram = primaryGenerator -> GetEnergySpectra();
     
-    G4MUTEXLOCK(& Mutex_Spectra);
-    for (const auto & entry : energyHistogram) {masterEnergySpectra[entry.first] += entry.second;}
-    G4MUTEXUNLOCK(& Mutex_Spectra);
+        G4MUTEXLOCK(& Mutex_Spectra);
+            for (const auto & entry : workerEnergyHistogram) {masterEnergySpectra[entry.first] += entry.second;}
+        G4MUTEXUNLOCK(& Mutex_Spectra);
+    }
 
     const G4UserSteppingAction * userSteppingAction = G4RunManager::GetRunManager() -> GetUserSteppingAction();
     const SteppingAction * steppingAction = dynamic_cast<const SteppingAction*> (userSteppingAction); 
     
-    if (steppingAction){energyDepositionMap = steppingAction -> GetEnergyDepositionMap();}
+    if (steppingAction)
+    {   
+        workerEnergyDepositionMap = steppingAction -> GetEnergyDepositionMap();
     
-    G4MUTEXLOCK(& Mutex_EDep);
-    for (const auto & entry : energyDepositionMap) {masterEnergyDeposition[entry.first] += entry.second;}
-    G4MUTEXUNLOCK(& Mutex_EDep);
+        G4MUTEXLOCK(& Mutex_EDep);
+            for (const auto & entry : workerEnergyDepositionMap) {masterEnergyDeposition[entry.first] += entry.second;}
+        G4MUTEXUNLOCK(& Mutex_EDep);
+    }   
 }
 
 void RunAction::MergeRootFiles(const std::string & baseName, const std::string & tempDirectory, const std::string & rootDirectory) 

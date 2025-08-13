@@ -32,6 +32,8 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         RealEnergy = InverseCumul(); 
         particleGun -> SetParticleEnergy(RealEnergy);
+        
+        totalEnergy = totalEnergy + RealEnergy;
 
         RealEnergy = RealEnergy / keV;
         
@@ -57,13 +59,13 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     {
         if (detectorConstruction) {thoraxAngle = detectorConstruction -> GetThoraxAngle();} else {thoraxAngle = 0;}
         
-        // if (thoraxAngle < 90)  {gunAngle = thoraxAngle;}
-        // if (thoraxAngle >= 90) {gunAngle = thoraxAngle - 180;}
-        // if (thoraxAngle > 270) {gunAngle = thoraxAngle - 360;}
-        // gunAngle = gunAngle * (2*pi / 360);
-        // x0 = x0 * std::cos(gunAngle/2);
+        if (thoraxAngle < 90)  {gunAngle = thoraxAngle;}
+        if (thoraxAngle >= 90) {gunAngle = thoraxAngle - 180;}
+        if (thoraxAngle > 270) {gunAngle = thoraxAngle - 360;}
+        gunAngle = gunAngle * (2*pi / 360);
+        x0 = x0 * std::cos(gunAngle/2);
 
-        gunAngle = thoraxAngle * (2*pi / 360);
+        // gunAngle = thoraxAngle * (2*pi / 360);
         model_width = 230; 
         model_depth = 150;
         minimum_span = model_depth / model_width;

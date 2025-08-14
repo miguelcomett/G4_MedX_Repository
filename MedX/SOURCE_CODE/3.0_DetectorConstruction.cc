@@ -177,26 +177,9 @@ void DetectorConstruction::ConstructOsteoporoticBone()
         x = r * std::cos(theta);
         y = r * std::sin(theta);
 
-        // outFile << x << " " << y << " " << z << "\n";
-        
-        // read file
-        // while (std::getline(inFile, line)) 
-        // {
-        //     if (currentLine == i) 
-        //     {
-        //         std::istringstream iss(line);
-        //         iss >> x >> y >> z;
-        //         break;
-        //     }
-        // currentLine++;
-        // }
-        // inFile.close();
-
         porePosition = G4ThreeVector(x, y, -z);
         porousBone = new G4SubtractionSolid("PorousBone", porousBone, pore, 0, porePosition);
     }
-
-    // outFile.close();
 
     logicOsteoBone = new G4LogicalVolume(porousBone, Bone, "PorousBoneLogical");
     physBone = new G4PVPlacement(armRotation, samplePosition, logicOsteoBone, "physBone", logicWorld, false, 0);

@@ -1,8 +1,16 @@
-#/run/numberOfThreads 10
+/run/numberOfThreads 1
 /run/initialize
 
 /myDetector/nColumns 1
 /myDetector/nRows 1
 
-/gun/energy 40 keV
-/run/beamOn 10
+#/gun/energy 40 keV
+/Pgun/Mode 1
+
+/Pgun/X 0 mm
+/Pgun/Y 0 mm
+/Pgun/gaussX true
+/Pgun/SpanX 100 mm
+/Pgun/SpanY 100 mm
+
+/run/beamOn 100

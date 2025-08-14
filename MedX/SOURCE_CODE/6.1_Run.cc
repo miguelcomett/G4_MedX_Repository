@@ -98,7 +98,7 @@ void Run::Merge(const G4Run * run)
     link_ParticleDefinition = localRun -> link_ParticleDefinition;
     link_Energy = localRun -> link_Energy;
             
-    std::map<G4String,G4int>::const_iterator it;
+    std::map<G4String, G4int>::const_iterator it;
     for (it  = localRun -> processCounter.begin(); it != localRun -> processCounter.end(); ++it) 
     {
         processName = it -> first;

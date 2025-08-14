@@ -12,11 +12,10 @@
 #include "G4ParticleGun.hh"
 #include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4GeneralParticleSource.hh"
 #include "G4PhysicalConstants.hh"
 #include "G4RunManager.hh"
-
 #include "G4VUserPrimaryGeneratorAction.hh"
+
 #include "3.0_DetectorConstruction.hh"
 #include "6.1_Run.hh"
 #include "5.1_GeneratorMessenger.hh"
@@ -54,7 +53,7 @@ class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
 
         std::map <G4float, G4int> energyHistogram; 
 
-        G4ParticleGun * particleGun;        
+        G4ParticleGun * particleGun;    
         PrimaryGeneratorMessenger * GeneratorMessenger;
 
         const G4VUserDetectorConstruction * userDetectorConstruction = G4RunManager::GetRunManager() -> GetUserDetectorConstruction();

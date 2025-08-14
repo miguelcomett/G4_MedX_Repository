@@ -79,8 +79,8 @@ if(APPLE)
 endif()
 
 # Add executable target and link with Geant4 and ROOT libraries
-add_executable(Sim 1_Main.cc ${sources} ${headers})
-target_link_libraries(Sim ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
+add_executable(MedX 1.0_Main.cc ${sources} ${headers})
+target_link_libraries(MedX ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
 
 # Copy macro (.mac) files to the binary directory
 file(GLOB MACROFILES "${PROJECT_SOURCE_DIR}/Macrofiles/*.mac")
@@ -108,7 +108,7 @@ file(MAKE_DIRECTORY ${ROOT})
 #target_link_libraries(your_target_name Qt5::Widgets)
 
 # Custom target for building the main executable
-add_custom_target(IFI.03.Radiography DEPENDS Sim)
+add_custom_target(IFI.03.Radiography DEPENDS MedX)
 
 # Copy all macro files from MACROFILES directory to the executable directory
 file(GLOB IFI03Radiography-SCRIPTS ${PROJECT_SOURCE_DIR}/Macrofiles/*)

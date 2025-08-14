@@ -22,11 +22,11 @@
 #/vis/geometry/set/colour LogicGrasa -1 1 1 1 0.6
 #/vis/geometry/set/colour LogicSkin -1 1 1 1 0.4
 
-/vis/geometry/set/colour Heart   -1 1 0 0 0.9
-/vis/geometry/set/colour Lungs   -1 1 1 0 0.8
-/vis/geometry/set/colour Ribcage -1 0.4 0.2 0.9 0.58
-/vis/geometry/set/colour Thorax  -1 0.5 0.8 1 0.42
-/vis/geometry/set/colour Filler  -1 1 1 1 0.1
+/vis/geometry/set/colour Heart   -1  1.0  0.0  0.0  0.90
+/vis/geometry/set/colour Lungs   -1  1.0  1.0  0.0  0.80
+/vis/geometry/set/colour Ribcage -1  0.4  0.2  0.9  0.58
+/vis/geometry/set/colour Thorax  -1  0.5  0.8  1.0  0.42
+/vis/geometry/set/colour Filler  -1  1.0  1.0  1.0  0.10
 
 #/vis/geometry/set/visibility Heart 0 false
 #/vis/geometry/set/visibility Lungs 0 false

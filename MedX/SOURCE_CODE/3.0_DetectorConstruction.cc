@@ -41,6 +41,7 @@ DetectorConstruction::DetectorConstruction()
         isBoneDivided = false;
         isHealthyBone = true;
         isOsteoBone = true;
+    
     is3DModel = true;
         isHeart = true;
         isLungs = true;
@@ -230,7 +231,7 @@ void DetectorConstruction::ConstructThorax()
     G4cout << "=============== 3D MODELS ====================================" << G4endl; 
     G4cout << "-> Model Rotation about Z: " << thoraxAngle << "°" << G4endl;
 
-    Heart = stl.Read(modelPath + "HEART3.stl");
+    Heart = stl.Read(modelPath + "HEART.stl");
     if (Heart && isHeart)
     {
         if (isTraquea)
@@ -277,7 +278,7 @@ void DetectorConstruction::ConstructThorax()
         std::exit(EXIT_FAILURE);
     }
 
-    Traquea = stl.Read(modelPath + "thyroid.stl");
+    Traquea = stl.Read(modelPath + "TRAQUEA.stl");
     if (Traquea && isTraquea)
     {
         logicTraquea = new G4LogicalVolume(Traquea, Air, "Traquea");
@@ -296,7 +297,7 @@ void DetectorConstruction::ConstructThorax()
         std::exit(EXIT_FAILURE);
     }
 
-    Lungs = stl.Read(modelPath + "LUNGS1.stl");
+    Lungs = stl.Read(modelPath + "LUNGS.stl");
     if (Lungs && isLungs)
     {
         if (isTumorRandom)
@@ -347,7 +348,7 @@ void DetectorConstruction::ConstructThorax()
         std::exit(EXIT_FAILURE);
     }
 
-    Ribcage = stl.Read(modelPath + "RIBCAGE_Real.stl");
+    Ribcage = stl.Read(modelPath + "RIBCAGE.stl");
     if (Ribcage && isRibcage) 
     {
         logicRibcage = new G4LogicalVolume(Ribcage, Bone, "Ribcage");
@@ -366,8 +367,8 @@ void DetectorConstruction::ConstructThorax()
         std::exit(EXIT_FAILURE);
     }
 
-    Thorax1 = stl.Read(modelPath + "TORAX_Real.stl");
-    Thorax2 = stl.Read(modelPath + "TORAX_Real0.stl");
+    Thorax1 = stl.Read(modelPath + "THORAX_outer.stl");
+    Thorax2 = stl.Read(modelPath + "TORAX_inner.stl");
     if (Thorax1 && Thorax2 && isThorax) 
     {
         if (isTraquea)

@@ -100,7 +100,8 @@ class DetectorConstruction:public G4VUserDetectorConstruction
                           * logicLungs, * logicHeart, * logicThorax, * logicRibcage, * logicFiller, * logicTumor, * logicTraquea,
                           * scoringVolume_0, * scoringVolume_1, * scoringVolume_2, * scoringVolume_3, 
                           * scoringVolume_4, * scoringVolume_5, * scoringVolume_6, * scoringVolume_7, * scoringVolume_8, * logicTumorReal, * ellipsoidLogic;
-        G4VPhysicalVolume * physicalWorld, * physicalRadiator, * physicalDetector, * physBone, * physArm, 
+        
+                          G4VPhysicalVolume * physicalWorld, * physicalRadiator, * physicalDetector, * physBone, * physArm, 
                           * physMuscle, * physGrasa, * physSkin, * physOs, * physHealthy;
                         
         G4ThreeVector samplePosition, DetectorPosition, porePosition, osteo_position, healthy_position, Radiator_Position, 

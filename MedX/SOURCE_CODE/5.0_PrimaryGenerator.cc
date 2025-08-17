@@ -2,23 +2,25 @@
 
 PrimaryGenerator::PrimaryGenerator()
 {
-    particleGun = new G4ParticleGun(1);
+    particleGun = new G4ParticleGun();
     particleTable = G4ParticleTable::GetParticleTable();
     particleName = particleTable -> FindParticle("gamma");
     particleGun -> SetParticleDefinition(particleName);   
-    particleGun -> SetParticleEnergy(0 * eV); 
+    particleGun -> SetParticleEnergy(40 * keV); 
 
     GeneratorMessenger = new PrimaryGeneratorMessenger(this);
 
     SpectraMode = 0;
     Xpos =  000.0 * mm;
-    Ypos =  000.0 * mm;
+    Ypos = -025.0 * mm;
     Zpos = -450.0 * mm;
     
-    SpanX = 100.0 * mm;
-    SpanY = 100.0 * mm;
+    SpanX = 250.0 * mm;
+    SpanY = 270.0 * mm;
 
     GunAngle = 0.0;
+
+    Xcos = false;
     
     threadID = G4Threading::G4GetThreadId();
     if (threadID == 0) {std::cout << std::endl; std::cout << "------------- GUN MESSENGERS -------------" << std::endl;}
@@ -65,7 +67,6 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
         gunAngle = gunAngle * (2*pi / 360);
         x0 = x0 * std::cos(gunAngle/2);
 
-        // gunAngle = thoraxAngle * (2*pi / 360);
         model_width = 230; 
         model_depth = 150;
         minimum_span = model_depth / model_width;
@@ -88,7 +89,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     Theta = AngleInCarts * (G4UniformRand() - 0.5) * 2;
     Phi   = AngleInCarts * (G4UniformRand() - 0.5) * 2;
     
-    photonMomentum = G4ThreeVector(Theta, Phi, 1.0);
+    photonMomentum = G4ThreeVector(Theta, Phi, -1.0);
     particleGun -> SetParticleMomentumDirection(photonMomentum);
 
     particleGun -> GeneratePrimaryVertex(anEvent);

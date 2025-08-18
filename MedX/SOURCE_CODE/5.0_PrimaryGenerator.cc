@@ -89,7 +89,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
     Theta = AngleInCarts * (G4UniformRand() - 0.5) * 2;
     Phi   = AngleInCarts * (G4UniformRand() - 0.5) * 2;
     
-    photonMomentum = G4ThreeVector(Theta, Phi, -1.0);
+    photonMomentum = G4ThreeVector(Theta, Phi, 1.0);
     particleGun -> SetParticleMomentumDirection(photonMomentum);
 
     particleGun -> GeneratePrimaryVertex(anEvent);

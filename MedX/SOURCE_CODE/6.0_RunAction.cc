@@ -1,4 +1,3 @@
-// #include "3.1_DetectorAction.hh"
 #include "6.0_RunAction.hh"
 #include "8.0_SteppingAction.hh"
 

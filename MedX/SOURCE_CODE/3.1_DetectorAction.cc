@@ -30,7 +30,7 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
     
         analysisManager = G4AnalysisManager::Instance();
         
-        if (arguments == 6 || arguments == 2)
+        if (arguments == 1 || arguments == 2)
         {
             analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
             analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);

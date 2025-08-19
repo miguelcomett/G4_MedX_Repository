@@ -11,12 +11,12 @@ PhysicsList::PhysicsList()
 
 PhysicsList::~PhysicsList(){}
 
-void PhysicsList::ConstructParticle() 
-{
-    G4VModularPhysicsList::ConstructParticle();
-}
+// void PhysicsList::ConstructParticle() 
+// {
+//     G4VModularPhysicsList::ConstructParticle();
+// }
 
-void PhysicsList::ConstructProcess() 
-{
-    G4VModularPhysicsList::ConstructProcess();
-}
+// void PhysicsList::ConstructProcess() 
+// {
+//     G4VModularPhysicsList::ConstructProcess();
+// }

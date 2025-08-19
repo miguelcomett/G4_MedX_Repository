@@ -6,14 +6,16 @@ SteppingAction::~SteppingAction() {}
 void SteppingAction::UserSteppingAction(const G4Step * step)
 {   
     // G4String particleName = step -> GetTrack() -> GetDefinition() -> GetParticleName();
+    // G4double energy = step -> GetPreStepPoint() -> GetKineticEnergy();
+
     // if (particleName == "gamma") 
     // {
-    //     G4cout << "Gamma created" << G4endl;
+    //     G4cout << "Gamma created of energy: " << G4BestUnit(energy, "Energy") << G4endl;
     // }
 
     Volume = step -> GetPreStepPoint() -> GetTouchableHandle() -> GetVolume() -> GetLogicalVolume();
 
-    if (arguments == 1 || arguments == 2 || arguments == 3)
+    if (arguments == 1 || arguments == 2 || arguments == 3 || arguments == 4)
     {   
         scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
         std::set <G4LogicalVolume*> scoringSet(scoringVolumes.begin(), scoringVolumes.end());

@@ -18,7 +18,7 @@ G4VPhysicalVolume * DetectorConstruction::Construct()
 {
     // Construct WORLD ########################################################################################################################
 
-    xWorld = 3*m, yWorld = 3*m, zWorld = 3*m;
+    xWorld = yWorld = zWorld = 2*m;
     solidWorld = new G4Box("SolidWorld", xWorld, yWorld, zWorld);
     logicWorld = new G4LogicalVolume(solidWorld, Vacuum, "LogicalWorld");
     physicalWorld = new G4PVPlacement(0, G4ThreeVector(0.0, 0.0, 0.0), logicWorld, "PhysicalWorld", 0, false, 0, true);
@@ -54,9 +54,9 @@ G4VPhysicalVolume * DetectorConstruction::Construct()
 
     if (arguments == 4) 
     {   
-        x_length = 15 * cm;
-        y_length = 15 * cm;
-        targetThickness = 5 * mm;
+        x_length = 4 * cm;
+        y_length = 4 * cm;
+        targetThickness = 1 * mm;
         
         TargetAngle = 13; // degrees
 
@@ -80,12 +80,12 @@ G4VPhysicalVolume * DetectorConstruction::Construct()
             isOsteoBone = true;
     
         is3DModel = true;
+            isThorax = true;
+            isRibcage = true;
             isHeart = true;
             isLungs = true;
                 isTraquea = false;
                 isTumorSTL = false;
-            isRibcage = true;
-            isThorax = true;
  
             isTumorRandom = false;
                 isFixed = false;
@@ -390,7 +390,7 @@ void DetectorConstruction::ConstructThorax()
     }
 
     Thorax_outer_STL = stl.Read(modelPath + "THORAX_outer.stl");
-    Thorax_inner_STL = stl.Read(modelPath + "TORAX_inner.stl");
+    Thorax_inner_STL = stl.Read(modelPath + "THORAX_inner.stl");
     if (Thorax_outer_STL && Thorax_inner_STL && isThorax) 
     {   
         if (isRibcage) {subtractedThorax = new G4SubtractionSolid("ThoraxMinusRibacage", Thorax_inner_STL, Ribcage_STL, originMatrix, samplePosition);}

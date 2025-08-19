@@ -116,7 +116,7 @@ class DetectorConstruction:public G4VUserDetectorConstruction
                     
         G4RotationMatrix * TargetRotation, * armRotation, * Model3DRotation, * originMatrix, * elipsoidRot, * elipsoidRot2; 
 
-        G4Element  * C, * Al, * N, * O, * Ca, * Mg, * V, * Cd, * Te, * W;
+        G4Element  * C, * Al, * N, * O, * Ca, * Mg, * V, * Cd, * Te;
         G4Material * SiO2, * H2O, * Aerogel, * worldMaterial, * Calcium, * Magnesium, * Aluminum, * Air, * Vacuum, * Silicon, * materialTarget, 
                    * CadTel, * vanadiumGlassMix, * amorphousGlass, * Wolframium, * V2O5, 
                    * Adipose, * Skin, * Muscle, * Bone, * OsBone, * compactBone, * TissueMix, * Light_Adipose, * Muscle_Sucrose;

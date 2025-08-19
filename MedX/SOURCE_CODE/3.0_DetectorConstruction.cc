@@ -54,16 +54,21 @@ G4VPhysicalVolume * DetectorConstruction::Construct()
 
     if (arguments == 4) 
     {   
-        x_length = 4 * cm;
-        y_length = 4 * cm;
+        x_length = 120 * cm;
+        y_length = 6 * cm;
         targetThickness = 1 * mm;
         
         TargetAngle = 13; // degrees
 
         ThoraxHalfHeight = (27 + 2.5) * cm;
 
-        y_position = - (ThoraxHalfHeight + (std::cos(TargetAngle * pi/180) * y_length/2));
-        z_position = - (10*cm + (std::tan((90-TargetAngle) * pi/180) * ThoraxHalfHeight) + (std::cos(TargetAngle * pi/180) * y_length * 1.5));
+        // Target position needs to be improved a lot:
+        // y_position = - (ThoraxHalfHeight + (std::cos(TargetAngle * pi/180) * y_length/2));
+        // z_position = - (30*cm + (std::tan((90-TargetAngle) * pi/180) * ThoraxHalfHeight) + (std::cos(TargetAngle * pi/180) * y_length * 1));
+
+        // just and aproximation of a position that kinda works:
+        y_position = - ThoraxHalfHeight;
+        z_position = - 50 * cm;
 
         Radiator_Position = G4ThreeVector(0.0, y_position, z_position);
         materialTarget = Wolframium;
@@ -521,7 +526,6 @@ void DetectorConstruction::DefineMaterials()
     V  = new G4Element("Vanadium",   "V",  23,  50.94*g/mole);
     Cd = new G4Element("Cadmium",    "Cd", 48, 112.41*g/mole);
     Te = new G4Element("Tellurium",  "Te", 52, 127.60*g/mole);
-    W  = new G4Element("Wolframium", "W",  74, 183.84*g/mole);
 
     Calcium = new G4Material("Calcium", 1.55*g/cm3, 1);
     Calcium -> AddElement(nist -> FindOrBuildElement("Ca"), 1);
@@ -534,9 +538,6 @@ void DetectorConstruction::DefineMaterials()
 
     Silicon = new G4Material("Silicon", 2.33*g/cm3, 1);
     Silicon -> AddElement(nist -> FindOrBuildElement("Si"), 1);
-
-    // Wolframium = new G4Material("Wolframium", 19.25*g/cm3, 1);
-    // Wolframium -> AddElement(nist -> FindOrBuildElement("W"), 1);
 
     Wolframium = nist -> FindOrBuildMaterial("G4_W");
 

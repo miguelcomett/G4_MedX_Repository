@@ -45,12 +45,6 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
 
         if (arguments == 3)
         {
-            Decimals = 2;
-            scaleFactor = std::pow(10, Decimals);
-
-            Xpos = std::round(posPhoton[0] * scaleFactor) / scaleFactor;
-            Ypos = std::round(posPhoton[1] * scaleFactor) / scaleFactor;
-
             const DetectorConstruction * detectorConstruction 
             = static_cast<const DetectorConstruction*>(G4RunManager::GetRunManager() -> GetUserDetectorConstruction());
             if (detectorConstruction) {is3DModel = detectorConstruction -> Getis3DModel();}
@@ -69,27 +63,24 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
             // if ( (is3DModel == true) && (posPhoton[0]<230*mm && posPhoton[0]>-230*mm && posPhoton[1]<240*mm && posPhoton[1]>-240*mm) )
             if ( (is3DModel == true) && (posPhoton[0]<x_lim && posPhoton[0]>-x_lim && posPhoton[1]<y_lim && posPhoton[1]>-y_lim) )
             { 
-                analysisManager -> FillNtupleFColumn(0, 0, Xpos);
-                analysisManager -> FillNtupleFColumn(0, 1, Ypos);
+                analysisManager -> FillNtupleFColumn(0, 0, posPhoton[0]);
+                analysisManager -> FillNtupleFColumn(0, 1, posPhoton[1]);
                 analysisManager -> AddNtupleRow(0);
             }
             
             if (is3DModel == false)
             {
-                analysisManager -> FillNtupleFColumn(0, 0, Xpos);
-                analysisManager -> FillNtupleFColumn(0, 1, Ypos);
+                analysisManager -> FillNtupleFColumn(0, 0, posPhoton[0]);
+                analysisManager -> FillNtupleFColumn(0, 1, posPhoton[1]);
                 analysisManager -> AddNtupleRow(0);
             }
         }
 
         if (arguments == 4)
         {
-            analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
-            analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
+            analysisManager -> FillNtupleFColumn(0, 0, posPhoton[0]);
+            analysisManager -> FillNtupleFColumn(0, 1, posPhoton[1]);
             analysisManager -> AddNtupleRow(0);
-
-            analysisManager -> FillNtupleDColumn(1, 0, photonEnergy);
-            analysisManager -> AddNtupleRow(1);
         }
     }
 

@@ -54,7 +54,7 @@ RunAction::RunAction()
         analysisManager -> FinishNtuple(4);
     }
 
-    if (arguments == 3)
+    if (arguments == 3 || arguments == 4)
     {
         analysisManager -> CreateNtuple("Hits", "Hits");
         analysisManager -> CreateNtupleFColumn("x_ax");
@@ -77,18 +77,6 @@ RunAction::RunAction()
         analysisManager -> CreateNtupleFColumn("Energies");
         analysisManager -> CreateNtupleIColumn("Counts");
         analysisManager -> FinishNtuple(3);
-    }
-    
-    if (arguments == 4)
-    {
-        analysisManager -> CreateNtuple("Hits", "Hits");
-        analysisManager -> CreateNtupleDColumn("X");
-        analysisManager -> CreateNtupleDColumn("Y");
-        analysisManager -> FinishNtuple(0);
-        
-        analysisManager -> CreateNtuple("Energy_Dist", "Energy_Dist");
-        analysisManager -> CreateNtupleDColumn("Energies");
-        analysisManager -> FinishNtuple(1);
     }
     
     if (arguments == 5)
@@ -180,117 +168,103 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
     accumulableManager -> Merge();
     MergeDataToMaster();
 
-    if (isMaster) 
+    if (isMaster && (arguments == 1 || arguments == 2 || arguments == 3 || arguments == 4)) 
     { 
-        if (arguments == 1 || arguments == 2 || arguments == 3 || arguments == 4)
-        {   
-            scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
+        scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
-            for (G4LogicalVolume * volume : scoringVolumes) 
+        for (G4LogicalVolume * volume : scoringVolumes) 
+        {
+            if (volume)
             {
-                if (volume)
-                {
-                    sampleMass = volume -> GetMass(); 
-                    totalMass = totalMass + sampleMass;
-                } 
-            }
-            
-            primaryEnergy = currentRun -> GetPrimaryEnergy();
-            numberOfEvents = thisRun -> GetNumberOfEvent();
+                sampleMass = volume -> GetMass(); 
+                totalMass = totalMass + sampleMass;
+            } 
+        }
+        
+        primaryEnergy = currentRun -> GetPrimaryEnergy();
+        numberOfEvents = thisRun -> GetNumberOfEvent();
 
-            TotalEnergyDeposit = EDepSum.GetValue();
-            radiationDose = TotalEnergyDeposit / totalMass;
+        TotalEnergyDeposit = EDepSum.GetValue();
+        radiationDose = TotalEnergyDeposit / totalMass;
 
-            DetectorEnergyDeposition = DetEDep.GetValue();
+        DetectorEnergyDeposition = DetEDep.GetValue();
 
-            if (masterEnergySpectra.size() == 0) // mono
+        if (masterEnergySpectra.size() == 0) // mono
+        {
+            totalEnergy = primaryEnergy * numberOfEvents;
+        }
+        if (masterEnergySpectra.size() > 0) // poly
+        {                
+            for (const auto & entry : masterEnergySpectra) 
             {
-                totalEnergy = primaryEnergy * numberOfEvents;
-            }
-            if (masterEnergySpectra.size() > 0) // poly
-            {                
-                for (const auto & entry : masterEnergySpectra) 
-                {
-                    energies = entry.first;
-                    frequency = entry.second;
-                    
-                    totalEnergy = totalEnergy + (energies * frequency);
-                }
-
-                totalEnergy = totalEnergy * keV;
+                energies = entry.first;
+                frequency = entry.second;
+                
+                totalEnergy = totalEnergy + (energies * frequency);
             }
 
-            G4cout                                                                                                                                                                                          << G4endl; 
-            G4cout << "\033[32m" << "Run Summary:"                                                                                                                                                          << G4endl;
-            G4cout << "--> Total Initial Energy: " << "\033[1m" << G4BestUnit(totalEnergy, "Energy")                                                                                          << "\033[22m" << G4endl;
-            G4cout << "--> Energy Deposition in Detector: " << "\033[1m" << G4BestUnit(DetectorEnergyDeposition, "Energy") << " (" << (DetectorEnergyDeposition / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
-            G4cout                                                                                                                                                                                          << G4endl; 
-            G4cout << "--> Total Mass of Sample: " << "\033[1m" << G4BestUnit(totalMass, "Mass")                                                                                              << "\033[22m" << G4endl;
-            G4cout << "--> Energy Deposition: "    << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << " (" << (TotalEnergyDeposit / totalEnergy * 100) << "%)"                       << "\033[22m" << G4endl;
-            G4cout                                                                                                                                                                                          << G4endl;
-            G4cout << "--> Radiation Dose: "       << "\033[1m" << G4BestUnit(radiationDose, "Dose")                                                                                          << "\033[22m" << G4endl;
-
-            totalMass = totalMass / kg;
-            TotalEnergyDeposit = TotalEnergyDeposit / TeV;
-            radiationDose = radiationDose / microgray;
-            primaryEnergy = primaryEnergy / keV;
+            totalEnergy = totalEnergy * keV;
         }
 
-        if (arguments == 1 || arguments == 2 || arguments == 3)
-        {
-            analysisManager -> FillNtupleDColumn(1, 0, numberOfEvents);
-            analysisManager -> FillNtupleDColumn(1, 1, totalMass);
-            analysisManager -> FillNtupleDColumn(1, 2, TotalEnergyDeposit);
-            analysisManager -> FillNtupleDColumn(1, 3, radiationDose);
-            analysisManager -> AddNtupleRow(1);
-        
-            if (masterEnergyDeposition.size() > 0)
-            {   
-                for (const auto & entry : masterEnergyDeposition) 
-                {
-                    tissueName = entry.first;
-                    tissueEDep = entry.second;
+        G4cout                                                                                                                                                                                          << G4endl; 
+        G4cout << "\033[32m" << "Run Summary:"                                                                                                                                                          << G4endl;
+        G4cout << "--> Total Initial Energy: "          << "\033[1m" << G4BestUnit(totalEnergy, "Energy")                                                                                 << "\033[22m" << G4endl;
+        G4cout << "--> Energy Deposition in Detector: " << "\033[1m" << G4BestUnit(DetectorEnergyDeposition, "Energy") << " (" << (DetectorEnergyDeposition / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
+        G4cout                                                                                                                                                                                          << G4endl; 
+        G4cout << "--> Total Mass of Sample: "          << "\033[1m" << G4BestUnit(totalMass, "Mass")                                                                                     << "\033[22m" << G4endl;
+        G4cout << "--> Energy Deposition: "             << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << " (" << (TotalEnergyDeposit / totalEnergy * 100) << "%)"              << "\033[22m" << G4endl;
+        G4cout                                                                                                                                                                                          << G4endl;
+        G4cout << "--> Radiation Dose: "                << "\033[1m" << G4BestUnit(radiationDose, "Dose")                                                                                 << "\033[22m" << G4endl;
 
-                    for (auto & volume : scoringVolumes) 
-                    {
-                        if (volume -> GetName() == tissueName) {sampleMass = volume -> GetMass(); break;}
-                    }
-
-                    radiationDose = tissueEDep / sampleMass;
-
-                    G4cout 
-                    << "  > [" << std::setw(7) << std::left << tissueName << "] "
-                    << "Mass: " 
-                    << "\033[1m" << std::setw(9) << std::left << std::setprecision(4) << sampleMass/kg << " kg\033[22m"
-                    << ", Energy Deposition: " 
-                    << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(tissueEDep, "Energy") << "\033[22m"
-                    << " === Radiation Dose: " 
-                    << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(radiationDose, "Dose") << "\033[22m" <<
-                    G4endl;
-
-                    analysisManager -> FillNtupleSColumn(2, 0, tissueName); // tissueName.c_str()
-                    analysisManager -> FillNtupleDColumn(2, 1, radiationDose / microgray);
-                    analysisManager -> AddNtupleRow(2);
-                }
-            }
-
-            if (masterEnergySpectra.size() == 0) // mono
+        analysisManager -> FillNtupleDColumn(1, 0, numberOfEvents);
+        analysisManager -> FillNtupleDColumn(1, 1, totalMass / kg);
+        analysisManager -> FillNtupleDColumn(1, 2, TotalEnergyDeposit / TeV);
+        analysisManager -> FillNtupleDColumn(1, 3, radiationDose / microgray);
+        analysisManager -> AddNtupleRow(1);
+    
+        if (masterEnergyDeposition.size() > 0)
+        {   
+            for (const auto & entry : masterEnergyDeposition) 
             {
-                analysisManager -> FillNtupleFColumn(3, 0, primaryEnergy);
-                analysisManager -> FillNtupleIColumn(3, 1, numberOfEvents);
-                analysisManager -> AddNtupleRow(3);
-            }
-            if (masterEnergySpectra.size() > 0) // poly
-            {                
-                for (const auto & entry : masterEnergySpectra) 
-                {
-                    energies = entry.first;
-                    frequency = entry.second;
+                tissueName = entry.first;
+                tissueEDep = entry.second;
 
-                    analysisManager -> FillNtupleFColumn(3, 0, energies);
-                    analysisManager -> FillNtupleIColumn(3, 1, frequency);
-                    analysisManager -> AddNtupleRow(3);
+                for (auto & volume : scoringVolumes) 
+                {
+                    if (volume -> GetName() == tissueName) {sampleMass = volume -> GetMass(); break;}
                 }
+
+                radiationDose = tissueEDep / sampleMass;
+
+                G4cout 
+                << "  > [" << std::setw(12) << std::left << tissueName << "] "
+                << "Mass: "                << "\033[1m" << std::setw(5) << std::left << std::setprecision(4) << sampleMass/kg << " kg, "          << "\033[22m"
+                << "Energy Dep.: "         << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(tissueEDep, "Energy")  << "\033[22m"
+                << " === Rad. Dose: "      << "\033[1m" << std::setw(6) << std::left << std::setprecision(5) << G4BestUnit(radiationDose, "Dose") << "\033[22m" 
+                << G4endl;
+
+                analysisManager -> FillNtupleSColumn(2, 0, tissueName);
+                analysisManager -> FillNtupleDColumn(2, 1, radiationDose / microgray);
+                analysisManager -> AddNtupleRow(2);
+            }
+        }
+
+        if (masterEnergySpectra.size() == 0) // mono
+        {
+            analysisManager -> FillNtupleFColumn(3, 0, primaryEnergy / keV);
+            analysisManager -> FillNtupleIColumn(3, 1, numberOfEvents);
+            analysisManager -> AddNtupleRow(3);
+        }
+        if (masterEnergySpectra.size() > 0) // poly
+        {                
+            for (const auto & entry : masterEnergySpectra) 
+            {
+                energies = entry.first;
+                frequency = entry.second;
+
+                analysisManager -> FillNtupleFColumn(3, 0, energies);
+                analysisManager -> FillNtupleIColumn(3, 1, frequency);
+                analysisManager -> AddNtupleRow(3);
             }
         }
 

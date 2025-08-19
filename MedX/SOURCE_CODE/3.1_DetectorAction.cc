@@ -7,16 +7,15 @@ SensitiveDetector::~SensitiveDetector(){}
 G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory * ROhist)
 {
     particleTrack = currentStep -> GetTrack();
-    particleTrack -> SetTrackStatus(fStopAndKill);
-
     preStepPoint  = currentStep -> GetPreStepPoint();
     
     particleName = particleTrack -> GetDefinition() -> GetParticleName();
     photonEnergy = preStepPoint -> GetKineticEnergy();
     photonEnergy_keV = photonEnergy / keV;
-
+    
     if (particleName == "gamma" && photonEnergy_keV >= 1.0)
     {   
+        particleTrack -> SetTrackStatus(fStopAndKill);
         posPhoton = preStepPoint -> GetPosition();
         
         const RunAction * constRunAction = dynamic_cast <const RunAction*> (userRunAction);
@@ -31,7 +30,7 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
     
         analysisManager = G4AnalysisManager::Instance();
         
-        if (arguments == 1 || arguments == 2)
+        if (arguments == 6 || arguments == 2)
         {
             analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
             analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
@@ -44,13 +43,7 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
             analysisManager -> AddNtupleRow(4);
         }
 
-        if (arguments == 4)
-        {
-            analysisManager -> FillNtupleDColumn(0, 0, Energy);
-            analysisManager -> AddNtupleRow(0);
-        }
-
-        if (arguments == 5)
+        if (arguments == 3)
         {
             Decimals = 2;
             scaleFactor = std::pow(10, Decimals);
@@ -88,14 +81,17 @@ G4bool SensitiveDetector::ProcessHits(G4Step * currentStep, G4TouchableHistory *
                 analysisManager -> AddNtupleRow(0);
             }
         }
+
+        if (arguments == 4)
+        {
+            analysisManager -> FillNtupleDColumn(0, 0, posPhoton[0]);
+            analysisManager -> FillNtupleDColumn(0, 1, posPhoton[1]);
+            analysisManager -> AddNtupleRow(0);
+
+            analysisManager -> FillNtupleDColumn(1, 0, photonEnergy);
+            analysisManager -> AddNtupleRow(1);
+        }
     }
 
     return true;
 }
-
-
-// postStepPoint = currentStep -> GetPostStepPoint();
-// momPhoton = preStepPoint -> GetMomentum();
-// Energy = preStepPoint -> GetKineticEnergy() / keV;
-// copyNo = touchable -> GetCopyNumber();
-// Event = G4RunManager::GetRunManager() -> GetCurrentEvent() -> GetEventID();

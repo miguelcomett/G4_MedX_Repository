@@ -4,24 +4,34 @@ PrimaryGenerator::PrimaryGenerator()
 {
     particleGun = new G4ParticleGun();
     particleTable = G4ParticleTable::GetParticleTable();
-    particleName = particleTable -> FindParticle("gamma");
-    particleGun -> SetParticleDefinition(particleName);   
-    particleGun -> SetParticleEnergy(40 * keV); 
+    
+    if (arguments == 1 || arguments == 2 || arguments == 3 || arguments == 5)
+    {
+        particleName = particleTable -> FindParticle("gamma");
+        particleGun -> SetParticleDefinition(particleName);   
+        particleGun -> SetParticleEnergy(40 * keV); 
+        
+        Xpos =  000.0 * mm;
+        Ypos = -025.0 * mm;
+        Zpos = -450.0 * mm;
+        
+        SpanX = 250.0 * mm;
+        SpanY = 270.0 * mm;
+    }
 
-    GeneratorMessenger = new PrimaryGeneratorMessenger(this);
-
+    if (arguments == 4)
+    {
+        particleName = particleTable -> FindParticle("e-");
+        particleGun -> SetParticleDefinition(particleName);   
+        particleGun -> SetParticleEnergy(100 * keV); 
+    }
+    
     SpectraMode = 0;
-    Xpos =  000.0 * mm;
-    Ypos = -025.0 * mm;
-    Zpos = -450.0 * mm;
-    
-    SpanX = 250.0 * mm;
-    SpanY = 270.0 * mm;
-
     GunAngle = 0.0;
-
     Xcos = false;
+    Xgauss = false;
     
+    GeneratorMessenger = new PrimaryGeneratorMessenger(this);
     threadID = G4Threading::G4GetThreadId();
     if (threadID == 0) {std::cout << std::endl; std::cout << "------------- GUN MESSENGERS -------------" << std::endl;}
 }
@@ -72,6 +82,24 @@ void PrimaryGenerator::GeneratePrimaries(G4Event * anEvent)
         minimum_span = model_depth / model_width;
         minimum_span = minimum_span * 1.15; // padding for safety
         x0 = x0 * ( (std::cos(gunAngle) * std::cos(gunAngle)) * (1-minimum_span) + minimum_span);
+    }
+
+    if (arguments == 4)
+    {
+        if (detectorConstruction) {TargetParameters = detectorConstruction -> GetTargetParameters();}
+
+        x_length    = TargetParameters[0];
+        y_length    = TargetParameters[1];
+        y_position  = TargetParameters[2];
+        z_position  = TargetParameters[3];
+        TargetAngle = TargetParameters[4];
+
+        Xpos = 000.0 * mm;
+        Ypos = y_position;
+        Zpos = z_position - 20*cm;
+        
+        SpanX = x_length/2;
+        SpanY = std::sin(TargetAngle * pi/180) * y_length/2;
     }
 
     x0 = x0 + Xpos; 

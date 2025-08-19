@@ -20,6 +20,8 @@
 #include "6.1_Run.hh"
 #include "5.1_GeneratorMessenger.hh"
 
+extern int arguments;
+
 class PrimaryGeneratorMessenger;
 
 class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
@@ -69,10 +71,11 @@ class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
         const G4double pi = 3.14159265358979323846;
         G4double x0, y0, z0, model_width, model_depth, minimum_span, thoraxAngle, gunAngle, Theta, Phi, AngleInCarts, Xpos, Ypos, Zpos, 
                 SpanX, SpanY, GunAngle, random, peak, min, max,
-                Y_max, X_random, Y_random, Alfa, Beta, Gamma, Delta, energy, intensity, totalEnergy;
+                Y_max, X_random, Y_random, Alfa, Beta, Gamma, Delta, energy, intensity, totalEnergy,
+                x_length, y_length, y_position, z_position, TargetAngle;
 
         G4ThreeVector photonPosition, photonMomentum;
-        std::vector<G4double> EnergyVector, IntensityVector, X_vector, Y_vector, Slopes_vector, Y_Cumulative;
+        std::vector<G4double> EnergyVector, IntensityVector, X_vector, Y_vector, Slopes_vector, Y_Cumulative, TargetParameters;
 };
 
 #endif

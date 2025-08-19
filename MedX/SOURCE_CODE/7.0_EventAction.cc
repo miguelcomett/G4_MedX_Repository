@@ -3,7 +3,7 @@
 EventAction::EventAction(){}
 EventAction::~EventAction(){}
 
-void EventAction::BeginOfEventAction(const G4Event * event) {EDepEvent = 0.0;}
+void EventAction::BeginOfEventAction(const G4Event * event) {}
 void EventAction::EndOfEventAction(const G4Event * event) 
 { 
     totalEvents = G4RunManager::GetRunManager() -> GetNumberOfEventsToBeProcessed();

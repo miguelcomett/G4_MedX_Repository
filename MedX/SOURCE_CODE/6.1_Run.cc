@@ -15,7 +15,7 @@ G4String Run::GetPrimaryParticleName() const {return link_ParticleDefinition ? l
 
 void Run::CountProcesses(G4String processName) 
 {
-    if (arguments == 3)
+    if (arguments == 5)
     {
         std::map <G4String, G4int> ::iterator it = processCounter.find(processName);
         if ( it == processCounter.end()) {processCounter[processName] = 1;} else {processCounter[processName]++;}
@@ -24,7 +24,7 @@ void Run::CountProcesses(G4String processName)
 
 void Run::EndOfRun()
 {
-    if (arguments == 3)
+    if (arguments == 5)
     {
         detectorConstruction = static_cast < const DetectorConstruction *> (G4RunManager::GetRunManager() -> GetUserDetectorConstruction());     
         

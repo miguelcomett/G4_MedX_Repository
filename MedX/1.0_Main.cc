@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     #ifdef __APPLE__
         G4RunManager * runManager;
         if (argc == 1) {runManager = new G4RunManager();} 
-        else {runManager = new G4MTRunManager();}
+        else           {runManager = new G4MTRunManager();}
     #endif
     #ifdef _WIN32
         auto * runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Default);

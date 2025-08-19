@@ -17,13 +17,12 @@ extern int arguments;
 class PhysicsList : public G4VModularPhysicsList
 {
     public:
+        
         PhysicsList();
         ~PhysicsList();   
+
+        virtual void ConstructParticle() override;
+		virtual void ConstructProcess() override;
 };
 
 #endif
-
-
-// in detector construction:
-// stepLimit = new G4UserLimits(1e-3 * mm);
-// logicHeart -> SetUserLimits(stepLimit);

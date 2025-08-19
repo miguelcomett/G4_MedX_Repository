@@ -26,7 +26,6 @@ class EventAction : public G4UserEventAction
     private:
         
         G4int totalEvents, eventID;
-        G4double EDepEvent;
 
         std::chrono::system_clock::time_point nowTime1;
         std::time_t nowTime2;

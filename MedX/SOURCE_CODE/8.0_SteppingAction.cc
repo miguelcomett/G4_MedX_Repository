@@ -4,16 +4,16 @@ SteppingAction::SteppingAction() {}
 SteppingAction::~SteppingAction() {}
 
 void SteppingAction::UserSteppingAction(const G4Step * step)
-{
-    track = step -> GetTrack();
-    position = track -> GetPosition();
-    worldMaxX =  500.1*mm; worldMinX = -500.1*mm; worldMaxY = 500.1*mm; worldMinY = -500.1*mm; worldMaxZ = 500.1*mm; worldMinZ = -500.1*mm;
-    if (position.x() < worldMinX || position.x() > worldMaxX || position.y() < worldMinY || position.y() > worldMaxY || position.z() < worldMinZ || position.z() > worldMaxZ)  
-    {track -> SetTrackStatus(fStopAndKill); G4cout << " ERROR: Particle outside world bounds!!!" << G4endl;}
+{   
+    // G4String particleName = step -> GetTrack() -> GetDefinition() -> GetParticleName();
+    // if (particleName == "gamma") 
+    // {
+    //     G4cout << "Gamma created" << G4endl;
+    // }
 
     Volume = step -> GetPreStepPoint() -> GetTouchableHandle() -> GetVolume() -> GetLogicalVolume();
 
-    if (arguments == 1 || arguments == 2 || arguments == 5)
+    if (arguments == 1 || arguments == 2 || arguments == 3)
     {   
         scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
         std::set <G4LogicalVolume*> scoringSet(scoringVolumes.begin(), scoringVolumes.end());
@@ -59,7 +59,7 @@ void SteppingAction::UserSteppingAction(const G4Step * step)
         }
     }
 
-    if (arguments == 3) 
+    if (arguments == 5) 
     {
         scoringVolume = detectorConstruction -> GetScoringVolume();
 

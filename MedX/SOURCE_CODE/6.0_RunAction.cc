@@ -56,22 +56,6 @@ RunAction::RunAction()
 
     if (arguments == 3)
     {
-        analysisManager -> CreateNtuple("Transportation", "Transportation");
-        analysisManager -> CreateNtupleDColumn("Mass_Attenuation");
-        analysisManager -> CreateNtupleDColumn("Energy_keV");
-        analysisManager -> CreateNtupleDColumn("Ratio");
-        analysisManager -> FinishNtuple(0);
-    }
-
-    if (arguments == 4)
-    {
-        analysisManager -> CreateNtuple("Energy_Dist", "Energy_Dist");
-        analysisManager -> CreateNtupleDColumn("Energies");
-        analysisManager -> FinishNtuple(0);
-    }
-
-    if (arguments == 5)
-    {
         analysisManager -> CreateNtuple("Hits", "Hits");
         analysisManager -> CreateNtupleFColumn("x_ax");
         analysisManager -> CreateNtupleFColumn("y_ax");
@@ -93,6 +77,27 @@ RunAction::RunAction()
         analysisManager -> CreateNtupleFColumn("Energies");
         analysisManager -> CreateNtupleIColumn("Counts");
         analysisManager -> FinishNtuple(3);
+    }
+    
+    if (arguments == 4)
+    {
+        analysisManager -> CreateNtuple("Hits", "Hits");
+        analysisManager -> CreateNtupleDColumn("X");
+        analysisManager -> CreateNtupleDColumn("Y");
+        analysisManager -> FinishNtuple(0);
+        
+        analysisManager -> CreateNtuple("Energy_Dist", "Energy_Dist");
+        analysisManager -> CreateNtupleDColumn("Energies");
+        analysisManager -> FinishNtuple(1);
+    }
+    
+    if (arguments == 5)
+    {
+        analysisManager -> CreateNtuple("Transportation", "Transportation");
+        analysisManager -> CreateNtupleDColumn("Mass_Attenuation");
+        analysisManager -> CreateNtupleDColumn("Energy_keV");
+        analysisManager -> CreateNtupleDColumn("Ratio");
+        analysisManager -> FinishNtuple(0);
     }
 }
 
@@ -119,10 +124,10 @@ void RunAction::BeginOfRunAction(const G4Run * thisRun)
     if (!std::filesystem::exists(rootDirectory)) {std::filesystem::create_directory(rootDirectory);}
 
     if (arguments == 1) {baseName = "/Sim";}
-    if (arguments == 2) {baseName = "/Sim";}
-    if (arguments == 3) {baseName = "/AttCoeff";}
-    if (arguments == 4) {baseName = "/Xray";}
-    if (arguments == 5) {baseName = "/CT";}
+    if (arguments == 2) {baseName = "/Rad";}
+    if (arguments == 3) {baseName = "/CT";}
+    if (arguments == 4) {baseName = "/ElectronGun";}
+    if (arguments == 5) {baseName = "/AttCoeff";}
 
     runID = thisRun -> GetRunID();
     fileName = baseName + std::to_string(runID);
@@ -177,7 +182,7 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
 
     if (isMaster) 
     { 
-        if (arguments == 1 || arguments == 2 || arguments == 5)
+        if (arguments == 1 || arguments == 2 || arguments == 3 || arguments == 4)
         {   
             scoringVolumes = detectorConstruction -> GetAllScoringVolumes();
 
@@ -215,29 +220,30 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                 totalEnergy = totalEnergy * keV;
             }
 
-            G4cout                                                                                                        << G4endl; 
-            G4cout << "\033[32m" << "Run Summary:"                                                                        << G4endl;
-            G4cout << "--> Total Initial Energy: " << "\033[1m" << G4BestUnit(totalEnergy, "Energy")        << "\033[22m" << G4endl;
-            G4cout << "--> Energy Deposition in Detector: " << "\033[1m" << G4BestUnit(DetectorEnergyDeposition, "Energy")   
-                                         << " (" << (DetectorEnergyDeposition / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
-            G4cout                                                                                                        << G4endl; 
-            G4cout << "--> Total Mass of Sample: " << "\033[1m" << G4BestUnit(totalMass, "Mass")            << "\033[22m" << G4endl;
-            G4cout << "--> Energy Deposition: "    << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << " ("
-                                                       << (TotalEnergyDeposit / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
-            G4cout                                                                                                        << G4endl;
-            G4cout << "--> Radiation Dose: "       << "\033[1m" << G4BestUnit(radiationDose, "Dose")        << "\033[22m" << G4endl;
+            G4cout                                                                                                                                                                                          << G4endl; 
+            G4cout << "\033[32m" << "Run Summary:"                                                                                                                                                          << G4endl;
+            G4cout << "--> Total Initial Energy: " << "\033[1m" << G4BestUnit(totalEnergy, "Energy")                                                                                          << "\033[22m" << G4endl;
+            G4cout << "--> Energy Deposition in Detector: " << "\033[1m" << G4BestUnit(DetectorEnergyDeposition, "Energy") << " (" << (DetectorEnergyDeposition / totalEnergy * 100) << "%)"  << "\033[22m" << G4endl;
+            G4cout                                                                                                                                                                                          << G4endl; 
+            G4cout << "--> Total Mass of Sample: " << "\033[1m" << G4BestUnit(totalMass, "Mass")                                                                                              << "\033[22m" << G4endl;
+            G4cout << "--> Energy Deposition: "    << "\033[1m" << G4BestUnit(TotalEnergyDeposit, "Energy") << " (" << (TotalEnergyDeposit / totalEnergy * 100) << "%)"                       << "\033[22m" << G4endl;
+            G4cout                                                                                                                                                                                          << G4endl;
+            G4cout << "--> Radiation Dose: "       << "\033[1m" << G4BestUnit(radiationDose, "Dose")                                                                                          << "\033[22m" << G4endl;
 
             totalMass = totalMass / kg;
             TotalEnergyDeposit = TotalEnergyDeposit / TeV;
             radiationDose = radiationDose / microgray;
             primaryEnergy = primaryEnergy / keV;
+        }
 
+        if (arguments == 1 || arguments == 2 || arguments == 3)
+        {
             analysisManager -> FillNtupleDColumn(1, 0, numberOfEvents);
             analysisManager -> FillNtupleDColumn(1, 1, totalMass);
             analysisManager -> FillNtupleDColumn(1, 2, TotalEnergyDeposit);
             analysisManager -> FillNtupleDColumn(1, 3, radiationDose);
             analysisManager -> AddNtupleRow(1);
-            
+        
             if (masterEnergyDeposition.size() > 0)
             {   
                 for (const auto & entry : masterEnergyDeposition) 
@@ -286,28 +292,28 @@ void RunAction::EndOfRunAction(const G4Run * thisRun)
                     analysisManager -> AddNtupleRow(3);
                 }
             }
-
-            simulationEndTime = std::chrono::system_clock::now();
-            now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
-            now_tm_1 = std::localtime(&now_end);
-            
-            auto duration = std::chrono::duration_cast <std::chrono::seconds> (simulationEndTime - simulationStartTime);
-            durationInSeconds = duration.count() * second;
-
-            G4cout << G4endl;
-            G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
-            G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
-            G4cout << "========================================== \033[0m" << G4endl;
-            G4cout << G4endl;
         }
+
+        simulationEndTime = std::chrono::system_clock::now();
+        now_end = std::chrono::system_clock::to_time_t(simulationEndTime);
+        now_tm_1 = std::localtime(&now_end);
         
+        auto duration = std::chrono::duration_cast <std::chrono::seconds> (simulationEndTime - simulationStartTime);
+        durationInSeconds = duration.count() * second;
+
+        G4cout << G4endl;
+        G4cout << "Ending time: " << std::put_time(now_tm_1, "%H:%M:%S") << "   Date: " << std::put_time(now_tm_1, "%d-%m-%Y") << G4endl;
+        G4cout << "Total simulation time: " << G4BestUnit(durationInSeconds, "Time") << G4endl;
+        G4cout << "========================================== \033[0m" << G4endl;
+        G4cout << G4endl;
+
         customRun -> EndOfRun();
     }
 
     analysisManager -> Write();
     analysisManager -> CloseFile();
     
-    if (isMaster && arguments > 1) {MergeRootFiles(baseName, tempDirectory, rootDirectory);}
+    if (isMaster && arguments != 1) {MergeRootFiles(baseName, tempDirectory, rootDirectory);}
 }
 
 void RunAction::MergeDataToMaster()

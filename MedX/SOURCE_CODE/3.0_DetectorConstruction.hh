@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <random>
+#include <cmath>
 
 #include "G4SystemOfUnits.hh"
 #include "G4VPhysicalVolume.hh"
@@ -16,6 +17,7 @@
 #include "G4LogicalVolume.hh"
 #include "G4GenericMessenger.hh"
 #include "G4UnionSolid.hh"
+#include "G4VisAttributes.hh"
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4Material.hh"
 #include "G4Tubs.hh"
@@ -31,6 +33,7 @@
 #include "G4UserLimits.hh"
 #include "G4GeometryManager.hh"
 #include "G4GeometryTolerance.hh"
+#include "G4UnitsTable.hh"   
 
 #include "3.1_DetectorAction.hh"
 #include "3.2_Geometry3D.hh"
@@ -49,7 +52,7 @@ class DetectorConstruction:public G4VUserDetectorConstruction
         void ConstructSDandField() override;
         G4VPhysicalVolume * Construct() override;
 
-        G4LogicalVolume * GetScoringVolume() const {return scoringVolume_0;}
+        G4LogicalVolume * GetScoringVolume() const {return logicRadiator;}
 
         std::vector<G4LogicalVolume*> scoringVolumes;
         std::vector<G4LogicalVolume*> GetAllScoringVolumes() const {return scoringVolumes;}
@@ -59,10 +62,12 @@ class DetectorConstruction:public G4VUserDetectorConstruction
         G4double GetThoraxAngle() const {return thoraxAngle;}
 
         G4bool  isArm, isHealthyBone, isOsteoBone, isBoneDivided, 
-                is3DModel, isHeart, isLungs, isRibcage, isFiller, isThorax, isTumorReal, isTraquea,
+                is3DModel, isHeart, isLungs, isRibcage, isThorax, isTumorSTL, isTraquea,
                 checkOverlaps, isTumorRandom, isTestParametrization, isFixed, isDebug;
 
         G4bool Getis3DModel() const {return is3DModel;}
+
+        std::vector<G4double> GetTargetParameters() const {return {x_length, y_length, y_position, z_position, TargetAngle};}
     
     private:
 
@@ -80,11 +85,14 @@ class DetectorConstruction:public G4VUserDetectorConstruction
         G4GenericMessenger * DetectorMessenger;
 
         std::string currentPath, modelPath;
+        
+        const G4double pi = 3.14159265358979323846;
 
         G4int DetectorColumnsCount, DetectorRowsCount, numPores, numTumores;
         
         G4double innerBoneRadius, outerBoneRadius, boneHeight, poreRadius, xWorld, yWorld, zWorld, 
-                 regionMinZ, regionMaxZ, regionMinRadius, regionMaxRadius, r, theta, z, x, y,
+                 regionMinZ, regionMaxZ, regionMinRadius, regionMaxRadius, r, theta, z, x, y, 
+                 x_length, y_length, y_position, z_position, TargetAngle, ThoraxHalfHeight,
                  innerMuscleRadius, outerMuscleRadius, innerGrasaRadius, outerGrasaRadius, innerSkinRadius, outerSkinRadius,
                  fractionMass_VO2, fractionMass_SiO2, fTargetAngle, thoraxAngle, targetThickness, 
                  tumorRadius, a, b, c, angleX, angleY, angleZ, verify, randomNum, aRight, bRight, cRight, aLeft, bLeft, cLeft;
@@ -97,30 +105,29 @@ class DetectorConstruction:public G4VUserDetectorConstruction
 
         G4LogicalVolume   * logicWorld, * logicRadiator, * logicDetector, * logicHealthyBone, * logicOsteoBone, * logicMuscle, 
                           * logicGrasa, * logicSkin, * logicOs, * logicHealthy, 
-                          * logicLungs, * logicHeart, * logicThorax, * logicRibcage, * logicFiller, * logicTumor, * logicTraquea,
-                          * scoringVolume_0, * scoringVolume_1, * scoringVolume_2, * scoringVolume_3, 
-                          * scoringVolume_4, * scoringVolume_5, * scoringVolume_6, * scoringVolume_7, * scoringVolume_8, * logicTumorReal, * ellipsoidLogic;
+                          * logicLungs, * logicHeart, * logic_Thorax_inner, * logic_Thorax_outer, * logicRibcage, * logicFiller, * logicTumor, * logicTraquea,
+                          * logicTumorReal, * ellipsoidLogic;
         
-                          G4VPhysicalVolume * physicalWorld, * physicalRadiator, * physicalDetector, * physBone, * physArm, 
+        G4VPhysicalVolume * physicalWorld, * physicalRadiator, * physicalDetector, * physBone, * physArm, 
                           * physMuscle, * physGrasa, * physSkin, * physOs, * physHealthy;
                         
         G4ThreeVector samplePosition, DetectorPosition, porePosition, osteo_position, healthy_position, Radiator_Position, 
                       tumorPosition, correctedTumorPosition, selectedCenter, ellipsoidPosition1, ellipsoidPosition2, leftEllipsoidCenter, rightEllipsoidCenter;
                     
-        G4RotationMatrix * armRotation, * Model3DRotation, * originMatrix, * elipsoidRot, * elipsoidRot2; 
+        G4RotationMatrix * TargetRotation, * armRotation, * Model3DRotation, * originMatrix, * elipsoidRot, * elipsoidRot2; 
 
         G4Element  * C, * Al, * N, * O, * Ca, * Mg, * V, * Cd, * Te, * W;
-        G4Material * SiO2, * H2O, * Aerogel, * worldMaterial, * Calcium, * Magnesium, * Aluminum, * Air, * Silicon, * materialTarget, 
+        G4Material * SiO2, * H2O, * Aerogel, * worldMaterial, * Calcium, * Magnesium, * Aluminum, * Air, * Vacuum, * Silicon, * materialTarget, 
                    * CadTel, * vanadiumGlassMix, * amorphousGlass, * Wolframium, * V2O5, 
                    * Adipose, * Skin, * Muscle, * Bone, * OsBone, * compactBone, * TissueMix, * Light_Adipose, * Muscle_Sucrose;
         
+        G4VisAttributes * RadiatorAttributes;
+        
         STLGeometryReader * stlReader;
-        G4TessellatedSolid * Ribcage, * Lungs, * Heart, * TumorReal, * Traquea, * Tumor;
-        G4VSolid * Thorax1, * Thorax2, * AccumulatedLungs;
-        G4SubtractionSolid * subtractedLungs_1, * subtractedLungs_2, 
-                           * subtractedThorax_1, * subtractedThorax_2, * subtractedThorax_3,
-                           * subtractedFiller_1, * subtractedFiller_2, * subtractedFiller_3, 
-                           * subtractedFiller_4, * subtractedHeart_1;
+        
+        G4TessellatedSolid * Ribcage_STL, * Lungs_STL, * Heart_STL, * Tumor_STL, * Traquea_STL, * Thorax_outer_STL, * Thorax_inner_STL;
+        
+        G4SubtractionSolid * subtractedLungs, * subtractedThorax, * Thorax_outer, * subtractedHeart;
 
         //Distribuciones
         std::random_device rd;
